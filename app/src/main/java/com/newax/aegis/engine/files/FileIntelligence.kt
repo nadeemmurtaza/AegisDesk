@@ -6,6 +6,10 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 
+/**
+ * Facade: tries the multi-index FileQueryPlanner first (indexed DB), falls back to
+ * live MediaStore query for cold-start or unindexed files.
+ */
 object FileIntelligence {
 
     private val FILE_PROJECTION = arrayOf(
@@ -90,6 +94,17 @@ object FileIntelligence {
     fun buildSendIntent(file: FileRecord, targetPackage: String? = null): Intent =
         buildShareIntent(file, targetPackage)
 
+    fun buildSendIntent(fo: com.newax.aegis.db.entity.FileObject, targetPackage: String? = null): Intent {
+        val uri = android.net.Uri.parse("file://${fo.path}")
+        val i = Intent(Intent.ACTION_SEND).apply {
+            type = fo.mimeType.ifBlank { "*/*" }
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (targetPackage != null) setPackage(targetPackage)
+        }
+        return i
+    }
+
     // ── URI info ──────────────────────────────────────────────────────────────
 
     fun infoFromUri(context: Context, uri: Uri): FileRecord? {
@@ -142,12 +157,70 @@ object FileIntelligence {
         return results
     }
 
+    // ── Multi-index layer (DB-backed) ─────────────────────────────────────────
+
+    fun findBestIndexed(
+        context: Context,
+        db: com.newax.aegis.db.AegisDatabase,
+        query: String,
+        limit: Int = 8
+    ): List<FileRecord> {
+        val dbResults = FileQueryPlanner.execute(FileQueryPlanner.plan(query), db, context, limit)
+        if (dbResults.isNotEmpty()) return dbResults.map { fo ->
+            FileRecord(
+                uri = android.net.Uri.parse("file://${fo.path}"),
+                name = fo.filename,
+                mimeType = fo.mimeType,
+                sizeBytes = fo.sizeBytes,
+                lastModifiedMs = fo.modifiedMs,
+                relativePath = fo.folder
+            )
+        }
+        return findBest(context, query, limit)
+    }
+
+    fun recentIndexed(
+        context: Context,
+        db: com.newax.aegis.db.AegisDatabase,
+        limit: Int = 20
+    ): List<FileRecord> {
+        val dbResults = db.fileDao().recentUniqueFiles(limit)
+        if (dbResults.isNotEmpty()) return dbResults.map { fo ->
+            FileRecord(
+                uri = android.net.Uri.parse("file://${fo.path}"),
+                name = fo.filename,
+                mimeType = fo.mimeType,
+                sizeBytes = fo.sizeBytes,
+                lastModifiedMs = fo.modifiedMs,
+                relativePath = fo.folder
+            )
+        }
+        return recentFiles(context, limit)
+    }
+
     // ── Describe for LLM / response text ─────────────────────────────────────
 
     fun describeResults(files: List<FileRecord>): String {
         if (files.isEmpty()) return "No files found."
         return files.joinToString("\n") { f ->
             "• ${f.name} (${f.humanSize}, ${java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(java.util.Date(f.lastModifiedMs))})"
+        }
+    }
+
+    fun describeFileObjects(files: List<com.newax.aegis.db.entity.FileObject>): String {
+        if (files.isEmpty()) return "No files found."
+        return files.joinToString("\n") { fo ->
+            val size = when {
+                fo.sizeBytes > 1_048_576 -> "${"%.1f".format(fo.sizeBytes / 1_048_576.0)} MB"
+                fo.sizeBytes > 1024 -> "${fo.sizeBytes / 1024} KB"
+                else -> "${fo.sizeBytes} B"
+            }
+            val date = java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault())
+                .format(java.util.Date(fo.modifiedMs))
+            val extras = buildString {
+                if (fo.entitiesJson.isNotBlank() && fo.entitiesJson != "[]") append(" [${fo.entitiesJson.take(40)}]")
+            }
+            "• ${fo.filename} ($size, $date)$extras"
         }
     }
 }

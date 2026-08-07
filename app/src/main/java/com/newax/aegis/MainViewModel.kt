@@ -32,7 +32,9 @@ import com.newax.aegis.engine.learning.ScanProgress
 import com.newax.aegis.engine.apps.AppCapability
 import com.newax.aegis.engine.apps.AppIntelligence
 import com.newax.aegis.engine.apps.AppScanner
+import com.newax.aegis.engine.files.FileIndexer
 import com.newax.aegis.engine.files.FileIntelligence
+import com.newax.aegis.engine.files.WorldRegistry
 import com.newax.aegis.engine.person.PersonRegistry
 import com.newax.aegis.engine.planner.CandidateMerger
 import com.newax.aegis.engine.procedure.ProcedureExecutor
@@ -147,6 +149,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             db.personRegistryDao().hotPersons(50).forEach { snap ->
                 PersonRegistry.refreshSnapshotCommitmentCount(db, snap.personEntityId)
             }
+        }
+        FileIndexer.registerOpportunisticTasks(application, db)
+        FileIndexer.startWatching(application, db)
+        ResourceGovernor.fire("file-scan-init", ResourceClass.LIGHT, JobPriority.P3_INDEXING) {
+            FileIndexer.scanAll(application, db)
         }
         OpportunisticScheduler.start(application)
         ResourceGovernor.fire("app-scan", ResourceClass.LIGHT, JobPriority.P3_INDEXING) {
@@ -263,10 +270,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val query = lower
                         .replace(Regex("find (the )?file|find (the )?doc(ument)?|recent files|recent documents|show files|list files|open file|share file"), "")
                         .trim()
-                    val files = if (query.isBlank()) FileIntelligence.recentFiles(getApplication(), 10)
-                                else FileIntelligence.findBest(getApplication(), query, 8)
-                    if (files.isEmpty()) "No files found for \"$query\"."
-                    else "Found ${files.size} file(s):\n${FileIntelligence.describeResults(files)}"
+                    if (query.isBlank()) {
+                        val files = FileIntelligence.recentIndexed(getApplication(), db, 10)
+                        if (files.isEmpty()) "No recent files."
+                        else "Recent files:\n${FileIntelligence.describeResults(files)}"
+                    } else {
+                        // Try multi-index first, then fall back to WorldRegistry resolveFiles
+                        val indexed = WorldRegistry.resolveFiles(getApplication(), db, query, 8)
+                        if (indexed.isNotEmpty()) {
+                            "Found ${indexed.size} file(s):\n${FileIntelligence.describeFileObjects(indexed)}"
+                        } else {
+                            val files = FileIntelligence.findBest(getApplication(), query, 8)
+                            if (files.isEmpty()) "No files found for \"$query\"."
+                            else "Found ${files.size} file(s):\n${FileIntelligence.describeResults(files)}"
+                        }
+                    }
                 }
                 messages += ChatMessage(reply, false)
             }
@@ -280,19 +298,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val personName = sendFileMatch.groupValues[2].trim()
             viewModelScope.launch {
                 val reply = withContext(Dispatchers.IO) {
-                    val files = FileIntelligence.findBest(getApplication(), fileQuery, 3)
-                    if (files.isEmpty()) return@withContext "No file found matching \"$fileQuery\"."
-                    val file = files.first()
-                    val task = PersonRegistry.resolveTask(db, getApplication(), personName, AppCapability.SEND_FILE)
-                    if (task == null) return@withContext "Don't know who \"$personName\" is."
-                    val pol = task.policy
-                    if (pol.canShareFiles == 0) return@withContext "Blocked by policy: sharing files with ${task.personName} is disabled."
-                    val sendIntent = FileIntelligence.buildSendIntent(file, task.appResolution.packageName)
-                    if (pol.canShareFiles == 2) {
-                        getApplication<android.app.Application>().startActivity(sendIntent)
-                        "Sending ${file.name} to ${task.personName}."
+                    val result = WorldRegistry.resolveFileTask(
+                        getApplication(), db,
+                        WorldRegistry.FileTaskQuery(fileQuery, personName, AppCapability.SEND_FILE)
+                    )
+                    if (result == null) return@withContext "No file found matching \"$fileQuery\" or person \"$personName\" unknown."
+                    val topFile = result.files.firstOrNull()
+                    val filename = topFile?.filename ?: "file"
+                    val sizeStr = topFile?.let {
+                        when {
+                            it.sizeBytes > 1_048_576 -> "${"%.1f".format(it.sizeBytes / 1_048_576.0)} MB"
+                            it.sizeBytes > 1024 -> "${it.sizeBytes / 1024} KB"
+                            else -> "${it.sizeBytes} B"
+                        }
+                    } ?: ""
+                    val appShort = result.packageName.substringAfterLast('.')
+                    if (!result.requiresConfirm && result.sendIntent != null) {
+                        getApplication<android.app.Application>().startActivity(result.sendIntent)
+                        "Sending $filename to ${result.personName}."
+                    } else if (result.sendIntent != null) {
+                        "Ready to send $filename ($sizeStr) to ${result.personName} via $appShort. Confirm?"
                     } else {
-                        "Ready to send ${file.name} (${file.humanSize}) to ${task.personName} via ${task.appResolution.packageName.substringAfterLast('.')}. Confirm?"
+                        "Found $filename but couldn't build send intent for ${result.personName}."
                     }
                 }
                 messages += ChatMessage(reply, false)

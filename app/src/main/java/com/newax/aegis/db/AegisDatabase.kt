@@ -17,6 +17,10 @@ import com.newax.aegis.db.entity.PersonSnapshot
 import com.newax.aegis.db.entity.PersonPolicy
 import com.newax.aegis.db.entity.PersonChannelPref
 import com.newax.aegis.db.entity.Commitment
+import com.newax.aegis.db.entity.FileEntityLink
+import com.newax.aegis.db.entity.FileObject
+import com.newax.aegis.db.entity.FileTextContent
+import com.newax.aegis.db.entity.FileTextFts
 import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.engine.graph.StandardPredicates
 import com.newax.aegis.memory.EncryptedMemory
@@ -46,9 +50,13 @@ import net.sqlcipher.database.SupportFactory
         PersonPolicy::class,
         PersonChannelPref::class,
         Commitment::class,
-        TriggerRule::class
+        TriggerRule::class,
+        FileObject::class,
+        FileTextContent::class,
+        FileTextFts::class,
+        FileEntityLink::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AegisDatabase : RoomDatabase() {
@@ -65,6 +73,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun appRegistryDao(): AppRegistryDao
     abstract fun personRegistryDao(): PersonRegistryDao
     abstract fun triggerDao(): TriggerDao
+    abstract fun fileDao(): FileDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -102,6 +111,79 @@ abstract class AegisDatabase : RoomDatabase() {
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_predicate ON triples(predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subj_pred ON triples(subject, predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_object ON triples(objectValue)")
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS file_objects (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        path TEXT NOT NULL,
+                        filename TEXT NOT NULL,
+                        extension TEXT NOT NULL,
+                        mimeType TEXT NOT NULL,
+                        sizeBytes INTEGER NOT NULL,
+                        createdMs INTEGER NOT NULL DEFAULT 0,
+                        modifiedMs INTEGER NOT NULL DEFAULT 0,
+                        receivedMs INTEGER NOT NULL DEFAULT 0,
+                        lastOpenedMs INTEGER NOT NULL DEFAULT 0,
+                        sourceApp TEXT NOT NULL DEFAULT '',
+                        folder TEXT NOT NULL DEFAULT '',
+                        sha256 TEXT NOT NULL DEFAULT '',
+                        pHash TEXT NOT NULL DEFAULT '',
+                        metadataJson TEXT NOT NULL DEFAULT '',
+                        thumbnailPath TEXT,
+                        entitiesJson TEXT NOT NULL DEFAULT '',
+                        conceptsJson TEXT NOT NULL DEFAULT '',
+                        graphEntityId INTEGER,
+                        embeddingId INTEGER,
+                        indexState INTEGER NOT NULL DEFAULT 0,
+                        isDuplicate INTEGER NOT NULL DEFAULT 0,
+                        canonicalId INTEGER
+                    )
+                """)
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_fo_path ON file_objects(path)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_sha256 ON file_objects(sha256)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_phash ON file_objects(pHash)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_ext ON file_objects(extension)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_folder ON file_objects(folder)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_mime ON file_objects(mimeType)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_src ON file_objects(sourceApp)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_mod ON file_objects(modifiedMs)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_cre ON file_objects(createdMs)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_recv ON file_objects(receivedMs)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_state ON file_objects(indexState)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_geid ON file_objects(graphEntityId)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS file_text_content (
+                        fileId INTEGER NOT NULL PRIMARY KEY,
+                        text TEXT NOT NULL,
+                        language TEXT NOT NULL DEFAULT '',
+                        pageCount INTEGER NOT NULL DEFAULT 0,
+                        wordCount INTEGER NOT NULL DEFAULT 0,
+                        extractedMs INTEGER NOT NULL
+                    )
+                """)
+
+                database.execSQL("""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS file_text_fts
+                    USING fts4(content="file_text_content", text)
+                """)
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS file_entity_links (
+                        fileId INTEGER NOT NULL,
+                        entityLabel TEXT NOT NULL,
+                        entityType TEXT NOT NULL,
+                        graphEntityId INTEGER,
+                        PRIMARY KEY (fileId, entityLabel)
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fel_label ON file_entity_links(entityLabel)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fel_type  ON file_entity_links(entityType)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fel_geid  ON file_entity_links(graphEntityId)")
             }
         }
 
@@ -367,7 +449,7 @@ abstract class AegisDatabase : RoomDatabase() {
                 )
                     .openHelperFactory(SupportFactory(passphrase))
                     .addCallback(FtsSetupCallback())
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .build()
                 passphrase.fill(0)
             }
