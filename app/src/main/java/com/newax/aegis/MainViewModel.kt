@@ -21,6 +21,7 @@ import com.newax.aegis.engine.TotpManager
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.engine.embedding.VectorMemorySearch
 import com.newax.aegis.engine.learning.DraftStore
+import com.newax.aegis.engine.learning.LlmFactExtractor
 import com.newax.aegis.engine.learning.LearningDraft
 import com.newax.aegis.engine.learning.LearningWorker
 import com.newax.aegis.engine.learning.MemoryConsolidator
@@ -127,9 +128,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val model = LiteRtOfflineModel(getApplication(), file)
                 model.initialize()
                 offlineModel = model
+                LlmFactExtractor.bind(model)
                 modelStatus = "Offline AI ready • ${file.name}"
             } catch (error: Throwable) {
                 offlineModel?.close(); offlineModel = null
+                LlmFactExtractor.bind(null)
                 modelStatus = "Model unavailable: ${error.message ?: error.javaClass.simpleName}"
             } finally { modelBusy = false }
         }

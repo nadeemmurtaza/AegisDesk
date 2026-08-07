@@ -15,6 +15,7 @@ import com.newax.aegis.vision.OcrEngine
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
 
 /**
  * Runs one scan batch for the currently scheduled source.
@@ -49,14 +50,15 @@ object BackgroundLearner {
 
         Log.d(TAG, "Scanning: ${source.label}")
 
+        val llmBudget = intArrayOf(5)   // max LLM calls this batch
         val drafts = try {
             when (source) {
                 ScanSource.CONTACTS    -> scanContacts(context, db, memory)
-                ScanSource.SMS_INBOX   -> scanSms(context, Telephony.Sms.Inbox.CONTENT_URI, source, db, memory)
-                ScanSource.SMS_SENT    -> scanSms(context, Telephony.Sms.Sent.CONTENT_URI, source, db, memory)
+                ScanSource.SMS_INBOX   -> scanSms(context, Telephony.Sms.Inbox.CONTENT_URI, source, db, memory, llmBudget)
+                ScanSource.SMS_SENT    -> scanSms(context, Telephony.Sms.Sent.CONTENT_URI, source, db, memory, llmBudget)
                 ScanSource.CALL_LOGS   -> scanCallLogs(context, source, db, memory)
-                ScanSource.GALLERY_OCR -> scanGallery(context, source)
-                ScanSource.DOWNLOADS   -> scanDownloads(context, source)
+                ScanSource.GALLERY_OCR -> scanGallery(context, source, llmBudget)
+                ScanSource.DOWNLOADS   -> scanDownloads(context, source, llmBudget)
             }
         } catch (e: SecurityException) {
             Log.w(TAG, "Permission denied for ${source.label}: ${e.message}"); emptyList()
@@ -147,7 +149,8 @@ object BackgroundLearner {
         uri: android.net.Uri,
         source: ScanSource,
         db: AegisDatabase,
-        memory: EncryptedMemory
+        memory: EncryptedMemory,
+        llmBudget: IntArray
     ): List<LearningDraft> {
         val lastMs = ScanProgress.getLastSeenMs(source)
         val drafts = mutableListOf<LearningDraft>()
@@ -168,15 +171,15 @@ object BackgroundLearner {
                 val dateMs = cursor.getLong(dateIdx)
                 if (dateMs > newestMs) newestMs = dateMs
 
-                val label      = if (source == ScanSource.SMS_SENT) "SMS to $addr" else "SMS from $addr"
+                val label       = if (source == ScanSource.SMS_SENT) "SMS to $addr" else "SMS from $addr"
                 val subjectName = resolveSubject(addr)
 
-                // Record mention even if no facts are extracted
-                if (subjectName != null) {
-                    PersonFactStore.recordMention(db, subjectName, source.name)
-                }
+                if (subjectName != null) PersonFactStore.recordMention(db, subjectName, source.name)
 
-                val facts = FactExtractor.extract(body, label, subjectName)
+                val regexFacts = FactExtractor.extract(body, label, subjectName)
+                val llmFacts   = llmExtract(body, label, subjectName, llmBudget)
+                val facts      = mergedFacts(regexFacts, llmFacts)
+
                 if (facts.isNotEmpty()) {
                     val snippet = SensitiveInfoDetector.analyze(body.take(80)).redactedText
                     facts.forEach { f -> drafts += toDraft(f, label, snippet, subjectName) }
@@ -253,7 +256,7 @@ object BackgroundLearner {
 
     // ── Gallery OCR ──────────────────────────────────────────────────────────
 
-    private fun scanGallery(context: Context, source: ScanSource): List<LearningDraft> {
+    private fun scanGallery(context: Context, source: ScanSource, llmBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 
@@ -285,8 +288,11 @@ object BackgroundLearner {
                 bitmap.recycle()
 
                 val text = ocrText?.takeIf { it.length >= 15 } ?: continue
-                FactExtractor.extract(text, "Gallery: $name").forEach { f ->
-                    drafts += toDraft(f, "Gallery OCR: $name", text.take(60))
+                val label      = "Gallery OCR: $name"
+                val regexFacts = FactExtractor.extract(text, label)
+                val llmFacts   = llmExtract(text, label, null, llmBudget)
+                mergedFacts(regexFacts, llmFacts).forEach { f ->
+                    drafts += toDraft(f, label, text.take(60))
                 }
             }
         }
@@ -297,7 +303,7 @@ object BackgroundLearner {
 
     // ── Downloads ────────────────────────────────────────────────────────────
 
-    private fun scanDownloads(context: Context, source: ScanSource): List<LearningDraft> {
+    private fun scanDownloads(context: Context, source: ScanSource, llmBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 
@@ -318,10 +324,13 @@ object BackgroundLearner {
                     val mime = cursor.getString(mimeIdx) ?: ""
                     when {
                         mime.startsWith("text/") -> {
-                            val text = try { File(path).readText(Charsets.UTF_8).take(3000) }
-                            catch (_: Exception) { continue }
-                            FactExtractor.extract(text, "File: $name").forEach { f ->
-                                drafts += toDraft(f, "Downloads: $name", text.take(60))
+                            val text  = try { File(path).readText(Charsets.UTF_8).take(3000) }
+                                        catch (_: Exception) { continue }
+                            val label      = "Downloads: $name"
+                            val regexFacts = FactExtractor.extract(text, "File: $name")
+                            val llmFacts   = llmExtract(text, label, null, llmBudget)
+                            mergedFacts(regexFacts, llmFacts).forEach { f ->
+                                drafts += toDraft(f, label, text.take(60))
                             }
                         }
                         mime.contains("pdf") -> {
@@ -351,6 +360,32 @@ object BackgroundLearner {
         // If majority digits → it's a phone number, not a name
         return if (digits > addr.length / 2) null
         else addr.trim().takeIf { it.length >= 2 }
+    }
+
+    /** Call LLM extractor if budget allows; returns empty list otherwise. */
+    private fun llmExtract(
+        text: String,
+        source: String,
+        subject: String?,
+        budget: IntArray
+    ): List<FactExtractor.ExtractedFact> {
+        if (budget[0] <= 0 || !LlmFactExtractor.isReady() || text.length < 80) return emptyList()
+        budget[0]--
+        return runBlocking { LlmFactExtractor.extract(text, source, subject) }
+    }
+
+    /** Union regex + LLM facts, deduplicating by first 60 chars of lowercased fact text. */
+    private fun mergedFacts(
+        regex: List<FactExtractor.ExtractedFact>,
+        llm: List<FactExtractor.ExtractedFact>
+    ): List<FactExtractor.ExtractedFact> {
+        if (llm.isEmpty()) return regex
+        val seen = regex.map { it.fact.lowercase().take(60) }.toMutableSet()
+        val merged = regex.toMutableList()
+        llm.forEach { f ->
+            if (seen.add(f.fact.lowercase().take(60))) merged.add(f)
+        }
+        return merged
     }
 
     private fun toDraft(
