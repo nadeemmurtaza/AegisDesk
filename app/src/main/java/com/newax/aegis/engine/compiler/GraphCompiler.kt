@@ -50,8 +50,8 @@ object GraphCompiler {
         var edgesAdded = 0
         var skipped = 0
 
-        val records = db.memoryRecordDao().getAll()
-            .filter { it.validUntil == null && it.subject.isNotBlank() }
+        val records = db.memoryRecordDao().current(5000)
+            .filter { it.subject.isNotBlank() }
 
         for (record in records) {
             runCatching {
@@ -77,11 +77,12 @@ object GraphCompiler {
         val files = db.fileDao().recentUniqueFiles(100)
         for (file in files) {
             runCatching {
-                if (file.graphEntityId > 0) {
+                val geid = file.graphEntityId
+                if (geid != null && geid > 0) {
                     val entities = db.fileDao().entitiesForFile(file.id)
                     for (link in entities) {
-                        val entityId = GraphStore.resolveOrCreate(db, link.label, GraphStore.EntityType.UNKNOWN)
-                        GraphStore.addEdge(db, file.graphEntityId, StandardPredicates.MENTIONED_IN, entityId)
+                        val entityId = GraphStore.resolveOrCreate(db, link.entityLabel, GraphStore.EntityType.UNKNOWN)
+                        GraphStore.addEdge(db, geid, StandardPredicates.MENTIONED_IN, entityId)
                         edgesAdded++
                     }
                 } else skipped++
