@@ -76,6 +76,7 @@ class AegisNotificationListenerService : NotificationListenerService() {
             direction = "IN",
             source    = appName
         )
+        com.newax.aegis.engine.trigger.TriggerEngine.onNotification(sender, safeText.take(300), pkg)
 
         val entry = InboxEntry(
             appName              = appName,

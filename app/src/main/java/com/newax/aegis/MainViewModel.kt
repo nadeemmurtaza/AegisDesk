@@ -32,8 +32,11 @@ import com.newax.aegis.engine.learning.ScanProgress
 import com.newax.aegis.engine.apps.AppCapability
 import com.newax.aegis.engine.apps.AppIntelligence
 import com.newax.aegis.engine.apps.AppScanner
+import com.newax.aegis.engine.files.FileIntelligence
 import com.newax.aegis.engine.person.PersonRegistry
 import com.newax.aegis.engine.planner.CandidateMerger
+import com.newax.aegis.engine.procedure.ProcedureExecutor
+import com.newax.aegis.engine.procedure.StepSerializer
 import com.newax.aegis.engine.planner.DeterministicResolver
 import com.newax.aegis.engine.planner.QueryPlanner
 import com.newax.aegis.engine.resource.AegisJob
@@ -102,8 +105,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         TotpManager.init(application)
         ScanProgress.init(application)
         refreshDrafts()
+        // Start new TriggerEngine (DB-backed, replaces old text-rule engine)
+        com.newax.aegis.engine.trigger.TriggerEngine.start(application, db) { rule, ctx ->
+            // NOTIFY_USER action: post an Android notification
+            if (rule.actionType == com.newax.aegis.db.entity.TriggerRule.ACTION_NOTIFY_USER) {
+                val nm = application.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                val channelId = "aegis_triggers"
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    nm?.createNotificationChannel(android.app.NotificationChannel(channelId, "Aegis Triggers", android.app.NotificationManager.IMPORTANCE_DEFAULT))
+                }
+                val n = androidx.core.app.NotificationCompat.Builder(application, channelId)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle(rule.label)
+                    .setContentText(ctx["text"] ?: "")
+                    .setAutoCancel(true).build()
+                nm?.notify(rule.id.toInt(), n)
+            }
+        }
         viewModelScope.launch {
-            com.newax.aegis.engine.TriggerEngine.triggerEvents.collect { systemPrompt ->
+            // Single collection point — old TriggerEngine.triggerEvents delegates here
+            com.newax.aegis.engine.trigger.TriggerEngine.triggerEvents.collect { systemPrompt ->
                 messages += ChatMessage("Processing background event…", true)
                 submit(systemPrompt, isBackground = true)
             }
@@ -234,6 +255,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             return
         }
+        // ── File search fast path ─────────────────────────────────────────────
+        val fileTriggers = listOf("find file", "find document", "find the file", "find the doc", "recent files", "recent documents", "show files", "list files", "open file", "share file")
+        if (fileTriggers.any { lower.contains(it) }) {
+            viewModelScope.launch {
+                val reply = withContext(Dispatchers.IO) {
+                    val query = lower
+                        .replace(Regex("find (the )?file|find (the )?doc(ument)?|recent files|recent documents|show files|list files|open file|share file"), "")
+                        .trim()
+                    val files = if (query.isBlank()) FileIntelligence.recentFiles(getApplication(), 10)
+                                else FileIntelligence.findBest(getApplication(), query, 8)
+                    if (files.isEmpty()) "No files found for \"$query\"."
+                    else "Found ${files.size} file(s):\n${FileIntelligence.describeResults(files)}"
+                }
+                messages += ChatMessage(reply, false)
+            }
+            return
+        }
+        // ── Send file fast path: "send [file query] to [person]" ─────────────
+        val sendFileRegex = Regex("""send (.+?) to (.+)""", RegexOption.IGNORE_CASE)
+        val sendFileMatch = sendFileRegex.find(lower)
+        if (sendFileMatch != null) {
+            val fileQuery  = sendFileMatch.groupValues[1].trim()
+            val personName = sendFileMatch.groupValues[2].trim()
+            viewModelScope.launch {
+                val reply = withContext(Dispatchers.IO) {
+                    val files = FileIntelligence.findBest(getApplication(), fileQuery, 3)
+                    if (files.isEmpty()) return@withContext "No file found matching \"$fileQuery\"."
+                    val file = files.first()
+                    val task = PersonRegistry.resolveTask(db, getApplication(), personName, AppCapability.SEND_FILE)
+                    if (task == null) return@withContext "Don't know who \"$personName\" is."
+                    val pol = task.policy
+                    if (pol.canShareFiles == 0) return@withContext "Blocked by policy: sharing files with ${task.personName} is disabled."
+                    val sendIntent = FileIntelligence.buildSendIntent(file, task.appResolution.packageName)
+                    if (pol.canShareFiles == 2) {
+                        getApplication<android.app.Application>().startActivity(sendIntent)
+                        "Sending ${file.name} to ${task.personName}."
+                    } else {
+                        "Ready to send ${file.name} (${file.humanSize}) to ${task.personName} via ${task.appResolution.packageName.substringAfterLast('.')}. Confirm?"
+                    }
+                }
+                messages += ChatMessage(reply, false)
+            }
+            return
+        }
         // ── App registry fast path (no LLM, no screenshot) ───────────────────
         val quickPlan = QueryPlanner.plan(text)
         if (quickPlan.intent == QueryPlanner.Intent.APP_LAUNCH) {
@@ -248,16 +313,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val needsConfirm = (cap == AppCapability.CALL && !pol.canCallWithoutConfirm) ||
                     (cap == AppCapability.SEND_TEXT && !pol.canAutoSend) ||
                     pol.sensitiveActionsRequireConfirm
-                if (!needsConfirm && personTask.appResolution.intent != null) {
-                    try {
-                        getApplication<Application>().startActivity(personTask.appResolution.intent)
-                        messages += ChatMessage("${cap.name.lowercase().replace('_', ' ')} ${personTask.personName}.", false)
-                        PersonRegistry.recordChannelUsed(db, personTask.personEntityId, "default",
-                            personTask.appResolution.packageName, cap.name)
-                    } catch (_: Exception) {
-                        messages += ChatMessage("Could not complete action for ${personTask.personName}.", false)
+                val res = personTask.appResolution
+                if (!needsConfirm) {
+                    when {
+                        res.intent != null -> {
+                            try {
+                                getApplication<Application>().startActivity(res.intent)
+                                messages += ChatMessage("${cap.name.lowercase().replace('_',' ')} ${personTask.personName}.", false)
+                                PersonRegistry.recordChannelUsed(db, personTask.personEntityId, "default", res.packageName, cap.name)
+                            } catch (_: Exception) {
+                                messages += ChatMessage("Could not complete action for ${personTask.personName}.", false)
+                            }
+                            return
+                        }
+                        res.procedure != null -> {
+                            viewModelScope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    ProcedureExecutor.executeFromJson(res.procedure.steps, getApplication(), db, res.procedure.id)
+                                }
+                                if (result.success) {
+                                    AppIntelligence.recordProcedureSuccess(db, res.procedure.id)
+                                    PersonRegistry.recordChannelUsed(db, personTask.personEntityId, "default", res.packageName, cap.name)
+                                    messages += ChatMessage("${cap.name.lowercase().replace('_',' ')} ${personTask.personName}.", false)
+                                } else {
+                                    AppIntelligence.recordProcedureFailure(db, res.procedure.id)
+                                    messages += ChatMessage("Procedure failed: ${result.failReason}", false)
+                                }
+                            }
+                            return
+                        }
                     }
-                    return
                 }
             }
             val appLabel = quickPlan.entityNames.firstOrNull() ?: quickPlan.keywords.firstOrNull()
@@ -265,14 +350,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val pkg = AppIntelligence.packageForLabel(db, appLabel)
                 val resolution = pkg?.let { AppIntelligence.resolve(db, getApplication(), cap, it) }
                     ?: AppIntelligence.resolve(db, getApplication(), cap)
-                if (resolution != null && resolution.intent != null) {
-                    try {
-                        getApplication<Application>().startActivity(resolution.intent)
-                        messages += ChatMessage("Opened ${appLabel}.", false)
-                    } catch (_: Exception) {
-                        messages += ChatMessage("Could not open ${appLabel}.", false)
+                if (resolution != null) {
+                    when {
+                        resolution.intent != null -> {
+                            try {
+                                getApplication<Application>().startActivity(resolution.intent)
+                                messages += ChatMessage("Opened $appLabel.", false)
+                            } catch (_: Exception) {
+                                messages += ChatMessage("Could not open $appLabel.", false)
+                            }
+                            return
+                        }
+                        resolution.procedure != null -> {
+                            viewModelScope.launch {
+                                messages += ChatMessage("Executing procedure for $appLabel…", false)
+                                val result = withContext(Dispatchers.IO) {
+                                    ProcedureExecutor.executeFromJson(
+                                        resolution.procedure.steps, getApplication(), db, resolution.procedure.id
+                                    )
+                                }
+                                if (result.success) {
+                                    AppIntelligence.recordProcedureSuccess(db, resolution.procedure.id)
+                                    messages += ChatMessage("Done (${result.stepsCompleted} steps).", false)
+                                } else {
+                                    AppIntelligence.recordProcedureFailure(db, resolution.procedure.id)
+                                    messages += ChatMessage("Procedure failed at step ${result.failedStep}: ${result.failReason}", false)
+                                }
+                            }
+                            return
+                        }
                     }
-                    return
                 }
             }
         }

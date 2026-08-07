@@ -17,6 +17,7 @@ import com.newax.aegis.db.entity.PersonSnapshot
 import com.newax.aegis.db.entity.PersonPolicy
 import com.newax.aegis.db.entity.PersonChannelPref
 import com.newax.aegis.db.entity.Commitment
+import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.engine.graph.StandardPredicates
 import com.newax.aegis.memory.EncryptedMemory
 import net.sqlcipher.database.SupportFactory
@@ -44,9 +45,10 @@ import net.sqlcipher.database.SupportFactory
         PersonSnapshot::class,
         PersonPolicy::class,
         PersonChannelPref::class,
-        Commitment::class
+        Commitment::class,
+        TriggerRule::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AegisDatabase : RoomDatabase() {
@@ -62,6 +64,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun memoryRecordDao(): MemoryRecordDao
     abstract fun appRegistryDao(): AppRegistryDao
     abstract fun personRegistryDao(): PersonRegistryDao
+    abstract fun triggerDao(): TriggerDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -99,6 +102,27 @@ abstract class AegisDatabase : RoomDatabase() {
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_predicate ON triples(predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subj_pred ON triples(subject, predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_object ON triples(objectValue)")
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS trigger_rules (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        label TEXT NOT NULL,
+                        conditionType TEXT NOT NULL,
+                        conditionParams TEXT NOT NULL,
+                        actionType TEXT NOT NULL,
+                        actionParams TEXT NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        debounceMs INTEGER NOT NULL DEFAULT 30000,
+                        lastFiredMs INTEGER NOT NULL DEFAULT 0,
+                        createdMs INTEGER NOT NULL
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tr_enabled ON trigger_rules(enabled)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tr_cond ON trigger_rules(conditionType)")
             }
         }
 
@@ -343,7 +367,7 @@ abstract class AegisDatabase : RoomDatabase() {
                 )
                     .openHelperFactory(SupportFactory(passphrase))
                     .addCallback(FtsSetupCallback())
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 passphrase.fill(0)
             }

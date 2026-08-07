@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.UiProcedure
+import com.newax.aegis.engine.procedure.ProcedureExecutor
+import com.newax.aegis.engine.procedure.StepSerializer
 
 object AppIntelligence {
 
@@ -62,6 +64,32 @@ object AppIntelligence {
         if (proc != null) return Resolution(Strategy.UI_PROCEDURE, pkg, procedure = proc)
 
         return null
+    }
+
+    // ── Full execution (launch + procedure) ───────────────────────────────────
+
+    suspend fun execute(
+        db: AegisDatabase,
+        context: Context,
+        capability: AppCapability,
+        packageHint: String? = null,
+        extras: Map<String, String> = emptyMap()
+    ): Boolean {
+        val resolution = resolve(db, context, capability, packageHint, extras) ?: return false
+        return when (resolution.strategy) {
+            Strategy.LAUNCH_INTENT, Strategy.DEEP_LINK, Strategy.ACTION_INTENT -> {
+                resolution.intent?.let { context.startActivity(it); true } ?: false
+            }
+            Strategy.UI_PROCEDURE -> {
+                val proc = resolution.procedure ?: return false
+                val steps = StepSerializer.deserialize(proc.steps)
+                val result = ProcedureExecutor.execute(steps, context, db, proc.id)
+                if (result.success) recordProcedureSuccess(db, proc.id)
+                else recordProcedureFailure(db, proc.id)
+                result.success
+            }
+            Strategy.NOT_FOUND -> false
+        }
     }
 
     // ── Procedure outcome tracking ─────────────────────────────────────────────

@@ -26,6 +26,7 @@ class AegisAccessibilityService : AccessibilityService() {
             val pkg = event.packageName?.toString() ?: return
             currentPackage = pkg
             com.newax.aegis.engine.HabitTracker.logAppOpen(pkg)
+            com.newax.aegis.engine.trigger.TriggerEngine.onWindowChanged(pkg)
         }
     }
 
@@ -188,6 +189,66 @@ class AegisAccessibilityService : AccessibilityService() {
         ProposedAction.Recents -> performGlobalAction(GLOBAL_ACTION_RECENTS)
         ProposedAction.Back -> performGlobalAction(GLOBAL_ACTION_BACK)
         else -> false // Handle all the background-only actions like AuditSecurity, PostSocialMedia etc.
+    }
+
+    // ── Public direct-execution API (used by ProcedureExecutor) ──────────────
+
+    fun getRootNode(): android.view.accessibility.AccessibilityNodeInfo? = rootInActiveWindow
+
+    fun tapNode(node: android.view.accessibility.AccessibilityNodeInfo): Boolean {
+        var n: android.view.accessibility.AccessibilityNodeInfo? = node
+        repeat(5) {
+            if (n?.isClickable == true) return n!!.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+            n = n?.parent
+        }
+        return false
+    }
+
+    fun typeIntoNode(node: android.view.accessibility.AccessibilityNodeInfo, text: String, clear: Boolean = true): Boolean {
+        if (clear) {
+            val sel = android.os.Bundle().apply {
+                putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+                putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, node.text?.length ?: 0)
+            }
+            node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_SELECTION, sel)
+        }
+        val args = android.os.Bundle().apply {
+            putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+        }
+        return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+    }
+
+    fun tapAt(x: Float, y: Float): Boolean {
+        val path = android.graphics.Path().apply { moveTo(x, y) }
+        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 100)
+        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+        return dispatchGesture(gesture, null, null)
+    }
+
+    fun scrollForward(node: android.view.accessibility.AccessibilityNodeInfo? = null): Boolean {
+        val target = node ?: findScrollable(rootInActiveWindow) ?: return false
+        return target.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+    }
+
+    fun scrollBackward(node: android.view.accessibility.AccessibilityNodeInfo? = null): Boolean {
+        val target = node ?: findScrollable(rootInActiveWindow) ?: return false
+        return target.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+    }
+
+    fun globalBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
+    fun globalHome(): Boolean = performGlobalAction(GLOBAL_ACTION_HOME)
+
+    fun publicFindByText(text: String): android.view.accessibility.AccessibilityNodeInfo? =
+        rootInActiveWindow?.findAccessibilityNodeInfosByText(text)?.firstOrNull()
+
+    fun publicFindByDescription(desc: String): android.view.accessibility.AccessibilityNodeInfo? =
+        findByDescription(desc)
+
+    private fun findScrollable(node: android.view.accessibility.AccessibilityNodeInfo?): android.view.accessibility.AccessibilityNodeInfo? {
+        if (node == null) return null
+        if (node.isScrollable) return node
+        for (i in 0 until node.childCount) findScrollable(node.getChild(i))?.let { return it }
+        return null
     }
 
     private fun openApp(name: String): Boolean {
