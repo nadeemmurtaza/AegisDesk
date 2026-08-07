@@ -12,8 +12,14 @@ import kotlinx.coroutines.launch
 
 object OpportunisticScheduler {
 
+    data class DevStats(val registered: Int, val lastRunMs: Long, val runCount: Long)
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val tasks = mutableListOf<suspend () -> Unit>()
+    @Volatile private var lastRunMs = 0L
+    @Volatile private var runCount  = 0L
+
+    fun devStats() = DevStats(tasks.size, lastRunMs, runCount)
 
     fun register(task: suspend () -> Unit) { tasks += task }
 
@@ -28,6 +34,8 @@ object OpportunisticScheduler {
 
     private suspend fun runAll() {
         if (ResourceGovernor.isCriticalRunning()) return
+        lastRunMs = System.currentTimeMillis()
+        runCount++
         tasks.forEach { task ->
             if (!ResourceGovernor.isCriticalRunning()) {
                 ResourceGovernor.submit(AegisJob(

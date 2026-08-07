@@ -11,8 +11,30 @@ import kotlinx.coroutines.sync.withLock
 import java.util.PriorityQueue
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 object ResourceGovernor {
+
+    data class DevStats(
+        val heavyRunning: Boolean,
+        val critRunning: Boolean,
+        val queued: Int,
+        val pressure: Int,
+        val completed: Long,
+        val failed: Long
+    )
+
+    private val completedCount = AtomicLong(0)
+    private val failedCount    = AtomicLong(0)
+
+    fun devStats() = DevStats(
+        heavyRunning = isHeavyRunning(),
+        critRunning  = isCriticalRunning(),
+        queued       = queueDepth(),
+        pressure     = pressureLevel.get(),
+        completed    = completedCount.get(),
+        failed       = failedCount.get()
+    )
 
     // ── Pressure ──────────────────────────────────────────────────────────────
 
@@ -112,7 +134,9 @@ object ResourceGovernor {
     }
 
     private suspend fun runSafe(job: AegisJob) {
-        try { job.block() } catch (_: CancellationException) { } catch (_: Exception) { }
+        try { job.block(); completedCount.incrementAndGet() }
+        catch (_: CancellationException) { }
+        catch (_: Exception) { failedCount.incrementAndGet() }
     }
 
     private fun cancelByClass(cls: ResourceClass) {

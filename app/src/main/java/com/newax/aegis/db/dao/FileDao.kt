@@ -223,6 +223,21 @@ interface FileDao {
 
     @Query("SELECT COUNT(*) FROM file_objects WHERE indexState = ${FileObject.INDEX_STATE_BARE}")
     fun unindexedCount(): Int
+
+    @Query("SELECT COUNT(*) FROM file_objects WHERE (indexState & 1) = 0 AND (mimeType LIKE 'application/%' OR mimeType LIKE 'text/%')")
+    fun needsTextExtractionCount(): Int
+
+    @Query("SELECT COUNT(*) FROM file_objects WHERE (indexState & 2) = 0 AND (indexState & 1) != 0")
+    fun needsEntityExtractionCount(): Int
+
+    @Query("SELECT COUNT(*) FROM file_objects WHERE (indexState & 4) = 0 AND mimeType LIKE 'image/%'")
+    fun needsVisualIndexCount(): Int
+
+    @Query("SELECT COUNT(*) FROM file_text_content")
+    fun textContentCount(): Int
+
+    @Query("SELECT COUNT(*) FROM file_entity_links")
+    fun entityLinkCount(): Int
 }
 
 // forward ref
