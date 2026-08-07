@@ -3,6 +3,9 @@ package com.newax.aegis.engine.embedding
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.EmbeddingEntity
 import com.newax.aegis.db.entity.TripleEntity
+import com.newax.aegis.engine.resource.JobPriority
+import com.newax.aegis.engine.resource.ResourceClass
+import com.newax.aegis.engine.resource.ResourceGovernor
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -108,6 +111,25 @@ object VectorStore {
     }
 
     fun pruneOrphans(db: AegisDatabase) = db.embeddingDao().pruneOrphans()
+
+    // ── Governor-gated async indexing ─────────────────────────────────────────
+
+    fun submitIndexFact(db: AegisDatabase, factId: Long, text: String) {
+        govSubmit("emb-fact-$factId") { indexFact(db, factId, text) }
+    }
+
+    fun submitIndexEdge(db: AegisDatabase, edgeId: Long, subjectName: String, predicateName: String, objectStr: String) {
+        govSubmit("emb-edge-$edgeId") { indexEdge(db, edgeId, subjectName, predicateName, objectStr) }
+    }
+
+    fun submitIndexMemory(db: AegisDatabase, category: String, fact: String) {
+        govSubmit("emb-mem-${fact.hashCode()}") { indexMemoryFact(db, category, fact) }
+    }
+
+    private fun govSubmit(label: String, block: suspend () -> Unit) {
+        ResourceGovernor.fire(label = label, resourceClass = ResourceClass.HEAVY,
+            priority = JobPriority.P4_EMBEDDINGS, ramBudgetMb = 50, block = block)
+    }
 
     // ── ByteArray ↔ FloatArray ─────────────────────────────────────────────────
 

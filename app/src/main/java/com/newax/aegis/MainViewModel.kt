@@ -9,7 +9,6 @@ import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.net.Uri
-import android.provider.CalendarContract
 import android.content.ContentValues
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -30,6 +29,19 @@ import com.newax.aegis.engine.learning.LearningWorker
 import com.newax.aegis.engine.learning.MemoryConsolidator
 import com.newax.aegis.engine.learning.PersonFactStore
 import com.newax.aegis.engine.learning.ScanProgress
+import com.newax.aegis.engine.apps.AppCapability
+import com.newax.aegis.engine.apps.AppIntelligence
+import com.newax.aegis.engine.apps.AppScanner
+import com.newax.aegis.engine.person.PersonRegistry
+import com.newax.aegis.engine.planner.CandidateMerger
+import com.newax.aegis.engine.planner.DeterministicResolver
+import com.newax.aegis.engine.planner.QueryPlanner
+import com.newax.aegis.engine.resource.AegisJob
+import com.newax.aegis.engine.resource.JobPriority
+import com.newax.aegis.engine.resource.OpportunisticScheduler
+import com.newax.aegis.engine.resource.ResourceClass
+import com.newax.aegis.engine.resource.ResourceGovernor
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,9 +59,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var offlineModel: LiteRtOfflineModel? = null
 
     private val memoryCallback = object : ComponentCallbacks2 {
-        override fun onTrimMemory(level: Int) { offlineModel?.onMemoryPressure(level) }
-        override fun onLowMemory()             { offlineModel?.onMemoryPressure(ComponentCallbacks2.TRIM_MEMORY_COMPLETE) }
+        override fun onTrimMemory(level: Int) {
+            offlineModel?.onMemoryPressure(level)
+            ResourceGovernor.onMemoryPressure(pressureFromTrim(level))
+        }
+        override fun onLowMemory() {
+            offlineModel?.onMemoryPressure(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
+            ResourceGovernor.onMemoryPressure(5)
+        }
         override fun onConfigurationChanged(newConfig: Configuration) {}
+    }
+
+    private fun pressureFromTrim(level: Int): Int = when {
+        level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE        -> 5
+        level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL-> 4
+        level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW     -> 3
+        level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN       -> 2
+        level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND      -> 1
+        else                                                      -> 0
     }
 
     val messages = mutableStateListOf(ChatMessage("Aegis is ready in offline basic mode.", false))
@@ -89,6 +116,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         memory.getRaw("comm_log")?.let { com.newax.aegis.engine.CommunicationLog.load(it) }
         memory.getRaw("project_tracker")?.let { com.newax.aegis.engine.ProjectTracker.load(it) }
         com.newax.aegis.engine.MemoryIndexer.reindexAll()
+        com.newax.aegis.engine.CommunicationLog.onInteraction = { contact, ts ->
+            PersonRegistry.resolve(db, contact)?.let { eid ->
+                db.personRegistryDao().touchInteraction(eid, ts, ts)
+            }
+        }
+        OpportunisticScheduler.register {
+            // Refresh PersonSnapshot commitment counts for all known persons
+            db.personRegistryDao().hotPersons(50).forEach { snap ->
+                PersonRegistry.refreshSnapshotCommitmentCount(db, snap.personEntityId)
+            }
+        }
+        OpportunisticScheduler.start(application)
+        ResourceGovernor.fire("app-scan", ResourceClass.LIGHT, JobPriority.P3_INDEXING) {
+            AppScanner.scan(application, db)
+            AppScanner.seedGraphTriples(db)
+        }
         tts = TextToSpeech(application) { status ->
             if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ur", "PK")
         }
@@ -102,6 +145,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * showing the approval card. Otherwise queue it for manual approval.
      */
     private fun processAction(action: ProposedAction) {
+        // PersonPolicy gate: send actions always require approval (policy-enforced)
+        if (action is ProposedAction.Send || action is ProposedAction.SendImage) {
+            if (pendingAction == null) pendingAction = action
+            else queuedActions.addLast(action)
+            return
+        }
         val toggle = AutomationSettings.toggleForAction(action)
         if (toggle != null && AutomationSettings.isEnabled(toggle)) {
             viewModelScope.launch {
@@ -166,6 +215,68 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             messages += ChatMessage("All saved personal facts were deleted.", false)
             return
         }
+        // ── Commitment/person fast path ───────────────────────────────────────
+        val commitmentTriggers = listOf("what am i waiting for", "what do i owe", "overdue", "pending commitment", "commitments from", "commitments to")
+        if (commitmentTriggers.any { lower.contains(it) }) {
+            viewModelScope.launch {
+                val reply = withContext(Dispatchers.IO) {
+                    val overdue = PersonRegistry.overdueCommitments(db)
+                    if (overdue.isNotEmpty()) {
+                        "Overdue commitments:\n" + overdue.take(5).joinToString("\n") { "• ${it.action} (${it.debtorLabel} → ${it.creditorLabel})" }
+                    } else {
+                        val userOwes = db.personRegistryDao().userCommitments(5)
+                        if (userOwes.isNotEmpty())
+                            "Your pending commitments:\n" + userOwes.joinToString("\n") { "• ${it.action} → ${it.creditorLabel}" }
+                        else "No pending commitments found."
+                    }
+                }
+                messages += ChatMessage(reply, false)
+            }
+            return
+        }
+        // ── App registry fast path (no LLM, no screenshot) ───────────────────
+        val quickPlan = QueryPlanner.plan(text)
+        if (quickPlan.intent == QueryPlanner.Intent.APP_LAUNCH) {
+            val cap = quickPlan.appCapabilityHint ?: AppCapability.OPEN_APP
+            // Person+capability combined resolution (e.g. "Message Ali", "Call Sara")
+            val personName = quickPlan.entityNames.firstOrNull()
+            val personTask = personName?.let {
+                runCatching { PersonRegistry.resolveTask(db, getApplication(), it, cap) }.getOrNull()
+            }
+            if (personTask != null) {
+                val pol = personTask.policy
+                val needsConfirm = (cap == AppCapability.CALL && !pol.canCallWithoutConfirm) ||
+                    (cap == AppCapability.SEND_TEXT && !pol.canAutoSend) ||
+                    pol.sensitiveActionsRequireConfirm
+                if (!needsConfirm && personTask.appResolution.intent != null) {
+                    try {
+                        getApplication<Application>().startActivity(personTask.appResolution.intent)
+                        messages += ChatMessage("${cap.name.lowercase().replace('_', ' ')} ${personTask.personName}.", false)
+                        PersonRegistry.recordChannelUsed(db, personTask.personEntityId, "default",
+                            personTask.appResolution.packageName, cap.name)
+                    } catch (_: Exception) {
+                        messages += ChatMessage("Could not complete action for ${personTask.personName}.", false)
+                    }
+                    return
+                }
+            }
+            val appLabel = quickPlan.entityNames.firstOrNull() ?: quickPlan.keywords.firstOrNull()
+            if (appLabel != null) {
+                val pkg = AppIntelligence.packageForLabel(db, appLabel)
+                val resolution = pkg?.let { AppIntelligence.resolve(db, getApplication(), cap, it) }
+                    ?: AppIntelligence.resolve(db, getApplication(), cap)
+                if (resolution != null && resolution.intent != null) {
+                    try {
+                        getApplication<Application>().startActivity(resolution.intent)
+                        messages += ChatMessage("Opened ${appLabel}.", false)
+                    } catch (_: Exception) {
+                        messages += ChatMessage("Could not open ${appLabel}.", false)
+                    }
+                    return
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
         if (!engine.canHandle(text) && !text.contains(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE))) {
             val model = offlineModel
             if (model == null || !model.isReady) {
@@ -175,7 +286,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             modelBusy = true
             viewModelScope.launch {
                 try {
-                    val replyText = withContext(Dispatchers.IO) {
+                    // ── Deterministic retrieval before LLM ────────────────────
+                    val plan   = QueryPlanner.plan(text)
+                    val merged = withContext(Dispatchers.IO) {
+                        val resolved = DeterministicResolver.resolve(plan, db, memory, getApplication())
+                        CandidateMerger.merge(resolved, plan)
+                    }
+                    if (!merged.requiresLlm && merged.topFacts.isNotEmpty()) {
+                        messages += ChatMessage(merged.summary, false)
+                        modelBusy = false
+                        return@launch
+                    }
+                    // ─────────────────────────────────────────────────────────
+                    val resultDeferred = CompletableDeferred<String>()
+                    val llmJob = AegisJob(
+                        id            = ResourceGovernor.newId(),
+                        label         = "llm-inference",
+                        resourceClass = ResourceClass.CRITICAL,
+                        priority      = JobPriority.P0_USER_VISIBLE,
+                        ramBudgetMb   = 512,
+                        cancellable   = true
+                    ) {
                         val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty().take(2000)
                         val ocrText = com.newax.aegis.vision.ScreenCaptureService.latestOcrResult.value
                             ?.let { com.newax.aegis.vision.OcrEngine.formatForContext(it) }
@@ -190,6 +321,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 .filter { it.value.isNotEmpty() }
                                 .joinToString("\n") { "${it.key.uppercase()}:\n- " + it.value.joinToString("\n- ") }
                             if (profile.isNotBlank()) append("User Profile:\n$profile\n\n")
+                            if (merged.llmContext.isNotBlank()) append("${merged.llmContext}\n\n")
                             if (unread != "Your inbox is clear.") append("Unread Notifications:\n$unread\n\n")
                             if (screen.isNotBlank()) append("Current screen:\n$screen\n\n")
                             if (ocrText.isNotBlank()) append("Screen OCR:\n$ocrText\n\n")
@@ -197,8 +329,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             append("User: ${text.trim().take(3000)}")
                         }.take(7000)
                         val frame = com.newax.aegis.vision.ScreenCaptureService.latestFrame.value
-                        model.complete(prompt, frame)
+                        resultDeferred.complete(model.complete(prompt, frame))
                     }
+                    ResourceGovernor.preemptForUser(llmJob)
+                    val replyText = resultDeferred.await()
 
                     val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty()
                     val firstLine = replyText.trim().lineSequence().firstOrNull()?.trim().orEmpty()
@@ -353,6 +487,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         is ProposedAction.LogCommunication -> {
             com.newax.aegis.engine.CommunicationLog.logInteraction(action.contact, action.summaryText)
+            val now = System.currentTimeMillis()
+            PersonRegistry.resolve(db, action.contact)?.let { eid ->
+                db.personRegistryDao().touchInteraction(eid, now, now)
+            }
             memory.storeRaw("comm_log", com.newax.aegis.engine.CommunicationLog.serialize())
             bumpMemoryVersion()
             true
@@ -657,42 +795,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun queryCalendar(timeframe: String) {
         val context = getApplication<Application>()
-        try {
-            val now = Calendar.getInstance().timeInMillis
-            val endRange = when {
-                timeframe.contains("tomorrow", true) -> now + 86400000L * 2
-                timeframe.contains("week", true)     -> now + 86400000L * 7
-                timeframe.contains("month", true)    -> now + 86400000L * 30
-                else                                 -> now + 86400000L
-            }
-            val events = withContext(Dispatchers.IO) {
-                val cursor = context.contentResolver.query(
-                    CalendarContract.Events.CONTENT_URI,
-                    arrayOf(CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART),
-                    "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?",
-                    arrayOf(now.toString(), endRange.toString()),
-                    "${CalendarContract.Events.DTSTART} ASC"
-                )
-                val list = mutableListOf<String>()
-                cursor?.use {
-                    val titleIdx = it.getColumnIndexOrThrow(CalendarContract.Events.TITLE)
-                    val dtIdx    = it.getColumnIndexOrThrow(CalendarContract.Events.DTSTART)
-                    var count = 0
-                    while (it.moveToNext() && count < 10) {
-                        val date = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault())
-                            .format(java.util.Date(it.getLong(dtIdx)))
-                        list += "${it.getString(titleIdx)} at $date"
-                        count++
-                    }
-                }
-                list
-            }
-            messages += ChatMessage(
-                if (events.isEmpty()) "No events found for $timeframe." else "Found: " + events.joinToString(" | "), false
-            )
-        } catch (e: Exception) {
-            messages += ChatMessage("Failed to read calendar. Permissions might be missing.", false)
+        val now = Calendar.getInstance().timeInMillis
+        val endRange = when {
+            timeframe.contains("tomorrow", true) -> now + 86400000L * 2
+            timeframe.contains("week", true)     -> now + 86400000L * 7
+            timeframe.contains("month", true)    -> now + 86400000L * 30
+            else                                 -> now + 86400000L
         }
+        val events = withContext(Dispatchers.IO) {
+            com.newax.aegis.engine.CalendarQueries.query(context, now, endRange, 10)
+        }
+        messages += ChatMessage(
+            if (events.isEmpty()) "No events found for $timeframe."
+            else "Found: " + events.joinToString(" | ") { it.formatted() },
+            false
+        )
     }
 
     private suspend fun createCalendarEvent(title: String, timeString: String) {

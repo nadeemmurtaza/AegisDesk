@@ -3,7 +3,12 @@ package com.newax.aegis.engine.learning
 import android.content.Context
 import android.util.Log
 import androidx.work.*
+import com.newax.aegis.engine.resource.AegisJob
+import com.newax.aegis.engine.resource.JobPriority
+import com.newax.aegis.engine.resource.ResourceClass
+import com.newax.aegis.engine.resource.ResourceGovernor
 import com.newax.aegis.memory.EncryptedMemory
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 
 /**
@@ -17,9 +22,25 @@ import java.util.concurrent.TimeUnit
 class LearningWorker(appContext: Context, params: WorkerParameters) : Worker(appContext, params) {
 
     override fun doWork(): Result {
+        if (ResourceGovernor.isCriticalRunning()) {
+            Log.d(TAG, "LLM active — skipping batch, will retry")
+            return Result.retry()
+        }
         return try {
-            val memory = EncryptedMemory(applicationContext)
-            val draftsCreated = BackgroundLearner.runNextBatch(applicationContext, memory)
+            var draftsCreated = 0
+            runBlocking {
+                ResourceGovernor.submit(AegisJob(
+                    id            = ResourceGovernor.newId(),
+                    label         = "learning-batch",
+                    resourceClass = ResourceClass.HEAVY,
+                    priority      = JobPriority.P3_INDEXING,
+                    cancellable   = true,
+                    checkpointable = true
+                ) {
+                    val memory = EncryptedMemory(applicationContext)
+                    draftsCreated = BackgroundLearner.runNextBatch(applicationContext, memory)
+                })
+            }
             Log.d(TAG, "Batch done: $draftsCreated new draft(s)")
             Result.success(workDataOf(OUTPUT_KEY to draftsCreated))
         } catch (e: Exception) {

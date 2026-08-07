@@ -57,9 +57,8 @@ dependencies {
     // QR code for 2FA enrollment
     implementation("com.google.zxing:core:3.5.3")
 
-    // OCR — on-device ML Kit text recognition (Latin + supplemental scripts)
+    // OCR — on-device ML Kit text recognition (Latin bundled in base artifact)
     implementation("com.google.mlkit:text-recognition:16.0.1")
-    implementation("com.google.mlkit:text-recognition-latin:16.0.1")
     
     // On-device text embeddings (Universal Sentence Encoder via MediaPipe)
     implementation("com.google.mediapipe:tasks-text:0.10.14")

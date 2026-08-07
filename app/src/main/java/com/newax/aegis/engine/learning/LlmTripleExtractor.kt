@@ -51,7 +51,7 @@ object LlmTripleExtractor {
         if (triples.isEmpty()) return
         val indexed = GraphStore.saveLlmTriples(db, triples)
         indexed.forEach { idx ->
-            VectorStore.indexEdge(db, idx.edgeId, idx.subjectName, idx.predicateName, idx.objectStr)
+            VectorStore.submitIndexEdge(db, idx.edgeId, idx.subjectName, idx.predicateName, idx.objectStr)
         }
     }
 

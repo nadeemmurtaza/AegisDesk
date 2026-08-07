@@ -8,6 +8,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.newax.aegis.db.dao.*
 import com.newax.aegis.db.entity.*
+import com.newax.aegis.db.entity.AppRecord
+import com.newax.aegis.db.entity.AppCapabilityLink
+import com.newax.aegis.db.entity.UiProcedure
+import com.newax.aegis.db.entity.ScreenNode
+import com.newax.aegis.db.entity.NavEdge
+import com.newax.aegis.db.entity.PersonSnapshot
+import com.newax.aegis.db.entity.PersonPolicy
+import com.newax.aegis.db.entity.PersonChannelPref
+import com.newax.aegis.db.entity.Commitment
 import com.newax.aegis.engine.graph.StandardPredicates
 import com.newax.aegis.memory.EncryptedMemory
 import net.sqlcipher.database.SupportFactory
@@ -25,9 +34,19 @@ import net.sqlcipher.database.SupportFactory
         GraphPredicate::class,
         GraphEdge::class,
         GraphBlob::class,
-        EntityAlias::class
+        EntityAlias::class,
+        MemoryRecord::class,
+        AppRecord::class,
+        AppCapabilityLink::class,
+        UiProcedure::class,
+        ScreenNode::class,
+        NavEdge::class,
+        PersonSnapshot::class,
+        PersonPolicy::class,
+        PersonChannelPref::class,
+        Commitment::class
     ],
-    version = 4,
+    version = 7,
     exportSchema = false
 )
 abstract class AegisDatabase : RoomDatabase() {
@@ -40,6 +59,9 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun embeddingDao(): EmbeddingDao
     abstract fun tripleDao(): TripleDao
     abstract fun graphDao(): GraphDao
+    abstract fun memoryRecordDao(): MemoryRecordDao
+    abstract fun appRegistryDao(): AppRegistryDao
+    abstract fun personRegistryDao(): PersonRegistryDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -77,6 +99,140 @@ abstract class AegisDatabase : RoomDatabase() {
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_predicate ON triples(predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subj_pred ON triples(subject, predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_object ON triples(objectValue)")
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""CREATE TABLE IF NOT EXISTS person_snapshots (personEntityId INTEGER NOT NULL PRIMARY KEY, displayName TEXT NOT NULL, canonicalPhone TEXT, canonicalEmail TEXT, preferredChannel TEXT, preferredLanguage TEXT NOT NULL DEFAULT '', preferredTone TEXT NOT NULL DEFAULT '', relationshipType TEXT NOT NULL DEFAULT '', activeProjectId TEXT, pendingCommitmentCount INTEGER NOT NULL DEFAULT 0, recentTopics TEXT NOT NULL DEFAULT '', lastInteractionMs INTEGER NOT NULL DEFAULT 0, importanceScore INTEGER NOT NULL DEFAULT 50, snapshotUpdatedMs INTEGER NOT NULL DEFAULT 0)""")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ps_interaction ON person_snapshots(lastInteractionMs)")
+                database.execSQL("""CREATE TABLE IF NOT EXISTS person_policies (personEntityId INTEGER NOT NULL PRIMARY KEY, canAutoOpenChat INTEGER NOT NULL DEFAULT 1, canAutoDraft INTEGER NOT NULL DEFAULT 1, canAutoSend INTEGER NOT NULL DEFAULT 0, canCallWithoutConfirm INTEGER NOT NULL DEFAULT 0, canShareFiles INTEGER NOT NULL DEFAULT 1, sensitiveActionsRequireConfirm INTEGER NOT NULL DEFAULT 1)""")
+                database.execSQL("""CREATE TABLE IF NOT EXISTS person_channel_prefs (personEntityId INTEGER NOT NULL, taskContext TEXT NOT NULL, packageName TEXT NOT NULL, capability TEXT NOT NULL, probability REAL NOT NULL DEFAULT 0.8, evidenceCount INTEGER NOT NULL DEFAULT 1, lastUpdatedMs INTEGER NOT NULL, PRIMARY KEY (personEntityId, taskContext))""")
+                database.execSQL("""CREATE TABLE IF NOT EXISTS commitments (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, debtorPersonId INTEGER, creditorPersonId INTEGER, debtorLabel TEXT NOT NULL, creditorLabel TEXT NOT NULL, action TEXT NOT NULL, dueMs INTEGER, status TEXT NOT NULL DEFAULT 'pending', source TEXT NOT NULL DEFAULT '', confidence INTEGER NOT NULL DEFAULT 80, createdMs INTEGER NOT NULL, resolvedMs INTEGER)""")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_debtor ON commitments(debtorPersonId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_creditor ON commitments(creditorPersonId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_status ON commitments(status)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_due ON commitments(dueMs)")
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS app_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        label TEXT NOT NULL,
+                        version TEXT NOT NULL,
+                        category TEXT NOT NULL DEFAULT '',
+                        launchActivity TEXT,
+                        needsValidation INTEGER NOT NULL DEFAULT 0,
+                        lastScanMs INTEGER NOT NULL
+                    )
+                """)
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_ar_pkg ON app_records(packageName)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS app_capability_links (
+                        packageName TEXT NOT NULL,
+                        capability TEXT NOT NULL,
+                        intentAction TEXT,
+                        deepLinkPattern TEXT,
+                        mimeTypes TEXT,
+                        confidence INTEGER NOT NULL DEFAULT 80,
+                        PRIMARY KEY (packageName, capability)
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_acl_cap ON app_capability_links(capability)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS ui_procedures (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        versionRange TEXT NOT NULL,
+                        taskCapability TEXT NOT NULL,
+                        steps TEXT NOT NULL,
+                        screenSignature TEXT NOT NULL DEFAULT '',
+                        confidence INTEGER NOT NULL DEFAULT 80,
+                        successCount INTEGER NOT NULL DEFAULT 0,
+                        failureCount INTEGER NOT NULL DEFAULT 0,
+                        lastRunMs INTEGER NOT NULL DEFAULT 0,
+                        needsValidation INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_up_pkg ON ui_procedures(packageName)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_up_cap ON ui_procedures(taskCapability)")
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS screen_nodes (
+                        packageName TEXT NOT NULL,
+                        screenSignature TEXT NOT NULL,
+                        screenType TEXT NOT NULL DEFAULT '',
+                        nodes TEXT NOT NULL DEFAULT '',
+                        appVersion TEXT NOT NULL DEFAULT '',
+                        PRIMARY KEY (packageName, screenSignature)
+                    )
+                """)
+
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS nav_edges (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        fromSignature TEXT NOT NULL,
+                        toSignature TEXT NOT NULL,
+                        actionViewId TEXT NOT NULL DEFAULT '',
+                        actionContentDesc TEXT NOT NULL DEFAULT '',
+                        actionText TEXT NOT NULL DEFAULT ''
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ne_from ON nav_edges(fromSignature)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ne_to   ON nav_edges(toSignature)")
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS memory_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        type INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        category TEXT NOT NULL DEFAULT '',
+                        subject TEXT NOT NULL DEFAULT '',
+                        source TEXT NOT NULL DEFAULT '',
+                        confidence INTEGER NOT NULL DEFAULT 80,
+                        importance INTEGER NOT NULL DEFAULT 50,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        validFrom INTEGER,
+                        validUntil INTEGER,
+                        contentHash TEXT NOT NULL DEFAULT '',
+                        graphEdgeId INTEGER,
+                        embeddingId TEXT
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_hash    ON memory_records(contentHash)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_subject ON memory_records(subject)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_type    ON memory_records(type)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_created ON memory_records(createdAt)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_valid   ON memory_records(validUntil)")
+
+                // Backfill: migrate person_facts → memory_records (type=FACT=1)
+                val now = System.currentTimeMillis()
+                database.execSQL("""
+                    INSERT INTO memory_records (type, content, category, subject, source, confidence, importance, createdAt, updatedAt, contentHash)
+                    SELECT
+                        1,
+                        fact,
+                        COALESCE(category, ''),
+                        COALESCE((SELECT name FROM people WHERE id = personId), ''),
+                        COALESCE(source, ''),
+                        80,
+                        50,
+                        $now,
+                        $now,
+                        ''
+                    FROM person_facts
+                """)
             }
         }
 
@@ -187,7 +343,7 @@ abstract class AegisDatabase : RoomDatabase() {
                 )
                     .openHelperFactory(SupportFactory(passphrase))
                     .addCallback(FtsSetupCallback())
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 passphrase.fill(0)
             }

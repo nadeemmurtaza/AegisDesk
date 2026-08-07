@@ -19,6 +19,8 @@ object CommunicationLog {
     private val lock = Any()
     private val logs = ArrayDeque<LogEntry>()
 
+    var onInteraction: ((contact: String, timestampMs: Long) -> Unit)? = null
+
     // --- Write ---
 
     /** Add a new log entry from any source. */
@@ -27,9 +29,13 @@ object CommunicationLog {
         message: String,
         direction: String = "IN",
         source: String = ""
-    ) = synchronized(lock) {
-        if (logs.size >= MAX_ENTRIES) logs.removeFirst()
-        logs.addLast(LogEntry(System.currentTimeMillis(), contact, message, direction, source))
+    ) {
+        val ts = System.currentTimeMillis()
+        synchronized(lock) {
+            if (logs.size >= MAX_ENTRIES) logs.removeFirst()
+            logs.addLast(LogEntry(ts, contact, message, direction, source))
+        }
+        onInteraction?.invoke(contact, ts)
     }
 
     /** Backward-compat alias for addLog(). */

@@ -462,4 +462,24 @@ class ContactsManager(private val context: Context, private val memory: Encrypte
             }
         }
     }.trim()
+
+    companion object {
+        fun phoneByName(context: Context, name: String): String? = try {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
+                arrayOf("%$name%"), null
+            )?.use { if (it.moveToFirst()) it.getString(0) else null }
+        } catch (_: Exception) { null }
+
+        fun emailByName(context: Context, name: String): String? = try {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Email.ADDRESS),
+                "${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} LIKE ?",
+                arrayOf("%$name%"), null
+            )?.use { if (it.moveToFirst()) it.getString(0) else null }
+        } catch (_: Exception) { null }
+    }
 }
