@@ -37,6 +37,11 @@
             </intent-filter>
         </activity>
         <activity android:name=".CrashReporterActivity" android:exported="false" />
+        <activity
+            android:name=".ui.devconsole.DevConsoleActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Aegis"
+            android:label="Aegis Dev Console" />
         <service
             android:name=".accessibility.AegisAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

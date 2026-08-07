@@ -55,9 +55,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import android.hardware.SensorManager
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.newax.aegis.ui.devconsole.DevConsoleActivity
 import com.newax.aegis.assistant.ChatMessage
 import com.newax.aegis.assistant.ProposedAction
 import kotlinx.coroutines.launch
@@ -95,6 +97,9 @@ sealed class Screen(val label: String) {
 }
 
 class MainActivity : FragmentActivity() {
+
+    private val shakeDetector by lazy { DevConsoleActivity.shakeListener(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -103,6 +108,16 @@ class MainActivity : FragmentActivity() {
                 onNotifications  = { startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) }
             )
         }
+        (getSystemService(SENSOR_SERVICE) as? SensorManager)?.let { sm ->
+            shakeDetector.register(sm)
+        }
+    }
+
+    override fun onDestroy() {
+        (getSystemService(SENSOR_SERVICE) as? SensorManager)?.let { sm ->
+            shakeDetector.unregister(sm)
+        }
+        super.onDestroy()
     }
 }
 
