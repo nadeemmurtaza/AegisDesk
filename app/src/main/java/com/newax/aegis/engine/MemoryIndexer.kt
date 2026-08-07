@@ -1,5 +1,7 @@
 package com.newax.aegis.engine
 
+import com.newax.aegis.db.AegisDatabase
+
 object MemoryIndexer {
 
     fun reindexAll() {
@@ -35,6 +37,15 @@ object MemoryIndexer {
             val id = "PROJECT:${p.id}"
             val words = p.id.split("\\s+".toRegex()) + p.status.split("\\s+".toRegex())
             for (word in words) TypeaheadTrie.insert(word, id)
+        }
+
+        // Index Room triples (subject + object as searchable terms)
+        val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+        db?.tripleDao()?.getAll()?.forEach { t ->
+            val tripleId = "TRIPLE:${t.id}"
+            (t.subject + " " + t.objectValue).split("\\s+".toRegex())
+                .filter { it.length >= 2 }
+                .forEach { word -> TypeaheadTrie.insert(word, tripleId) }
         }
     }
 }

@@ -64,3 +64,32 @@ sealed interface ProposedAction {
 }
 
 data class AssistantReply(val text: String, val proposedAction: ProposedAction? = null)
+
+enum class RiskLevel { LOW, MEDIUM, HIGH, CRITICAL }
+
+fun riskOf(action: ProposedAction): RiskLevel = when (action) {
+    is ProposedAction.DeleteFile, is ProposedAction.DeleteContact,
+    is ProposedAction.DeleteProject, is ProposedAction.ForgetFact,
+    ProposedAction.RejectAllDrafts -> RiskLevel.CRITICAL
+
+    is ProposedAction.Send, is ProposedAction.SendImage,
+    is ProposedAction.PostSocialMedia, is ProposedAction.RunScript,
+    is ProposedAction.CreateEvent -> RiskLevel.HIGH
+
+    is ProposedAction.Tap, is ProposedAction.TapPixels, is ProposedAction.Type,
+    is ProposedAction.UpdateMemory, is ProposedAction.UpdateGraph,
+    is ProposedAction.UpdateNode, is ProposedAction.LogCommunication,
+    is ProposedAction.UpdateProject, ProposedAction.ApproveAllDrafts,
+    is ProposedAction.ApproveDraft, is ProposedAction.MergeContacts,
+    is ProposedAction.AnalyzeContacts -> RiskLevel.MEDIUM
+
+    else -> RiskLevel.LOW
+}
+
+val ProposedAction.riskLevel: RiskLevel get() = riskOf(this)
+
+val ProposedAction.confirmationWarning: String? get() = when (riskOf(this)) {
+    RiskLevel.CRITICAL -> "⚠ This action is irreversible."
+    RiskLevel.HIGH     -> "This action will affect external systems or send data."
+    else               -> null
+}

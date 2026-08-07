@@ -2,6 +2,7 @@ package com.newax.aegis.engine.embedding
 
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.EmbeddingEntity
+import com.newax.aegis.db.entity.TripleEntity
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -20,6 +21,7 @@ object VectorStore {
 
     const val TYPE_FACT   = "fact"
     const val TYPE_MEMORY = "memory"
+    const val TYPE_TRIPLE = "triple"
     private const val THRESHOLD = 0.35f
 
     data class SearchResult(
@@ -36,6 +38,20 @@ object VectorStore {
             EmbeddingEntity(
                 sourceType = TYPE_FACT,
                 sourceId   = factId.toString(),
+                text       = text,
+                embedding  = emb.toByteArray()
+            )
+        )
+    }
+
+    /** Index a knowledge graph triple as "subject predicate object" text. */
+    fun indexTriple(db: AegisDatabase, tripleId: Long, triple: TripleEntity) {
+        val text = "${triple.subject} ${triple.predicate.replace('_', ' ')} ${triple.objectValue}"
+        val emb = EmbeddingEngine.embed(text) ?: return
+        db.embeddingDao().upsert(
+            EmbeddingEntity(
+                sourceType = TYPE_TRIPLE,
+                sourceId   = tripleId.toString(),
                 text       = text,
                 embedding  = emb.toByteArray()
             )

@@ -1,5 +1,6 @@
 package com.newax.aegis.engine
 
+import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.memory.EncryptedMemory
 
 /**
@@ -145,11 +146,14 @@ object ContextCorrelator {
     private fun buildGraphContext(entities: ExtractedEntities, graph: KnowledgeGraph): String {
         val ids = (entities.names + entities.organizations).take(5)
         val sb = StringBuilder()
+        val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
         for (id in ids) {
-            val edges = graph.query(id)
-            if (edges.isNotEmpty()) {
+            val edges   = graph.query(id)
+            val triples = db?.tripleDao()?.involving(id).orEmpty()
+            if (edges.isNotEmpty() || triples.isNotEmpty()) {
                 sb.appendLine("Node: $id")
-                edges.take(4).forEach { sb.appendLine("  ${it.relation} → ${it.to}") }
+                edges.take(4).forEach   { sb.appendLine("  ${it.relation} → ${it.to}") }
+                triples.take(4).forEach { t -> sb.appendLine("  ${t.predicate.replace('_', ' ')} → ${t.objectValue}") }
                 val props = graph.getNodeInfo(id)
                 if (props.isNotBlank() && props != "Node not found." && props != "Node '$id' has no properties.")
                     sb.appendLine("  props: $props")

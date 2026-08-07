@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import android.app.Application
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import android.net.Uri
 import android.provider.CalendarContract
 import android.content.ContentValues
@@ -44,6 +46,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val modelImporter = ModelImporter(application)
     private var offlineModel: LiteRtOfflineModel? = null
 
+    private val memoryCallback = object : ComponentCallbacks2 {
+        override fun onTrimMemory(level: Int) { offlineModel?.onMemoryPressure(level) }
+        override fun onLowMemory()             { offlineModel?.onMemoryPressure(ComponentCallbacks2.TRIM_MEMORY_COMPLETE) }
+        override fun onConfigurationChanged(newConfig: Configuration) {}
+    }
+
     val messages = mutableStateListOf(ChatMessage("Aegis is ready in offline basic mode.", false))
     var pendingAction by mutableStateOf<ProposedAction?>(null); private set
     var biometricAuthRequested by mutableStateOf(false)
@@ -62,6 +70,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        application.registerComponentCallbacks(memoryCallback)
         AutomationSettings.init(application)
         TotpManager.init(application)
         ScanProgress.init(application)
@@ -747,6 +756,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        getApplication<Application>().unregisterComponentCallbacks(memoryCallback)
         offlineModel?.close()
         tts?.shutdown()
         super.onCleared()

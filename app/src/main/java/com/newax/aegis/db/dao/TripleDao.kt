@@ -32,6 +32,12 @@ interface TripleDao {
     @Query("SELECT COUNT(*) FROM triples")
     fun count(): Int
 
+    @Query("SELECT * FROM triples WHERE id = :id LIMIT 1")
+    fun byId(id: Long): TripleEntity?
+
+    @Query("SELECT * FROM triples ORDER BY createdMs DESC LIMIT :limit")
+    fun getAll(limit: Int = 5000): List<TripleEntity>
+
     @Query("DELETE FROM triples WHERE subject = :subject")
     fun deleteBySubject(subject: String)
 }

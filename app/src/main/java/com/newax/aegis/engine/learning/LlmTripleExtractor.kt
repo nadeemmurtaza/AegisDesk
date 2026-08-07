@@ -5,6 +5,7 @@ import com.newax.aegis.assistant.LiteRtOfflineModel
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.TripleEntity
 import com.newax.aegis.engine.SensitiveInfoDetector
+import com.newax.aegis.engine.embedding.VectorStore
 import org.json.JSONArray
 
 object LlmTripleExtractor {
@@ -43,7 +44,10 @@ object LlmTripleExtractor {
 
     fun save(db: AegisDatabase, triples: List<TripleEntity>) {
         if (triples.isEmpty()) return
-        db.tripleDao().insertAll(triples)
+        triples.forEach { triple ->
+            val id = db.tripleDao().insert(triple)
+            VectorStore.indexTriple(db, id, triple)
+        }
     }
 
     /** Persist a manually-created edge (e.g. from ProposedAction.UpdateGraph). */
