@@ -22,6 +22,7 @@ import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.engine.embedding.VectorMemorySearch
 import com.newax.aegis.engine.learning.DraftStore
 import com.newax.aegis.engine.learning.LlmFactExtractor
+import com.newax.aegis.engine.learning.LlmTripleExtractor
 import com.newax.aegis.engine.learning.LearningDraft
 import com.newax.aegis.engine.learning.LearningWorker
 import com.newax.aegis.engine.learning.MemoryConsolidator
@@ -129,10 +130,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 model.initialize()
                 offlineModel = model
                 LlmFactExtractor.bind(model)
+                LlmTripleExtractor.bind(model)
                 modelStatus = "Offline AI ready • ${file.name}"
             } catch (error: Throwable) {
                 offlineModel?.close(); offlineModel = null
                 LlmFactExtractor.bind(null)
+                LlmTripleExtractor.bind(null)
                 modelStatus = "Model unavailable: ${error.message ?: error.javaClass.simpleName}"
             } finally { modelBusy = false }
         }
@@ -327,6 +330,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         is ProposedAction.UpdateGraph -> {
             com.newax.aegis.engine.KnowledgeGraph.addEdge(action.from, action.relation, action.to)
             memory.storeRaw("knowledge_graph", com.newax.aegis.engine.KnowledgeGraph.serialize())
+            withContext(Dispatchers.IO) {
+                LlmTripleExtractor.saveEdge(db, action.from, action.relation, action.to)
+            }
             bumpMemoryVersion()
             true
         }

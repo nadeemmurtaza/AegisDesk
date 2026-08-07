@@ -16,6 +16,7 @@ import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
+import com.newax.aegis.engine.learning.LlmTripleExtractor
 
 /**
  * Runs one scan batch for the currently scheduled source.
@@ -50,15 +51,16 @@ object BackgroundLearner {
 
         Log.d(TAG, "Scanning: ${source.label}")
 
-        val llmBudget = intArrayOf(5)   // max LLM calls this batch
+        val llmBudget     = intArrayOf(5)   // max fact-LLM calls this batch
+        val triplesBudget = intArrayOf(3)   // max triple-LLM calls this batch
         val drafts = try {
             when (source) {
                 ScanSource.CONTACTS    -> scanContacts(context, db, memory)
-                ScanSource.SMS_INBOX   -> scanSms(context, Telephony.Sms.Inbox.CONTENT_URI, source, db, memory, llmBudget)
-                ScanSource.SMS_SENT    -> scanSms(context, Telephony.Sms.Sent.CONTENT_URI, source, db, memory, llmBudget)
+                ScanSource.SMS_INBOX   -> scanSms(context, Telephony.Sms.Inbox.CONTENT_URI, source, db, memory, llmBudget, triplesBudget)
+                ScanSource.SMS_SENT    -> scanSms(context, Telephony.Sms.Sent.CONTENT_URI, source, db, memory, llmBudget, triplesBudget)
                 ScanSource.CALL_LOGS   -> scanCallLogs(context, source, db, memory)
-                ScanSource.GALLERY_OCR -> scanGallery(context, source, llmBudget)
-                ScanSource.DOWNLOADS   -> scanDownloads(context, source, llmBudget)
+                ScanSource.GALLERY_OCR -> scanGallery(context, source, llmBudget, triplesBudget)
+                ScanSource.DOWNLOADS   -> scanDownloads(context, source, llmBudget, triplesBudget)
             }
         } catch (e: SecurityException) {
             Log.w(TAG, "Permission denied for ${source.label}: ${e.message}"); emptyList()
@@ -150,7 +152,8 @@ object BackgroundLearner {
         source: ScanSource,
         db: AegisDatabase,
         memory: EncryptedMemory,
-        llmBudget: IntArray
+        llmBudget: IntArray,
+        triplesBudget: IntArray
     ): List<LearningDraft> {
         val lastMs = ScanProgress.getLastSeenMs(source)
         val drafts = mutableListOf<LearningDraft>()
@@ -184,6 +187,7 @@ object BackgroundLearner {
                     val snippet = SensitiveInfoDetector.analyze(body.take(80)).redactedText
                     facts.forEach { f -> drafts += toDraft(f, label, snippet, subjectName) }
                 }
+                tripleExtract(db, body, label, subjectName, triplesBudget)
             }
         }
 
@@ -256,7 +260,7 @@ object BackgroundLearner {
 
     // ── Gallery OCR ──────────────────────────────────────────────────────────
 
-    private fun scanGallery(context: Context, source: ScanSource, llmBudget: IntArray): List<LearningDraft> {
+    private fun scanGallery(context: Context, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 
@@ -294,6 +298,7 @@ object BackgroundLearner {
                 mergedFacts(regexFacts, llmFacts).forEach { f ->
                     drafts += toDraft(f, label, text.take(60))
                 }
+                tripleExtract(db, text, label, null, triplesBudget)
             }
         }
 
@@ -303,7 +308,7 @@ object BackgroundLearner {
 
     // ── Downloads ────────────────────────────────────────────────────────────
 
-    private fun scanDownloads(context: Context, source: ScanSource, llmBudget: IntArray): List<LearningDraft> {
+    private fun scanDownloads(context: Context, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 
@@ -332,6 +337,7 @@ object BackgroundLearner {
                             mergedFacts(regexFacts, llmFacts).forEach { f ->
                                 drafts += toDraft(f, label, text.take(60))
                             }
+                            tripleExtract(db, text, label, null, triplesBudget)
                         }
                         mime.contains("pdf") -> {
                             drafts += toDraft(
@@ -372,6 +378,19 @@ object BackgroundLearner {
         if (budget[0] <= 0 || !LlmFactExtractor.isReady() || text.length < 80) return emptyList()
         budget[0]--
         return runBlocking { LlmFactExtractor.extract(text, source, subject) }
+    }
+
+    private fun tripleExtract(
+        db: AegisDatabase,
+        text: String,
+        source: String,
+        subject: String?,
+        budget: IntArray
+    ) {
+        if (budget[0] <= 0 || !LlmTripleExtractor.isReady() || text.length < 80) return
+        budget[0]--
+        val triples = runBlocking { LlmTripleExtractor.extract(text, source, subject) }
+        if (triples.isNotEmpty()) LlmTripleExtractor.save(db, triples)
     }
 
     /** Union regex + LLM facts, deduplicating by first 60 chars of lowercased fact text. */

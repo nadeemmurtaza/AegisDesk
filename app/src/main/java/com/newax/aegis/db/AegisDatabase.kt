@@ -18,9 +18,10 @@ import net.sqlcipher.database.SupportFactory
         PersonFactEntity::class,
         LearningDraftEntity::class,
         KvStoreEntity::class,
-        EmbeddingEntity::class
+        EmbeddingEntity::class,
+        TripleEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AegisDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun learningDraftDao(): LearningDraftDao
     abstract fun kvStoreDao(): KvStoreDao
     abstract fun embeddingDao(): EmbeddingDao
+    abstract fun tripleDao(): TripleDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -51,6 +53,26 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS triples (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        subject TEXT NOT NULL,
+                        predicate TEXT NOT NULL,
+                        objectValue TEXT NOT NULL,
+                        confidence REAL NOT NULL,
+                        source TEXT NOT NULL,
+                        createdMs INTEGER NOT NULL
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subject ON triples(subject)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_predicate ON triples(predicate)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subj_pred ON triples(subject, predicate)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_object ON triples(objectValue)")
+            }
+        }
+
         fun init(context: Context, memory: EncryptedMemory) {
             if (INSTANCE != null) return
             synchronized(this) {
@@ -63,7 +85,7 @@ abstract class AegisDatabase : RoomDatabase() {
                 )
                     .openHelperFactory(SupportFactory(passphrase))
                     .addCallback(FtsSetupCallback())
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 passphrase.fill(0)
             }
