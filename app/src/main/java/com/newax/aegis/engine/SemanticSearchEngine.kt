@@ -1,6 +1,7 @@
 package com.newax.aegis.engine
 
 import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.engine.graph.GraphStore
 import kotlin.math.ln
 
 object SemanticSearchEngine {
@@ -78,13 +79,19 @@ object SemanticSearchEngine {
                 }
             } catch (_: Exception) {}
 
-            // Room triples — search by entity tokens (capitalized and lowercase)
+            // Normalized graph — resolve entity tokens, walk current edges
             val entityTokens = (queryTokens.map { it.replaceFirstChar { c -> c.uppercase() } } + queryTokens)
                 .distinct().take(4)
             entityTokens.forEach { token ->
-                db.tripleDao().involving(token).take(3).forEach { t ->
-                    val text = "${t.subject} ${t.predicate.replace('_', ' ')} ${t.objectValue}"
-                    candidates += Hit("Graph[${t.subject}]", text, preRanked = true)
+                val entityId = GraphStore.resolve(db, token) ?: return@forEach
+                val entityName = db.graphDao().entityById(entityId)?.canonicalName ?: token
+                db.graphDao().currentEdgesFrom(entityId).take(4).forEach { edge ->
+                    val pred = db.graphDao().predicateById(edge.predicateId)?.name ?: return@forEach
+                    val obj = when {
+                        edge.objectId != null -> db.graphDao().entityById(edge.objectId)?.canonicalName ?: edge.objectValue ?: "?"
+                        else -> edge.objectValue ?: "?"
+                    }
+                    candidates += Hit("Graph[$entityName]", "$entityName ${pred.replace('_',' ')} $obj", preRanked = true)
                 }
             }
         }
@@ -163,6 +170,20 @@ object SemanticSearchEngine {
                     val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
                     val t  = db?.tripleDao()?.byId(id)
                     if (t != null) result.append("Triple [${t.subject}]: ${t.predicate.replace('_', ' ')} → ${t.objectValue}\n")
+                }
+                idStr.startsWith("ENTITY:") -> {
+                    val id = idStr.substringAfter("ENTITY:").toLongOrNull() ?: continue
+                    val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+                    val e  = db?.graphDao()?.entityById(id)
+                    if (e != null) {
+                        val edges = db.graphDao().currentEdgesFrom(id).take(4)
+                        val summary = edges.joinToString("; ") { edge ->
+                            val pred = db.graphDao().predicateById(edge.predicateId)?.name ?: "?"
+                            val obj  = edge.objectId?.let { db.graphDao().entityById(it)?.canonicalName } ?: edge.objectValue ?: "?"
+                            "${pred.replace('_', ' ')} $obj"
+                        }
+                        result.append("Entity [${e.canonicalName}]: $summary\n")
+                    }
                 }
             }
         }

@@ -39,8 +39,15 @@ object MemoryIndexer {
             for (word in words) TypeaheadTrie.insert(word, id)
         }
 
-        // Index Room triples (subject + object as searchable terms)
+        // Index normalized graph entities by canonical name
         val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+        db?.graphDao()?.allEntities(10_000)?.forEach { entity ->
+            val entityRef = "ENTITY:${entity.id}"
+            entity.canonicalName.split("\\s+".toRegex())
+                .filter { it.length >= 2 }
+                .forEach { word -> TypeaheadTrie.insert(word, entityRef) }
+        }
+        // Legacy triple index for backward compat with old data
         db?.tripleDao()?.getAll()?.forEach { t ->
             val tripleId = "TRIPLE:${t.id}"
             (t.subject + " " + t.objectValue).split("\\s+".toRegex())

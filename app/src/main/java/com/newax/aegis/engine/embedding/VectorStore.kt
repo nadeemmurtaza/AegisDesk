@@ -22,6 +22,7 @@ object VectorStore {
     const val TYPE_FACT   = "fact"
     const val TYPE_MEMORY = "memory"
     const val TYPE_TRIPLE = "triple"
+    const val TYPE_EDGE   = "edge"
     private const val THRESHOLD = 0.35f
 
     data class SearchResult(
@@ -90,6 +91,20 @@ object VectorStore {
         }
             .sortedByDescending { it.score }
             .take(topK)
+    }
+
+    /** Index a normalized graph edge as "subject predicate object" text. */
+    fun indexEdge(db: AegisDatabase, edgeId: Long, subjectName: String, predicateName: String, objectStr: String) {
+        val text = "$subjectName ${predicateName.replace('_', ' ')} $objectStr"
+        val emb = EmbeddingEngine.embed(text) ?: return
+        db.embeddingDao().upsert(
+            EmbeddingEntity(
+                sourceType = TYPE_EDGE,
+                sourceId   = edgeId.toString(),
+                text       = text,
+                embedding  = emb.toByteArray()
+            )
+        )
     }
 
     fun pruneOrphans(db: AegisDatabase) = db.embeddingDao().pruneOrphans()

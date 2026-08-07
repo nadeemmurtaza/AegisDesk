@@ -8,6 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.newax.aegis.db.dao.*
 import com.newax.aegis.db.entity.*
+import com.newax.aegis.engine.graph.StandardPredicates
 import com.newax.aegis.memory.EncryptedMemory
 import net.sqlcipher.database.SupportFactory
 
@@ -19,9 +20,14 @@ import net.sqlcipher.database.SupportFactory
         LearningDraftEntity::class,
         KvStoreEntity::class,
         EmbeddingEntity::class,
-        TripleEntity::class
+        TripleEntity::class,
+        GraphEntity::class,
+        GraphPredicate::class,
+        GraphEdge::class,
+        GraphBlob::class,
+        EntityAlias::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AegisDatabase : RoomDatabase() {
@@ -33,6 +39,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun kvStoreDao(): KvStoreDao
     abstract fun embeddingDao(): EmbeddingDao
     abstract fun tripleDao(): TripleDao
+    abstract fun graphDao(): GraphDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -73,6 +80,101 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // ── entities ─────────────────────────────────────────────────
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS entities (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        type INTEGER NOT NULL DEFAULT 0,
+                        canonicalName TEXT NOT NULL,
+                        payloadPointer INTEGER,
+                        createdAt INTEGER NOT NULL
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ent_name ON entities(canonicalName)")
+
+                // ── entity_aliases ────────────────────────────────────────────
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS entity_aliases (
+                        entityId INTEGER NOT NULL,
+                        alias TEXT NOT NULL,
+                        PRIMARY KEY (entityId, alias)
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_alias_alias ON entity_aliases(alias)")
+
+                // ── predicates ────────────────────────────────────────────────
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS predicates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL
+                    )
+                """)
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_pred_name ON predicates(name)")
+
+                // ── edges ─────────────────────────────────────────────────────
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS edges (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        subjectId INTEGER NOT NULL,
+                        predicateId INTEGER NOT NULL,
+                        objectId INTEGER,
+                        objectValue TEXT,
+                        confidence INTEGER NOT NULL DEFAULT 80,
+                        importance INTEGER NOT NULL DEFAULT 50,
+                        createdAt INTEGER NOT NULL,
+                        validFrom INTEGER,
+                        validUntil INTEGER,
+                        sourceId INTEGER
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_subj_pred ON edges(subjectId, predicateId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_pred_obj ON edges(predicateId, objectId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_subj_pred_obj ON edges(subjectId, predicateId, objectId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_valid ON edges(validUntil)")
+
+                // ── blobs ─────────────────────────────────────────────────────
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS blobs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        type INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                """)
+
+                // ── seed standard predicates ──────────────────────────────────
+                StandardPredicates.ALL.forEach { name ->
+                    database.execSQL("INSERT OR IGNORE INTO predicates(name) VALUES ('$name')")
+                }
+
+                // ── migrate triples → normalized graph ────────────────────────
+                // Create one entity per unique triple subject
+                database.execSQL("""
+                    INSERT INTO entities (type, canonicalName, createdAt)
+                    SELECT 0, subject, MIN(createdMs) FROM triples GROUP BY subject
+                """)
+
+                // Create edges: join subject→entity, predicate→predicates table
+                database.execSQL("""
+                    INSERT INTO edges (subjectId, predicateId, objectValue, confidence, importance, createdAt)
+                    SELECT
+                        e.id,
+                        COALESCE(
+                            (SELECT p.id FROM predicates p WHERE p.name = t.predicate),
+                            (SELECT p2.id FROM predicates p2 WHERE p2.name = 'related_to')
+                        ),
+                        t.objectValue,
+                        CAST(t.confidence * 100 AS INTEGER),
+                        50,
+                        t.createdMs
+                    FROM triples t
+                    JOIN entities e ON LOWER(e.canonicalName) = LOWER(t.subject)
+                """)
+            }
+        }
+
         fun init(context: Context, memory: EncryptedMemory) {
             if (INSTANCE != null) return
             synchronized(this) {
@@ -85,7 +187,7 @@ abstract class AegisDatabase : RoomDatabase() {
                 )
                     .openHelperFactory(SupportFactory(passphrase))
                     .addCallback(FtsSetupCallback())
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 passphrase.fill(0)
             }

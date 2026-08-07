@@ -6,6 +6,7 @@ import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.TripleEntity
 import com.newax.aegis.engine.SensitiveInfoDetector
 import com.newax.aegis.engine.embedding.VectorStore
+import com.newax.aegis.engine.graph.GraphStore
 import org.json.JSONArray
 
 object LlmTripleExtractor {
@@ -42,26 +43,21 @@ object LlmTripleExtractor {
         }
     }
 
+    /**
+     * Persist triples into the normalized graph store (entities + predicates + edges)
+     * and index each edge for vector search.
+     */
     fun save(db: AegisDatabase, triples: List<TripleEntity>) {
         if (triples.isEmpty()) return
-        triples.forEach { triple ->
-            val id = db.tripleDao().insert(triple)
-            VectorStore.indexTriple(db, id, triple)
+        val indexed = GraphStore.saveLlmTriples(db, triples)
+        indexed.forEach { idx ->
+            VectorStore.indexEdge(db, idx.edgeId, idx.subjectName, idx.predicateName, idx.objectStr)
         }
     }
 
     /** Persist a manually-created edge (e.g. from ProposedAction.UpdateGraph). */
     fun saveEdge(db: AegisDatabase, from: String, relation: String, to: String, source: String = "manual") {
-        db.tripleDao().insert(
-            TripleEntity(
-                subject     = from,
-                predicate   = relation.lowercase().replace(' ', '_'),
-                objectValue = to,
-                confidence  = 1.0f,
-                source      = source,
-                createdMs   = System.currentTimeMillis()
-            )
-        )
+        GraphStore.saveEdge(db, from, relation, to, source)
     }
 
     fun about(db: AegisDatabase, entity: String): List<TripleEntity> =
@@ -74,7 +70,7 @@ object LlmTripleExtractor {
     private fun buildPrompt(text: String, source: String, subject: String?): String = buildString {
         appendLine("Extract knowledge graph triples from the message. Output a JSON array only — no other text.")
         appendLine("""Each item: {"subject":"entity name","predicate":"relationship","object":"value or entity","confidence":0.0-1.0}""")
-        appendLine("Predicates: works_at, worked_at, lives_in, knows, owns, likes, dislikes, birthday_on, studies_at, related_to, called, texted, met, hobby_is, drives, has_condition, takes_medication, allergic_to, member_of")
+        appendLine("Predicates: works_at, worked_at, lives_in, knows, owns, likes, dislikes, birthday_on, studies_at, related_to, called, texted, met, hobby_is, drives, has_condition, takes_medication, allergic_to, member_of, preferred_channel, avoids_channel, quiet_hours_start, quiet_hours_end, relationship_type, nickname, preferred_tone")
         appendLine("Rules: subjects and objects are proper nouns or concepts. Skip raw credentials, card/account numbers, OTPs. Return [] if nothing useful.")
         if (source.isNotBlank()) appendLine("SOURCE: $source")
         if (subject != null)     appendLine("CONTEXT PERSON: $subject")
@@ -119,6 +115,8 @@ object LlmTripleExtractor {
     private val VALID_PREDICATES = setOf(
         "works_at", "worked_at", "lives_in", "knows", "owns", "likes", "dislikes",
         "birthday_on", "studies_at", "related_to", "called", "texted", "met",
-        "hobby_is", "drives", "has_condition", "takes_medication", "allergic_to", "member_of"
+        "hobby_is", "drives", "has_condition", "takes_medication", "allergic_to",
+        "member_of", "preferred_channel", "avoids_channel", "quiet_hours_start",
+        "quiet_hours_end", "relationship_type", "nickname", "preferred_tone"
     )
 }
