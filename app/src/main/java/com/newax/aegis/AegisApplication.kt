@@ -6,8 +6,11 @@ import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.migration.LegacyMigrationWorker
 import com.newax.aegis.engine.ContactScannerWorker
 import com.newax.aegis.engine.GalleryScannerWorker
+import com.newax.aegis.memory.EncryptedMemory
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.concurrent.TimeUnit
@@ -16,6 +19,13 @@ import kotlin.system.exitProcess
 class AegisApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Initialize encrypted DB before any workers or viewmodels access it
+        val memory = EncryptedMemory(this)
+        AegisDatabase.init(this, memory)
+        // One-shot migration from legacy EncryptedSharedPreferences storage
+        if (AegisDatabase.get.kvStoreDao().get("migration_v1_done") != "1") {
+            LegacyMigrationWorker.schedule(this)
+        }
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             val sw = StringWriter()
             throwable.printStackTrace(PrintWriter(sw))

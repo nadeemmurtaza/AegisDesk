@@ -55,7 +55,7 @@ fun PeopleScreen(vm: MainViewModel, padding: PaddingValues) {
 
     LaunchedEffect(Unit) {
         val list = withContext(Dispatchers.IO) {
-            PersonFactStore.getTopPeople(vm.memory, 50)
+            PersonFactStore.getTopPeople(vm.db, 50)
         }
         people.clear()
         people.addAll(list)
@@ -184,7 +184,7 @@ private fun PersonDetailView(
     var intelProfile by remember { mutableStateOf<PersonIntelligence.PersonIntelligenceProfile?>(null) }
 
     LaunchedEffect(person.name) {
-        val loaded = withContext(Dispatchers.IO) { PersonFactStore.factsFor(vm.memory, person.name) }
+        val loaded = withContext(Dispatchers.IO) { PersonFactStore.factsFor(vm.db, person.name) }
         facts.clear()
         facts.addAll(loaded)
 

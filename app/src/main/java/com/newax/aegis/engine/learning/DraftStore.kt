@@ -1,126 +1,107 @@
 package com.newax.aegis.engine.learning
 
-import com.newax.aegis.memory.EncryptedMemory
+import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.entity.LearningDraftEntity
 
 /**
- * Encrypted persistent store for pending learning drafts.
- * Drafts accumulate here until the user approves or rejects each one.
- * All storage goes through EncryptedMemory so values never appear in plaintext.
+ * Persistent draft store backed by Room + SQLCipher.
+ * Each draft is a row in `learning_drafts`; no JSON blob, no single-lock serialization.
+ * Public API mirrors the old EncryptedMemory-based version — callers need only swap
+ * the first parameter from `EncryptedMemory` to `AegisDatabase`.
  */
 object DraftStore {
-    private const val KEY = "learning_drafts"
+
     private const val MAX_STORED = 500
-    private val lock = Any()
 
-    fun addDraft(memory: EncryptedMemory, draft: LearningDraft) = synchronized(lock) {
-        val list = loadAll(memory).toMutableList()
-        // Deduplicate: skip if identical fact from same source already pending
-        val alreadyExists = list.any { it.status == LearningDraft.Status.PENDING && it.fact == draft.fact && it.source == draft.source }
-        if (!alreadyExists) {
-            list.add(draft)
-            save(memory, list)
-        }
+    fun addDraft(db: AegisDatabase, draft: LearningDraft) {
+        db.learningDraftDao().insert(draft.toEntity())
+        pruneIfNeeded(db)
     }
 
-    fun addDrafts(memory: EncryptedMemory, drafts: List<LearningDraft>) = synchronized(lock) {
+    fun addDrafts(db: AegisDatabase, drafts: List<LearningDraft>) {
         if (drafts.isEmpty()) return
-        val list = loadAll(memory).toMutableList()
-        val existingKeys = list.filter { it.status == LearningDraft.Status.PENDING }
-            .map { "${it.fact}|${it.source}" }.toSet()
-        val fresh = drafts.filter { "${it.fact}|${it.source}" !in existingKeys }
-        if (fresh.isNotEmpty()) {
-            list.addAll(fresh)
-            save(memory, list)
-        }
+        db.learningDraftDao().insertAll(drafts.map { it.toEntity() })
+        pruneIfNeeded(db)
     }
 
-    fun pending(memory: EncryptedMemory): List<LearningDraft> =
-        loadAll(memory).filter { it.status == LearningDraft.Status.PENDING }
-            .sortedByDescending { it.confidence }
+    fun pending(db: AegisDatabase): List<LearningDraft> =
+        db.learningDraftDao().getPending().map { it.toDraft() }
 
-    fun all(memory: EncryptedMemory): List<LearningDraft> = loadAll(memory)
+    fun all(db: AegisDatabase): List<LearningDraft> =
+        db.learningDraftDao().getAll().map { it.toDraft() }
 
-    fun getById(memory: EncryptedMemory, id: String): LearningDraft? =
-        loadAll(memory).firstOrNull { it.id == id }
+    fun getById(db: AegisDatabase, id: String): LearningDraft? =
+        db.learningDraftDao().findById(id)?.toDraft()
 
-    fun approveDraft(memory: EncryptedMemory, id: String): LearningDraft? = synchronized(lock) {
-        val list = loadAll(memory).toMutableList()
-        val idx = list.indexOfFirst { it.id == id }
-        if (idx == -1) return null
-        val updated = list[idx].copy(status = LearningDraft.Status.APPROVED)
-        list[idx] = updated
-        save(memory, list)
-        updated
+    fun approveDraft(db: AegisDatabase, id: String): LearningDraft? {
+        db.learningDraftDao().updateStatus(id, "APPROVED")
+        return db.learningDraftDao().findById(id)?.toDraft()
     }
 
-    fun rejectDraft(memory: EncryptedMemory, id: String) = synchronized(lock) {
-        val list = loadAll(memory).toMutableList()
-        val idx = list.indexOfFirst { it.id == id }
-        if (idx != -1) {
-            list[idx] = list[idx].copy(status = LearningDraft.Status.REJECTED)
-            save(memory, list)
-        }
+    fun rejectDraft(db: AegisDatabase, id: String) =
+        db.learningDraftDao().updateStatus(id, "REJECTED")
+
+    fun approveAll(db: AegisDatabase): List<LearningDraft> {
+        val pending = db.learningDraftDao().getPending().map { it.toDraft() }
+        db.learningDraftDao().approveAll()
+        return pending
     }
 
-    fun approveAll(memory: EncryptedMemory): List<LearningDraft> = synchronized(lock) {
-        val list = loadAll(memory).toMutableList()
-        val approved = mutableListOf<LearningDraft>()
-        list.forEachIndexed { i, d ->
-            if (d.status == LearningDraft.Status.PENDING) {
-                list[i] = d.copy(status = LearningDraft.Status.APPROVED)
-                approved += list[i]
-            }
-        }
-        save(memory, list)
-        approved
-    }
+    fun rejectAll(db: AegisDatabase) =
+        db.learningDraftDao().rejectAll()
 
-    fun rejectAll(memory: EncryptedMemory) = synchronized(lock) {
-        val list = loadAll(memory).map { d ->
-            if (d.status == LearningDraft.Status.PENDING) d.copy(status = LearningDraft.Status.REJECTED) else d
-        }
-        save(memory, list)
-    }
-
-    fun pendingCount(memory: EncryptedMemory): Int = loadAll(memory).count { it.status == LearningDraft.Status.PENDING }
+    fun pendingCount(db: AegisDatabase): Int =
+        db.learningDraftDao().pendingCount()
 
     data class DraftStats(val total: Int, val pending: Int, val approved: Int, val rejected: Int)
 
-    fun stats(memory: EncryptedMemory): DraftStats {
-        val all = loadAll(memory)
-        return DraftStats(
-            total    = all.size,
-            pending  = all.count { it.status == LearningDraft.Status.PENDING },
-            approved = all.count { it.status == LearningDraft.Status.APPROVED },
-            rejected = all.count { it.status == LearningDraft.Status.REJECTED }
-        )
+    fun stats(db: AegisDatabase): DraftStats = DraftStats(
+        total    = db.learningDraftDao().total(),
+        pending  = db.learningDraftDao().countByStatus("PENDING"),
+        approved = db.learningDraftDao().countByStatus("APPROVED"),
+        rejected = db.learningDraftDao().countByStatus("REJECTED")
+    )
+
+    fun pruneOld(db: AegisDatabase) =
+        db.learningDraftDao().clearNonPending()
+
+    fun clearOld(db: AegisDatabase, keepPending: Boolean = true) {
+        if (keepPending) db.learningDraftDao().clearNonPending()
+        else db.learningDraftDao().clearAll()
     }
 
-    /** Remove all non-pending drafts to keep storage small. Call periodically. */
-    fun pruneOld(memory: EncryptedMemory) = synchronized(lock) {
-        val list = loadAll(memory).filter { it.status == LearningDraft.Status.PENDING }
-        save(memory, list)
+    // ── Internals ─────────────────────────────────────────────────────────────
+
+    private fun pruneIfNeeded(db: AegisDatabase) {
+        val total = db.learningDraftDao().total()
+        if (total > MAX_STORED) {
+            // Remove oldest non-pending drafts first
+            val cutoffMs = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+            db.learningDraftDao().pruneOldProcessed(cutoffMs)
+        }
     }
 
-    /** Delete all drafts. If keepPending=true, preserves PENDING ones. */
-    fun clearOld(memory: EncryptedMemory, keepPending: Boolean = true) = synchronized(lock) {
-        val list = if (keepPending)
-            loadAll(memory).filter { it.status == LearningDraft.Status.PENDING }
-        else
-            emptyList()
-        memory.storeRaw(KEY, LearningDraft.listToJson(list))
-    }
+    private fun LearningDraft.toEntity() = LearningDraftEntity(
+        id            = id,
+        category      = category,
+        fact          = fact,
+        source        = source,
+        sourceSnippet = sourceSnippet,
+        confidence    = confidence,
+        status        = status.name,
+        subjectName   = subjectName,
+        timestampMs   = timestampMs
+    )
 
-    private fun loadAll(memory: EncryptedMemory): List<LearningDraft> {
-        val raw = memory.getRaw(KEY) ?: return emptyList()
-        return LearningDraft.listFromJson(raw)
-    }
-
-    private fun save(memory: EncryptedMemory, drafts: List<LearningDraft>) {
-        // Keep at most MAX_STORED; always preserve PENDING ones, trim old APPROVED/REJECTED
-        val pending   = drafts.filter { it.status == LearningDraft.Status.PENDING }
-        val processed = drafts.filter { it.status != LearningDraft.Status.PENDING }
-            .takeLast(MAX_STORED - pending.size)
-        memory.storeRaw(KEY, LearningDraft.listToJson(pending + processed))
-    }
+    private fun LearningDraftEntity.toDraft() = LearningDraft(
+        id            = id,
+        category      = category,
+        fact          = fact,
+        source        = source,
+        sourceSnippet = sourceSnippet,
+        confidence    = confidence,
+        timestampMs   = timestampMs,
+        status        = runCatching { LearningDraft.Status.valueOf(status) }.getOrDefault(LearningDraft.Status.PENDING),
+        subjectName   = subjectName
+    )
 }

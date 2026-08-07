@@ -18,6 +18,7 @@ import com.newax.aegis.assistant.*
 import com.newax.aegis.engine.AutomationSettings
 import com.newax.aegis.engine.ContactsManager
 import com.newax.aegis.engine.TotpManager
+import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.engine.learning.DraftStore
 import com.newax.aegis.engine.learning.LearningDraft
 import com.newax.aegis.engine.learning.LearningWorker
@@ -36,6 +37,7 @@ import java.util.Calendar
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val engine = LocalAssistantEngine()
     val memory = EncryptedMemory(application)
+    val db = AegisDatabase.get
     private val modelImporter = ModelImporter(application)
     private var offlineModel: LiteRtOfflineModel? = null
 
@@ -53,7 +55,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val pendingDrafts: StateFlow<List<LearningDraft>> = _pendingDrafts.asStateFlow()
 
     fun refreshDrafts() {
-        _pendingDrafts.value = DraftStore.pending(memory)
+        _pendingDrafts.value = DraftStore.pending(db)
     }
 
     init {
@@ -392,7 +394,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             true
         }
         is ProposedAction.ShowDrafts -> {
-            val drafts = DraftStore.pending(memory)
+            val drafts = DraftStore.pending(db)
             withContext(Dispatchers.Main) {
                 refreshDrafts()
                 val text = if (drafts.isEmpty()) {
@@ -413,14 +415,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             true
         }
         is ProposedAction.ApproveDraft -> {
-            val approved = DraftStore.approveDraft(memory, action.id)
+            val approved = DraftStore.approveDraft(db, action.id)
             withContext(Dispatchers.Main) {
                 if (approved != null) {
                     val result = MemoryConsolidator.processApproval(memory, approved)
                     val msg = when (result.action) {
                         MemoryConsolidator.Action.STORE_NEW -> {
                             memory.remember(approved.category, result.resolvedFact ?: approved.fact)
-                            approved.subjectName?.let { PersonFactStore.addFact(memory, it, approved) }
+                            approved.subjectName?.let { PersonFactStore.addFact(db, it, approved) }
                             bumpMemoryVersion()
                             "Saved [${approved.category}]: ${approved.fact.take(70)}"
                         }
@@ -430,13 +432,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         MemoryConsolidator.Action.REPLACE_EXISTING -> {
                             result.conflictingFact?.let { memory.forget(approved.category, it) }
                             memory.remember(approved.category, result.resolvedFact ?: approved.fact)
-                            approved.subjectName?.let { PersonFactStore.addFact(memory, it, approved) }
+                            approved.subjectName?.let { PersonFactStore.addFact(db, it, approved) }
                             bumpMemoryVersion()
                             "Memory updated — replaced outdated fact."
                         }
                         MemoryConsolidator.Action.PRESENT_CONFLICT -> {
                             memory.remember(approved.category, result.resolvedFact ?: approved.fact)
-                            approved.subjectName?.let { PersonFactStore.addFact(memory, it, approved) }
+                            approved.subjectName?.let { PersonFactStore.addFact(db, it, approved) }
                             bumpMemoryVersion()
                             "Saved — note: similar fact exists: \"${result.conflictingFact?.take(60)}\""
                         }
@@ -450,7 +452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             approved != null
         }
         is ProposedAction.RejectDraft -> {
-            DraftStore.rejectDraft(memory, action.id)
+            DraftStore.rejectDraft(db, action.id)
             withContext(Dispatchers.Main) {
                 refreshDrafts()
                 messages += ChatMessage("Draft rejected and discarded.", false)
@@ -458,7 +460,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             true
         }
         is ProposedAction.ApproveAllDrafts -> {
-            val approved = DraftStore.approveAll(memory)
+            val approved = DraftStore.approveAll(db)
             withContext(Dispatchers.Main) {
                 var stored = 0; var skipped = 0; var replaced = 0
                 approved.forEach { d ->
@@ -466,19 +468,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     when (result.action) {
                         MemoryConsolidator.Action.STORE_NEW -> {
                             memory.remember(d.category, result.resolvedFact ?: d.fact)
-                            d.subjectName?.let { PersonFactStore.addFact(memory, it, d) }
+                            d.subjectName?.let { PersonFactStore.addFact(db, it, d) }
                             stored++
                         }
                         MemoryConsolidator.Action.SKIP_DUPLICATE -> skipped++
                         MemoryConsolidator.Action.REPLACE_EXISTING -> {
                             result.conflictingFact?.let { memory.forget(d.category, it) }
                             memory.remember(d.category, result.resolvedFact ?: d.fact)
-                            d.subjectName?.let { PersonFactStore.addFact(memory, it, d) }
+                            d.subjectName?.let { PersonFactStore.addFact(db, it, d) }
                             replaced++
                         }
                         MemoryConsolidator.Action.PRESENT_CONFLICT -> {
                             memory.remember(d.category, result.resolvedFact ?: d.fact)
-                            d.subjectName?.let { PersonFactStore.addFact(memory, it, d) }
+                            d.subjectName?.let { PersonFactStore.addFact(db, it, d) }
                             stored++
                         }
                     }
@@ -493,7 +495,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             true
         }
         is ProposedAction.RejectAllDrafts -> {
-            DraftStore.rejectAll(memory)
+            DraftStore.rejectAll(db)
             withContext(Dispatchers.Main) {
                 refreshDrafts()
                 messages += ChatMessage("All pending drafts rejected.", false)

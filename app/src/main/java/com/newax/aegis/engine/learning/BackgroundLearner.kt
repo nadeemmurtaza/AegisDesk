@@ -6,6 +6,7 @@ import android.provider.CallLog
 import android.provider.MediaStore
 import android.provider.Telephony
 import android.util.Log
+import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.engine.ContactNormalizer
 import com.newax.aegis.engine.ContactsManager
 import com.newax.aegis.engine.SensitiveInfoDetector
@@ -35,6 +36,8 @@ object BackgroundLearner {
         ScanProgress.init(context)
         if (!ScanProgress.isEnabled()) return 0
 
+        val db = AegisDatabase.get
+
         var source = ScanProgress.currentSource()
         var skips = 0
         while (!ScanProgress.isSourceEnabled(source) && skips < ScanSource.entries.size) {
@@ -48,10 +51,10 @@ object BackgroundLearner {
 
         val drafts = try {
             when (source) {
-                ScanSource.CONTACTS    -> scanContacts(context, memory)
-                ScanSource.SMS_INBOX   -> scanSms(context, Telephony.Sms.Inbox.CONTENT_URI, source, memory)
-                ScanSource.SMS_SENT    -> scanSms(context, Telephony.Sms.Sent.CONTENT_URI, source, memory)
-                ScanSource.CALL_LOGS   -> scanCallLogs(context, source, memory)
+                ScanSource.CONTACTS    -> scanContacts(context, db, memory)
+                ScanSource.SMS_INBOX   -> scanSms(context, Telephony.Sms.Inbox.CONTENT_URI, source, db, memory)
+                ScanSource.SMS_SENT    -> scanSms(context, Telephony.Sms.Sent.CONTENT_URI, source, db, memory)
+                ScanSource.CALL_LOGS   -> scanCallLogs(context, source, db, memory)
                 ScanSource.GALLERY_OCR -> scanGallery(context, source)
                 ScanSource.DOWNLOADS   -> scanDownloads(context, source)
             }
@@ -62,20 +65,20 @@ object BackgroundLearner {
         }
 
         if (drafts.isNotEmpty()) {
-            DraftStore.addDrafts(memory, drafts)
+            DraftStore.addDrafts(db, drafts)
             ScanProgress.addToDraftsCreated(drafts.size)
 
             // Record person mentions in PersonFactStore
             drafts.forEach { draft ->
                 draft.subjectName?.takeIf { it.isNotBlank() }?.let { name ->
-                    PersonFactStore.recordMention(memory, name, source.name)
+                    PersonFactStore.recordMention(db, name, source.name)
                 }
             }
             Log.d(TAG, "${drafts.size} new drafts from ${source.label}")
         }
 
         // Trigger auto profile builds for people who crossed the importance threshold
-        triggerProfileBuilds(context, memory)
+        triggerProfileBuilds(context, db, memory)
 
         ScanProgress.setLastRunMs(System.currentTimeMillis())
         ScanProgress.advanceSource()
@@ -84,8 +87,8 @@ object BackgroundLearner {
 
     // ── Profile build trigger ─────────────────────────────────────────────────
 
-    private fun triggerProfileBuilds(context: Context, memory: EncryptedMemory) {
-        val tooBuild = PersonFactStore.getPeopleNeedingProfileBuild(memory)
+    private fun triggerProfileBuilds(context: Context, db: AegisDatabase, memory: EncryptedMemory) {
+        val tooBuild = PersonFactStore.getPeopleNeedingProfileBuild(db)
         if (tooBuild.isEmpty()) return
         val mgr = ContactsManager(context, memory)
         val allContacts = try { mgr.loadAllContacts() } catch (_: Exception) { return }
@@ -98,21 +101,21 @@ object BackgroundLearner {
             if (contact != null) {
                 try {
                     mgr.buildPersonProfile(contact.contactId)
-                    PersonFactStore.markProfileBuilt(memory, name)
+                    PersonFactStore.markProfileBuilt(db, name)
                     Log.d(TAG, "Auto-built profile: $name")
                 } catch (e: Exception) {
                     Log.w(TAG, "Profile build failed for $name: ${e.message}")
                 }
             } else {
                 // Person not in contacts — mark built to avoid retrying every cycle
-                PersonFactStore.markProfileBuilt(memory, name)
+                PersonFactStore.markProfileBuilt(db, name)
             }
         }
     }
 
     // ── Contacts ─────────────────────────────────────────────────────────────
 
-    private fun scanContacts(context: Context, memory: EncryptedMemory): List<LearningDraft> {
+    private fun scanContacts(context: Context, db: AegisDatabase, memory: EncryptedMemory): List<LearningDraft> {
         val mgr    = ContactsManager(context, memory)
         val all    = mgr.loadAllContacts()
         val offset = ScanProgress.getOffset(ScanSource.CONTACTS)
@@ -129,7 +132,7 @@ object BackgroundLearner {
                 }
             }
             // Record contact mention in PersonFactStore
-            PersonFactStore.recordMention(memory, contact.displayName, ScanSource.CONTACTS.name)
+            PersonFactStore.recordMention(db, contact.displayName, ScanSource.CONTACTS.name)
         }
 
         val nextOffset = if (batch.size < ScanSource.CONTACTS.batchSize) 0 else offset + batch.size
@@ -143,6 +146,7 @@ object BackgroundLearner {
         context: Context,
         uri: android.net.Uri,
         source: ScanSource,
+        db: AegisDatabase,
         memory: EncryptedMemory
     ): List<LearningDraft> {
         val lastMs = ScanProgress.getLastSeenMs(source)
@@ -169,7 +173,7 @@ object BackgroundLearner {
 
                 // Record mention even if no facts are extracted
                 if (subjectName != null) {
-                    PersonFactStore.recordMention(memory, subjectName, source.name)
+                    PersonFactStore.recordMention(db, subjectName, source.name)
                 }
 
                 val facts = FactExtractor.extract(body, label, subjectName)
@@ -189,6 +193,7 @@ object BackgroundLearner {
     private fun scanCallLogs(
         context: Context,
         source: ScanSource,
+        db: AegisDatabase,
         memory: EncryptedMemory
     ): List<LearningDraft> {
         val lastMs = ScanProgress.getLastSeenMs(source)
@@ -224,7 +229,7 @@ object BackgroundLearner {
                     else -> "call"
                 }
                 callCounts[name] = (callCounts[name] ?: 0) + 1
-                PersonFactStore.recordMention(memory, name, source.name)
+                PersonFactStore.recordMention(db, name, source.name)
 
                 if (durSec > 300) {
                     FactExtractor.extractFromCall(name, typeLabel, durSec, false)

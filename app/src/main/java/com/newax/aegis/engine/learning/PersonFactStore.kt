@@ -1,34 +1,22 @@
 package com.newax.aegis.engine.learning
 
-import com.newax.aegis.memory.EncryptedMemory
-import org.json.JSONArray
-import org.json.JSONObject
+import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.entity.PersonEntity
+import com.newax.aegis.db.entity.PersonFactEntity
 
 /**
  * Per-person fact store and cross-source importance tracker.
+ * Backed by Room + SQLCipher instead of EncryptedSharedPreferences.
  *
- * Every contact/person that appears across scan sources gets:
- *  - A fact list (facts extracted about them, deduplicated)
- *  - A mention map (how many times seen in each ScanSource)
- *  - An importance score (0–1) based on cross-source presence + frequency
- *
- * When importance crosses a threshold, needsProfileBuild() returns true,
- * signalling BackgroundLearner to call ContactsManager.buildPersonProfile().
- *
- * All data lives inside EncryptedMemory (storeRaw/getRaw) with key prefixes:
- *   pf_<nameSlug>    → JSON array of PersonFact
- *   pm_<nameSlug>    → JSON object: { sourceName: count, _total: N, _last_seen: ms }
- *   pf_index         → JSON array of tracked names
- *   pm_<nameSlug>_built → "1" when profile was built, prevents re-triggering
+ * Importance score (0–1):
+ *   60% from distinct-source diversity + 40% from raw mention frequency.
  */
 object PersonFactStore {
 
-    // Appear in this many distinct sources → auto-trigger profile build
     private const val CROSS_SOURCE_THRESHOLD = 2
-    // OR total mentions across all sources → auto-trigger
     private const val TOTAL_MENTION_THRESHOLD = 12
-    // Max facts kept per person (oldest trimmed first)
     private const val MAX_FACTS_PER_PERSON = 200
+    private const val TOTAL_SCAN_SOURCES = 6       // mirrors ScanSource.entries.size
 
     data class PersonFact(
         val name: String,
@@ -49,147 +37,133 @@ object PersonFactStore {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /** Store a fact linked to a named person. Deduplicates by fact text. */
-    fun addFact(memory: EncryptedMemory, name: String, draft: LearningDraft) {
-        val facts = loadFacts(memory, name).toMutableList()
-        val already = facts.any { trigramJaccard(it.fact.lowercase(), draft.fact.lowercase()) > 0.80f }
-        if (!already) {
-            facts += PersonFact(
-                name        = name,
-                fact        = draft.fact,
-                category    = draft.category,
-                confidence  = draft.confidence,
-                source      = draft.source,
-                timestampMs = draft.timestampMs
+    /** Store a fact linked to a named person. Deduplicates by trigram Jaccard > 0.80. */
+    fun addFact(db: AegisDatabase, name: String, draft: LearningDraft) {
+        val personId = getOrCreateId(db, name)
+        val existing = db.personFactDao().forPerson(personId)
+        val alreadyExists = existing.any { trigramJaccard(it.fact.lowercase(), draft.fact.lowercase()) > 0.80f }
+        if (!alreadyExists) {
+            db.personFactDao().insert(
+                PersonFactEntity(
+                    personId    = personId,
+                    fact        = draft.fact,
+                    category    = draft.category,
+                    confidence  = draft.confidence,
+                    source      = draft.source,
+                    timestampMs = draft.timestampMs
+                )
             )
-            val trimmed = if (facts.size > MAX_FACTS_PER_PERSON) facts.takeLast(MAX_FACTS_PER_PERSON) else facts
-            memory.storeRaw(factKey(name), serializeFacts(trimmed))
-            addToIndex(memory, name)
+            // Trim to max limit (oldest removed)
+            val count = db.personFactDao().countForPerson(personId)
+            if (count > MAX_FACTS_PER_PERSON) {
+                db.personFactDao().trimToLimit(personId, MAX_FACTS_PER_PERSON)
+            }
         }
     }
 
-    /** All facts stored about a person, newest first. */
-    fun factsFor(memory: EncryptedMemory, name: String): List<PersonFact> =
-        loadFacts(memory, name).sortedByDescending { it.timestampMs }
+    /** All facts for a person, newest first. */
+    fun factsFor(db: AegisDatabase, name: String): List<PersonFact> {
+        val personId = db.personDao().idForName(name) ?: return emptyList()
+        return db.personFactDao().forPerson(personId).map { it.toPersonFact(name) }
+    }
 
     /**
      * Record that this person was encountered in a scan source.
-     * Called by BackgroundLearner every time a person's name appears.
+     * Increments per-source count, updates denormalized totals + importance score.
      */
-    fun recordMention(memory: EncryptedMemory, name: String, source: String) {
-        val key = mentionKey(name)
-        val obj = runCatching { JSONObject(memory.getRaw(key) ?: "{}") }.getOrDefault(JSONObject())
-        obj.put(source, obj.optInt(source, 0) + 1)
-        val total = obj.keys().asSequence().filter { !it.startsWith("_") }.sumOf { obj.optInt(it, 0) }
-        obj.put("_total", total)
-        obj.put("_last_seen", System.currentTimeMillis())
-        memory.storeRaw(key, obj.toString())
-        addToIndex(memory, name)
+    fun recordMention(db: AegisDatabase, name: String, source: String) {
+        db.runInTransaction {
+            val personId = getOrCreateId(db, name)
+            db.personMentionDao().incrementOrInsert(personId, source)
+            val sourceCount    = db.personMentionDao().sourceCount(personId)
+            val totalMentions  = db.personMentionDao().totalMentions(personId)
+            val score          = computeScore(sourceCount, totalMentions)
+            db.personDao().updateStats(
+                id             = personId,
+                sourceCount    = sourceCount,
+                totalMentions  = totalMentions,
+                importanceScore = score,
+                lastSeenMs     = System.currentTimeMillis()
+            )
+        }
     }
 
-    /**
-     * Composite importance score 0–1.
-     * 60% from cross-source diversity, 40% from raw mention frequency.
-     */
-    fun getImportanceScore(memory: EncryptedMemory, name: String): Float {
-        val obj = mentionObj(memory, name) ?: return 0f
-        val sources      = obj.keys().asSequence().count { !it.startsWith("_") }.toFloat()
-        val totalMentions = obj.optInt("_total", 0).toFloat()
-        val sourceFactor  = (sources / ScanSource.entries.size).coerceIn(0f, 1f)
-        val mentionFactor = (totalMentions / 50f).coerceIn(0f, 1f)
-        return sourceFactor * 0.6f + mentionFactor * 0.4f
+    /** Composite importance score 0–1. */
+    fun getImportanceScore(db: AegisDatabase, name: String): Float {
+        val person = db.personDao().findByName(name) ?: return 0f
+        return person.importanceScore
     }
 
     /** Top N people by importance score. */
-    fun getTopPeople(memory: EncryptedMemory, limit: Int = 20): List<PersonImportance> {
-        return loadIndex(memory).map { name ->
-            val obj           = mentionObj(memory, name)
-            val sources       = obj?.keys()?.asSequence()?.count { !it.startsWith("_") } ?: 0
-            val totalMentions = obj?.optInt("_total", 0) ?: 0
-            val lastSeen      = obj?.optLong("_last_seen", 0L) ?: 0L
-            PersonImportance(
-                name          = name,
-                score         = getImportanceScore(memory, name),
-                sourceCount   = sources,
-                totalMentions = totalMentions,
-                lastSeenMs    = lastSeen
-            )
-        }.sortedByDescending { it.score }.take(limit)
+    fun getTopPeople(db: AegisDatabase, limit: Int = 20): List<PersonImportance> =
+        db.personDao().getTopPeople(limit).map { it.toPersonImportance() }
+
+    /** True if person crossed the threshold and hasn't had a profile built yet. */
+    fun needsProfileBuild(db: AegisDatabase, name: String): Boolean {
+        val person = db.personDao().findByName(name) ?: return false
+        if (person.profileBuilt) return false
+        return person.sourceCount >= CROSS_SOURCE_THRESHOLD || person.totalMentions >= TOTAL_MENTION_THRESHOLD
     }
 
-    /** True if person has crossed the threshold and hasn't had a profile built yet. */
-    fun needsProfileBuild(memory: EncryptedMemory, name: String): Boolean {
-        if (memory.getRaw("${mentionKey(name)}_built") == "1") return false
-        val obj           = mentionObj(memory, name) ?: return false
-        val sources       = obj.keys().asSequence().count { !it.startsWith("_") }
-        val totalMentions = obj.optInt("_total", 0)
-        return sources >= CROSS_SOURCE_THRESHOLD || totalMentions >= TOTAL_MENTION_THRESHOLD
-    }
+    fun markProfileBuilt(db: AegisDatabase, name: String) =
+        db.personDao().markProfileBuilt(name)
 
-    fun markProfileBuilt(memory: EncryptedMemory, name: String) {
-        memory.storeRaw("${mentionKey(name)}_built", "1")
-    }
+    fun getPeopleNeedingProfileBuild(db: AegisDatabase): List<String> =
+        db.personDao().getPeopleNeedingProfileBuild(CROSS_SOURCE_THRESHOLD, TOTAL_MENTION_THRESHOLD)
+            .map { it.name }
 
-    /** Names that crossed the threshold and still need a profile built. */
-    fun getPeopleNeedingProfileBuild(memory: EncryptedMemory): List<String> =
-        loadIndex(memory).filter { needsProfileBuild(memory, it) }
+    /**
+     * Full-text search across all person facts.
+     * Query supports FTS4 MATCH syntax: "hospital", "work*", "Ahmed hospital".
+     */
+    fun searchFacts(db: AegisDatabase, query: String, limit: Int = 50): List<PersonFact> {
+        if (query.isBlank()) return emptyList()
+        val safe = query.trim().replace("\"", "")   // strip any embedded quotes
+        return db.personFactDao().searchFts(safe, limit).map { entity ->
+            val name = db.personDao().findByName("") // resolve by personId
+            // Load name from persons table
+            entity.toPersonFact(resolvePersonName(db, entity.personId))
+        }
+    }
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
-    private fun factKey(name: String)    = "pf_${slug(name)}"
-    private fun mentionKey(name: String) = "pm_${slug(name)}"
-    private fun slug(name: String)       = name.lowercase().replace(Regex("\\s+"), "_").take(30)
+    private val nameCache = HashMap<Long, String>(64)
 
-    private fun mentionObj(memory: EncryptedMemory, name: String): JSONObject? =
-        runCatching { JSONObject(memory.getRaw(mentionKey(name)) ?: return null) }.getOrNull()
-
-    private fun addToIndex(memory: EncryptedMemory, name: String) {
-        val raw   = memory.getRaw("pf_index") ?: "[]"
-        val names = runCatching {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).map { arr.getString(it) }.toMutableSet()
-        }.getOrDefault(mutableSetOf())
-        if (names.add(name)) memory.storeRaw("pf_index", JSONArray(names.toList()).toString())
+    private fun resolvePersonName(db: AegisDatabase, personId: Long): String {
+        nameCache[personId]?.let { return it }
+        // Fallback: scan from getTopPeople (not ideal, but search is rare)
+        db.personDao().getTopPeople(1000).forEach { nameCache[it.id] = it.name }
+        return nameCache[personId] ?: ""
     }
 
-    private fun loadIndex(memory: EncryptedMemory): List<String> =
-        runCatching {
-            val arr = JSONArray(memory.getRaw("pf_index") ?: return emptyList())
-            (0 until arr.length()).map { arr.getString(it) }
-        }.getOrDefault(emptyList())
-
-    private fun loadFacts(memory: EncryptedMemory, name: String): List<PersonFact> =
-        runCatching {
-            val arr = JSONArray(memory.getRaw(factKey(name)) ?: return emptyList())
-            (0 until arr.length()).mapNotNull { i ->
-                runCatching {
-                    val o = arr.getJSONObject(i)
-                    PersonFact(
-                        name        = o.optString("name", name),
-                        fact        = o.getString("fact"),
-                        category    = o.optString("category", "personal"),
-                        confidence  = o.optDouble("confidence", 0.7).toFloat(),
-                        source      = o.optString("source", ""),
-                        timestampMs = o.optLong("ts", 0L)
-                    )
-                }.getOrNull()
-            }
-        }.getOrDefault(emptyList())
-
-    private fun serializeFacts(facts: List<PersonFact>): String {
-        val arr = JSONArray()
-        facts.forEach { f ->
-            arr.put(JSONObject().apply {
-                put("name",       f.name)
-                put("fact",       f.fact)
-                put("category",   f.category)
-                put("confidence", f.confidence.toDouble())
-                put("source",     f.source)
-                put("ts",         f.timestampMs)
-            })
-        }
-        return arr.toString()
+    private fun getOrCreateId(db: AegisDatabase, name: String): Long {
+        val id = db.personDao().insertIfAbsent(PersonEntity(name = name))
+        return if (id > 0L) id else db.personDao().idForName(name)!!
     }
+
+    private fun computeScore(sourceCount: Int, totalMentions: Int): Float {
+        val sourceFactor  = (sourceCount.toFloat() / TOTAL_SCAN_SOURCES).coerceIn(0f, 1f)
+        val mentionFactor = (totalMentions.toFloat() / 50f).coerceIn(0f, 1f)
+        return sourceFactor * 0.6f + mentionFactor * 0.4f
+    }
+
+    private fun PersonFactEntity.toPersonFact(name: String) = PersonFact(
+        name        = name,
+        fact        = fact,
+        category    = category,
+        confidence  = confidence,
+        source      = source,
+        timestampMs = timestampMs
+    )
+
+    private fun PersonEntity.toPersonImportance() = PersonImportance(
+        name          = name,
+        score         = importanceScore,
+        sourceCount   = sourceCount,
+        totalMentions = totalMentions,
+        lastSeenMs    = lastSeenMs
+    )
 
     private fun trigramJaccard(a: String, b: String): Float {
         if (a.length < 3 || b.length < 3) return 0f

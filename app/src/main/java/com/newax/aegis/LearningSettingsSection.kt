@@ -70,7 +70,7 @@ fun LearningSettingsSection(vm: MainViewModel) {
     var lastRunMs       by remember { mutableStateOf(ScanProgress.getLastRunMs()) }
     var currentSource   by remember { mutableStateOf(ScanProgress.currentSource()) }
     var totalCreated    by remember { mutableIntStateOf(ScanProgress.getTotalDraftsCreated()) }
-    var draftStats      by remember { mutableStateOf(DraftStore.stats(vm.memory)) }
+    var draftStats      by remember { mutableStateOf(DraftStore.stats(vm.db)) }
     var showResetDialog by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
 
@@ -81,7 +81,7 @@ fun LearningSettingsSection(vm: MainViewModel) {
         lastRunMs       = ScanProgress.getLastRunMs()
         currentSource   = ScanProgress.currentSource()
         totalCreated    = ScanProgress.getTotalDraftsCreated()
-        draftStats      = DraftStore.stats(vm.memory)
+        draftStats      = DraftStore.stats(vm.db)
     }
 
     // Section label
@@ -475,7 +475,7 @@ fun LearningSettingsSection(vm: MainViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
-                        DraftStore.clearOld(vm.memory, keepPending = false)
+                        DraftStore.clearOld(vm.db, keepPending = false)
                         vm.refreshDrafts()
                         refresh()
                         showClearDialog = false
