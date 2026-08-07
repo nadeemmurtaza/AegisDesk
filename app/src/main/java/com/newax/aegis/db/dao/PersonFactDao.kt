@@ -42,4 +42,10 @@ interface PersonFactDao {
 
     @Query("SELECT * FROM person_facts WHERE personId = :personId AND fact = :fact LIMIT 1")
     fun findExact(personId: Long, fact: String): PersonFactEntity?
+
+    @Query("SELECT id FROM person_facts")
+    fun getAllIds(): List<Long>
+
+    @Query("SELECT * FROM person_facts WHERE id IN (:ids)")
+    fun getByIds(ids: List<Long>): List<PersonFactEntity>
 }

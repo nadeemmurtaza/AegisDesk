@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.newax.aegis.db.dao.*
 import com.newax.aegis.db.entity.*
@@ -16,9 +17,10 @@ import net.sqlcipher.database.SupportFactory
         PersonMentionEntity::class,
         PersonFactEntity::class,
         LearningDraftEntity::class,
-        KvStoreEntity::class
+        KvStoreEntity::class,
+        EmbeddingEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AegisDatabase : RoomDatabase() {
@@ -28,14 +30,27 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun personFactDao(): PersonFactDao
     abstract fun learningDraftDao(): LearningDraftDao
     abstract fun kvStoreDao(): KvStoreDao
+    abstract fun embeddingDao(): EmbeddingDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
 
-        /**
-         * Initialize the database. Must be called once before [get] is used.
-         * Safe to call multiple times — subsequent calls are no-ops.
-         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS embeddings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        sourceType TEXT NOT NULL,
+                        sourceId TEXT NOT NULL,
+                        text TEXT NOT NULL,
+                        embedding BLOB NOT NULL
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS idx_emb_type ON embeddings(sourceType)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_emb_sourceid ON embeddings(sourceId)")
+            }
+        }
+
         fun init(context: Context, memory: EncryptedMemory) {
             if (INSTANCE != null) return
             synchronized(this) {
@@ -48,8 +63,9 @@ abstract class AegisDatabase : RoomDatabase() {
                 )
                     .openHelperFactory(SupportFactory(passphrase))
                     .addCallback(FtsSetupCallback())
+                    .addMigrations(MIGRATION_1_2)
                     .build()
-                passphrase.fill(0)  // zero passphrase from memory after use
+                passphrase.fill(0)
             }
         }
 
@@ -57,15 +73,12 @@ abstract class AegisDatabase : RoomDatabase() {
             get() = INSTANCE ?: error("AegisDatabase.init() not called")
     }
 
-    /** Creates the FTS4 virtual table and triggers on first open. */
     private class FtsSetupCallback : Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
-            // FTS4 external-content table backed by person_facts
             db.execSQL("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS person_facts_fts
                 USING fts4(content="person_facts", fact, category, source)
             """)
-            // Keep FTS index in sync via triggers
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS pf_ai AFTER INSERT ON person_facts BEGIN
                     INSERT INTO person_facts_fts(rowid, fact, category, source)

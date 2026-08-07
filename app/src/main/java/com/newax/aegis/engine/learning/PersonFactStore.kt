@@ -3,6 +3,7 @@ package com.newax.aegis.engine.learning
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
+import com.newax.aegis.engine.embedding.VectorStore
 
 /**
  * Per-person fact store and cross-source importance tracker.
@@ -43,7 +44,7 @@ object PersonFactStore {
         val existing = db.personFactDao().forPerson(personId)
         val alreadyExists = existing.any { trigramJaccard(it.fact.lowercase(), draft.fact.lowercase()) > 0.80f }
         if (!alreadyExists) {
-            db.personFactDao().insert(
+            val rowId = db.personFactDao().insert(
                 PersonFactEntity(
                     personId    = personId,
                     fact        = draft.fact,
@@ -53,7 +54,13 @@ object PersonFactStore {
                     timestampMs = draft.timestampMs
                 )
             )
-            // Trim to max limit (oldest removed)
+            // Index for semantic search immediately if engine is ready; worker catches up otherwise
+            val indexText = buildString {
+                append(draft.fact)
+                if (draft.category.isNotBlank()) append(" [${draft.category}]")
+            }
+            VectorStore.indexFact(db, rowId, indexText)
+
             val count = db.personFactDao().countForPerson(personId)
             if (count > MAX_FACTS_PER_PERSON) {
                 db.personFactDao().trimToLimit(personId, MAX_FACTS_PER_PERSON)

@@ -19,6 +19,7 @@ import com.newax.aegis.engine.AutomationSettings
 import com.newax.aegis.engine.ContactsManager
 import com.newax.aegis.engine.TotpManager
 import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.engine.embedding.VectorMemorySearch
 import com.newax.aegis.engine.learning.DraftStore
 import com.newax.aegis.engine.learning.LearningDraft
 import com.newax.aegis.engine.learning.LearningWorker
@@ -187,7 +188,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty()
                     val firstLine = replyText.trim().lineSequence().firstOrNull()?.trim().orEmpty()
                     if (firstLine.isNotBlank() && engine.canHandle(firstLine)) {
-                        val commandReply = engine.generateReply(firstLine, screen, memory.relevant(firstLine))
+                        val commandReply = engine.generateReply(firstLine, screen, VectorMemorySearch.search(db, memory, firstLine))
                         val explanation = replyText.trim().removePrefix(firstLine).trim()
                         messages += ChatMessage(if (explanation.isNotBlank()) explanation else commandReply.text, false)
                         commandReply.proposedAction?.let { processAction(it) }
@@ -208,7 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val replies = parts.map { part ->
             engine.generateReply(
                 part, screen,
-                if (lower in setOf("what do you remember", "show memory", "recall")) memory.getAllCategories().values.flatten() else memory.relevant(part)
+                if (lower in setOf("what do you remember", "show memory", "recall")) memory.getAllCategories().values.flatten() else VectorMemorySearch.search(db, memory, part)
             )
         }
         messages += ChatMessage(replies.joinToString("\n") { it.text }, false)

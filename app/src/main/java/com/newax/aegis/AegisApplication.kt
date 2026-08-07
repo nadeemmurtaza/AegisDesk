@@ -10,6 +10,8 @@ import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.migration.LegacyMigrationWorker
 import com.newax.aegis.engine.ContactScannerWorker
 import com.newax.aegis.engine.GalleryScannerWorker
+import com.newax.aegis.engine.embedding.EmbeddingEngine
+import com.newax.aegis.engine.embedding.EmbeddingIndexWorker
 import com.newax.aegis.memory.EncryptedMemory
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -25,6 +27,17 @@ class AegisApplication : Application() {
         // One-shot migration from legacy EncryptedSharedPreferences storage
         if (AegisDatabase.get.kvStoreDao().get("migration_v1_done") != "1") {
             LegacyMigrationWorker.schedule(this)
+        }
+        // Load USE model from disk if already downloaded; try to download if not
+        EmbeddingEngine.init(this)
+        if (!EmbeddingEngine.isReady()) {
+            EmbeddingEngine.downloadModelIfNeeded(this) { success ->
+                if (success && EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
+                    EmbeddingIndexWorker.schedule(this)
+                }
+            }
+        } else if (EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
+            EmbeddingIndexWorker.schedule(this)
         }
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             val sw = StringWriter()
