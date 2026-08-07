@@ -59,6 +59,33 @@ object HabitTracker {
         TriggerEngine.triggerEvents.tryEmit(prompt)
     }
 
+    data class AppHabitPattern(
+        val packageName: String,
+        val openCount: Int,
+        val peakHour: Int,
+        val lastOpenMs: Long,
+        val avgSessionMs: Long = 0L
+    )
+
+    fun getPatternForPackage(packageName: String): AppHabitPattern? = synchronized(lock) {
+        val hours = timeBuckets[packageName] ?: return@synchronized null
+        val openCount = hours.size
+        val peakHour = hours.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key ?: 0
+        val lastOpenMs = lastAiTrigger
+        AppHabitPattern(packageName, openCount, peakHour, lastOpenMs)
+    }
+
+    fun getAllPatterns(): List<AppHabitPattern> = synchronized(lock) {
+        timeBuckets.map { (pkg, hours) ->
+            AppHabitPattern(
+                packageName = pkg,
+                openCount = hours.size,
+                peakHour = hours.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key ?: 0,
+                lastOpenMs = lastAiTrigger
+            )
+        }.sortedByDescending { it.openCount }
+    }
+
     /**
      * Local pattern detection without AI: finds apps opened ≥3 times
      * where 70%+ of opens fall within the same 3-hour window.
