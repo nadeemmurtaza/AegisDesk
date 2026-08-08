@@ -14,7 +14,6 @@ import com.newax.aegis.db.migration.LegacyMigrationWorker
 import com.newax.aegis.memory.SecureKeyVault
 import com.newax.aegis.engine.trigger.TriggerEngine as CoreTriggerEngine
 import com.newax.aegis.engine.ContactScannerWorker
-import com.newax.aegis.engine.GalleryScannerWorker
 import com.newax.aegis.engine.background.IntelligenceWorker
 import com.newax.aegis.engine.embedding.EmbeddingEngine
 import com.newax.aegis.engine.embedding.EmbeddingIndexWorker
@@ -92,12 +91,10 @@ class AegisApplication : Application() {
             .setRequiresCharging(true)
             .build()
         WorkManager.getInstance(this).apply {
-            enqueueUniquePeriodicWork(
-                "GalleryScanner",
-                ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<GalleryScannerWorker>(1, TimeUnit.DAYS)
-                    .setConstraints(constraints).build()
-            )
+            // GalleryScanner is intentionally gone: it asked a text-only model to judge
+            // images it never received, and fed it filenames inside a delete instruction.
+            // Real gallery indexing is FileIndexer's job.
+            cancelUniqueWork("GalleryScanner")
             enqueueUniquePeriodicWork(
                 "ContactScanner",
                 ExistingPeriodicWorkPolicy.KEEP,

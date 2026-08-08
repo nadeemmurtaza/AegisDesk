@@ -88,6 +88,32 @@ fun riskOf(action: ProposedAction): RiskLevel = when (action) {
 
 val ProposedAction.riskLevel: RiskLevel get() = riskOf(this)
 
+/**
+ * Where the text that produced an action came from.
+ *
+ * USER is something the person typed or spoke. BACKGROUND is machine-generated text —
+ * notification bodies, gallery/contact scan output, OCR'd screen content — which is
+ * untrusted input that happens to be phrased as a request. A filename or message body
+ * can say "delete file /x"; that must never carry the authority of the user saying it.
+ */
+enum class ActionOrigin { USER, BACKGROUND }
+
+/**
+ * Actions at or above this risk level never auto-execute when they originated from
+ * background text, regardless of how the automation toggles are set. The toggles record
+ * what the user is willing to have done on *their* instruction, not on a scanner's.
+ */
+private val BACKGROUND_AUTO_EXECUTE_CEILING = RiskLevel.HIGH
+
+fun mayAutoExecute(action: ProposedAction, origin: ActionOrigin, toggleEnabled: Boolean): Boolean {
+    if (!toggleEnabled) return false
+    if (origin == ActionOrigin.BACKGROUND && riskOf(action) >= BACKGROUND_AUTO_EXECUTE_CEILING) return false
+    return true
+}
+
+/** Irreversible or outward-facing actions always re-authenticate before running. */
+fun requiresBiometric(action: ProposedAction): Boolean = riskOf(action) >= RiskLevel.HIGH
+
 val ProposedAction.confirmationWarning: String? get() = when (riskOf(this)) {
     RiskLevel.CRITICAL -> "⚠ This action is irreversible."
     RiskLevel.HIGH     -> "This action will affect external systems or send data."

@@ -173,23 +173,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Route an action: if its automation toggle is ON, fire immediately without
      * showing the approval card. Otherwise queue it for manual approval.
      */
-    private fun processAction(action: ProposedAction) {
+    private fun processAction(action: ProposedAction, origin: ActionOrigin = ActionOrigin.USER) {
         // PersonPolicy gate: send actions always require approval (policy-enforced)
         if (action is ProposedAction.Send || action is ProposedAction.SendImage) {
-            if (pendingAction == null) pendingAction = action
-            else queuedActions.addLast(action)
+            enqueueForApproval(action)
             return
         }
         val toggle = AutomationSettings.toggleForAction(action)
-        if (toggle != null && AutomationSettings.isEnabled(toggle)) {
+        val enabled = toggle != null && AutomationSettings.isEnabled(toggle)
+        if (mayAutoExecute(action, origin, enabled)) {
             viewModelScope.launch {
                 val ok = withContext(Dispatchers.IO) { runAction(action) }
                 if (!ok) messages += ChatMessage("Auto-action failed: ${action.summary}", false)
             }
         } else {
-            if (pendingAction == null) pendingAction = action
-            else queuedActions.addLast(action)
+            if (enabled && origin == ActionOrigin.BACKGROUND) {
+                messages += ChatMessage(
+                    "Held for your approval — ${action.summary}. " +
+                        "This came from a background scan, not from you, so it is not auto-run.",
+                    false
+                )
+            }
+            enqueueForApproval(action)
         }
+    }
+
+    private fun enqueueForApproval(action: ProposedAction) {
+        if (pendingAction == null) pendingAction = action
+        else queuedActions.addLast(action)
     }
 
     fun importModel(uri: Uri) {
@@ -498,13 +509,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         messages += ChatMessage(replies.joinToString("\n") { it.text }, false)
         val actions = replies.mapNotNull { it.proposedAction }
-        val needsApproval = actions.filter { a ->
-            val t = AutomationSettings.toggleForAction(a); t == null || !AutomationSettings.isEnabled(t)
+        val origin = if (isBackground) ActionOrigin.BACKGROUND else ActionOrigin.USER
+        fun autoAllowed(a: ProposedAction): Boolean {
+            val t = AutomationSettings.toggleForAction(a)
+            return mayAutoExecute(a, origin, t != null && AutomationSettings.isEnabled(t))
         }
-        val autoActions = actions.filter { a ->
-            val t = AutomationSettings.toggleForAction(a); t != null && AutomationSettings.isEnabled(t)
+        val needsApproval = actions.filterNot { autoAllowed(it) }
+        val autoActions = actions.filter { autoAllowed(it) }
+        autoActions.forEach { processAction(it, origin) }
+        if (isBackground && needsApproval.any { riskOf(it) >= RiskLevel.HIGH }) {
+            messages += ChatMessage(
+                "A background scan proposed ${needsApproval.count { riskOf(it) >= RiskLevel.HIGH }} " +
+                    "sensitive action(s). These always need your explicit approval.",
+                false
+            )
         }
-        autoActions.forEach { processAction(it) }
         if (needsApproval.isNotEmpty()) {
             if (pendingAction == null) {
                 queuedActions.clear()
@@ -522,11 +541,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun approve() {
         val action = pendingAction ?: return
-        val requiresBiometric = action is ProposedAction.Send || action is ProposedAction.UpdateMemory ||
-            action is ProposedAction.DeleteFile || action is ProposedAction.DeleteContact ||
-            action is ProposedAction.RunScript || action is ProposedAction.PostSocialMedia ||
-            action is ProposedAction.ForgetFact || action is ProposedAction.DeleteProject
-        if (requiresBiometric) {
+        // Derived from riskOf() rather than a parallel hand-maintained list, so a new
+        // destructive action can't be added without inheriting the auth requirement.
+        if (requiresBiometric(action)) {
             biometricAuthRequested = true
             messages += ChatMessage("Awaiting biometric authentication…", false)
             return

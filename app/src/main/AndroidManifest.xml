@@ -76,9 +76,6 @@
         </provider>
 
         <service android:name=".accessibility.GhostModeService" android:exported="false" />
-        <service android:name=".engine.GalleryScannerService" android:exported="false" />
-        <service android:name=".engine.ContactScannerService" android:exported="false" />
-        
         <receiver android:name=".engine.AegisSystemReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BATTERY_LOW" />
