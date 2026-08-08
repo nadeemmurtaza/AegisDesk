@@ -2004,7 +2004,7 @@
       },
       {
         "tableName": "file_text_fts",
-        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`text`, content=`file_text_content`)",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(content=`file_text_content`, `text`)",
         "fields": [
           {
             "fieldPath": "text",
