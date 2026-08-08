@@ -61,18 +61,21 @@ class AegisSystemReceiver : BroadcastReceiver() {
                 if (state == TelephonyManager.EXTRA_STATE_RINGING) {
                     TriggerEngine.evaluateEvent("Call", "Incoming call from $number")
 
-                    // Auto-answer logic for Call Agent
-                    val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as android.telecom.TelecomManager
-                    if (context.checkSelfPermission(android.Manifest.permission.ANSWER_PHONE_CALLS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        @Suppress("DEPRECATION") // Both acceptRingingCall overloads are deprecated with no replacement short of implementing a full InCallService.
+                    // Auto-answer logic for Call Agent — requires all gates to pass
+                    AutomationSettings.init(context)
+                    val callAgentEnabled = AutomationSettings.isEnabled(AutomationToggle.CALL_AGENT)
+                    val callerKnown = number != "Unknown" && number.isNotBlank()
+                    val hasPermission = context.checkSelfPermission(android.Manifest.permission.ANSWER_PHONE_CALLS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                    if (callAgentEnabled && callerKnown && hasPermission) {
+                        val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as android.telecom.TelecomManager
+                        @Suppress("DEPRECATION")
                         telecomManager.acceptRingingCall(VideoProfile.STATE_AUDIO_ONLY)
 
-                        // Turn on Speakerphone so Vosk can hear the caller and caller can hear TTS
                         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                         audioManager.mode = AudioManager.MODE_IN_CALL
                         setSpeakerphoneOn(audioManager, true)
 
-                        // Start full Vosk transcription service
                         context.startService(Intent(context, com.newax.aegis.voice.VoiceRecognitionService::class.java))
                     }
                 } else if (state == TelephonyManager.EXTRA_STATE_IDLE) {

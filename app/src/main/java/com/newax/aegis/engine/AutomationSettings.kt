@@ -119,6 +119,12 @@ enum class AutomationToggle(
     AUTO_POST_SOCIAL(
         "auto_post_social", "Auto-Post to Social Media", "Social Media",
         "Post content to social apps without prompt", true
+    ),
+
+    // Call Agent — SENSITIVE (TFA required)
+    CALL_AGENT(
+        "call_agent", "Call Agent (Auto-Answer)", "Call Agent",
+        "Automatically answer incoming calls and use voice AI. Default OFF. Only activates for known contacts.", true
     );
 
     companion object {

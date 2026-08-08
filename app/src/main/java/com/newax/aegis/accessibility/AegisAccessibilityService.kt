@@ -127,35 +127,7 @@ class AegisAccessibilityService : AccessibilityService() {
             editable?.setNodeText(action.text) == true &&
                 (findByText("Send") ?: findByDescription("Send"))?.clickUpTree() == true
         }
-        is ProposedAction.SendImage -> {
-            // Advanced UI automation for sending an image
-            val handler = android.os.Handler(android.os.Looper.getMainLooper())
-            
-            // Step 1: Find and click Attach
-            val attachBtn = findByDescription("Attach") ?: findByDescription("Gallery") ?: findByDescription("Camera")
-            if (attachBtn?.clickUpTree() == true) {
-                // Step 2: Wait for bottom sheet, click Gallery
-                handler.postDelayed({
-                    findByText("Gallery")?.clickUpTree()
-                    
-                    // Step 3: Wait for gallery grid, tap the first photo (approximate pixel tap)
-                    handler.postDelayed({
-                        // In reality we'd parse the Node tree for image bounds.
-                        // For prototype, we tap a common top-left grid coordinate
-                        val path = android.graphics.Path().apply { moveTo(200f, 400f) }
-                        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 100)
-                        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
-                        dispatchGesture(gesture, null, null)
-                        
-                        // Step 4: Click Send
-                        handler.postDelayed({
-                            (findByText("Send") ?: findByDescription("Send"))?.clickUpTree()
-                        }, 1000)
-                    }, 1000)
-                }, 1000)
-                true
-            } else false
-        }
+        is ProposedAction.SendImage -> false
         is ProposedAction.OpenApp -> openApp(action.name)
         is ProposedAction.Scroll -> scroll(action.forward)
         is ProposedAction.ToggleConnectivity -> {

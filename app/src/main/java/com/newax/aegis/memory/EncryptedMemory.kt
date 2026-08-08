@@ -19,8 +19,9 @@ class EncryptedMemory(context: Context) {
 
     private val lock = Any()
 
-    /** Key prefix for user-profile categories. Raw keys (no prefix) are non-category data. */
     private val CATEGORY_PREFIX = "profile_"
+
+    private val SYSTEM_KEYS = setOf("aegis_db_passphrase")
 
     fun remember(category: String, fact: String) {
         if (fact.isBlank()) return
@@ -61,7 +62,11 @@ class EncryptedMemory(context: Context) {
         return dynamicCategories.associateWith { getCategory(it) }.filterValues { it.isNotEmpty() }
     }
 
-    fun forgetAll() = synchronized(lock) { prefs.edit().clear().apply() }
+    fun forgetAll() = synchronized(lock) {
+        val editor = prefs.edit()
+        prefs.all.keys.filter { it.startsWith(CATEGORY_PREFIX) }.forEach { editor.remove(it) }
+        editor.apply()
+    }
 
     /**
      * Export all stored data for backup.
@@ -71,21 +76,21 @@ class EncryptedMemory(context: Context) {
         val strings    = mutableMapOf<String, String>()
         val stringSets = mutableMapOf<String, Set<String>>()
         prefs.all.forEach { (k, v) ->
+            if (SYSTEM_KEYS.contains(k)) return@forEach
             when (v) {
-                is String    -> strings[k] = v
-                is Set<*>    -> stringSets[k] = v.filterIsInstance<String>().toSet()
-                else         -> { /* skip numeric prefs if any */ }
+                is String -> strings[k] = v
+                is Set<*> -> stringSets[k] = v.filterIsInstance<String>().toSet()
+                else      -> {}
             }
         }
         return strings to stringSets
     }
 
-    /** Overwrite all data from a backup. Clears current content first. */
     fun importAll(strings: Map<String, String>, stringSets: Map<String, Set<String>>) = synchronized(lock) {
         val editor = prefs.edit()
-        editor.clear()
-        strings.forEach { (k, v) -> editor.putString(k, v) }
-        stringSets.forEach { (k, v) -> editor.putStringSet(k, v) }
+        prefs.all.keys.filter { !SYSTEM_KEYS.contains(it) }.forEach { editor.remove(it) }
+        strings.filterKeys { !SYSTEM_KEYS.contains(it) }.forEach { (k, v) -> editor.putString(k, v) }
+        stringSets.filterKeys { !SYSTEM_KEYS.contains(it) }.forEach { (k, v) -> editor.putStringSet(k, v) }
         editor.apply()
     }
 

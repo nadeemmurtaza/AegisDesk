@@ -72,8 +72,7 @@ class LocalAssistantEngine {
             lower.startsWith("audit security") -> AssistantReply("Extracting package permissions...", ProposedAction.AuditSecurity)
             lower.startsWith("take screenshot") -> AssistantReply("I will take a screenshot and save it to your gallery.", ProposedAction.TakeScreenshot)
             lower.startsWith("send image ") -> {
-                val value = clean.substringAfter("send image ").trim()
-                AssistantReply("This will attach and send an image, requiring approval.", ProposedAction.SendImage(value))
+                AssistantReply("SendImage is disabled: coordinate-based image selection cannot reliably target the correct photo. Use the app's share sheet directly.", null)
             }
             lower.startsWith("update memory ") -> {
                 val category = clean.substringAfter("update memory ").substringBefore(' ').trim()

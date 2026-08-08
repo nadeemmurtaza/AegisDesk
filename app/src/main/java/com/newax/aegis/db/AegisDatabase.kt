@@ -441,7 +441,7 @@ abstract class AegisDatabase : RoomDatabase() {
             if (INSTANCE != null) return
             synchronized(this) {
                 if (INSTANCE != null) return
-                val passphrase = DbKeyManager.getOrCreate(memory)
+                val passphrase = DbKeyManager.getOrCreate()
                 INSTANCE = Room.databaseBuilder(
                     context.applicationContext,
                     AegisDatabase::class.java,

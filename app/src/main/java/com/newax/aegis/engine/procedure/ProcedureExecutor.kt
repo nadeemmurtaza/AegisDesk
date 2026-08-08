@@ -36,6 +36,10 @@ object ProcedureExecutor {
         var completed = 0
         for ((idx, step) in steps.withIndex()) {
             if (!coroutineContext.isActive) break
+            val currentPkg = svc.currentPackage
+            if (ExecutionGuard.check(context, currentPkg) == ExecutionGuard.GuardResult.BLOCKED) {
+                return ExecutionResult(false, completed, steps.size, idx, "Blocked: protected package $currentPkg")
+            }
             val ok = executeStep(step, svc, context)
             if (!ok) {
                 val reason = "Step ${idx + 1} failed: ${step::class.simpleName}"
