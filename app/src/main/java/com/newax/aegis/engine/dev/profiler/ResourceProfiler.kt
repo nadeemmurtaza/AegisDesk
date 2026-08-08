@@ -108,14 +108,16 @@ object ResourceProfiler {
         ResourceGovernor.onMemoryPressure(0)
     }
 
-    private fun readCpuPercent(): Float = try {
-        val stat = BufferedReader(FileReader("/proc/stat")).readLine() ?: return 0f
-        val tokens = stat.split(" ").filter { it.isNotBlank() }.drop(1).map { it.toLongOrNull() ?: 0L }
-        if (tokens.size < 4) return 0f
-        val idle = tokens[3]
-        val total = tokens.sum()
-        if (total == 0L) 0f else ((total - idle).toFloat() / total) * 100f
-    } catch (_: Exception) { 0f }
+    private fun readCpuPercent(): Float {
+        return try {
+            val stat = BufferedReader(FileReader("/proc/stat")).readLine() ?: return 0f
+            val tokens = stat.split(" ").filter { it.isNotBlank() }.drop(1).map { it.toLongOrNull() ?: 0L }
+            if (tokens.size < 4) return 0f
+            val idle = tokens[3]
+            val total = tokens.sum()
+            if (total == 0L) 0f else ((total - idle).toFloat() / total) * 100f
+        } catch (_: Exception) { 0f }
+    }
 
     fun report(context: Context): String {
         val snap = snapshot(context)

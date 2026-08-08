@@ -15,7 +15,11 @@ data class AudioState(
     val streamVolumes: Map<String, Int>,
     val audioMode: String,
     val focusState: String,
-    val activeRecordingPackages: List<String>,
+    /**
+     * Audio sources currently being recorded. Not package names: the recording client's
+     * package is only exposed via @SystemApi, which a normal app cannot read.
+     */
+    val activeRecordingSources: List<String>,
     val inputDevices: List<AudioDeviceDescription>,
     val outputDevices: List<AudioDeviceDescription>
 )
@@ -30,6 +34,19 @@ data class AudioDeviceDescription(
 )
 
 object AudioDashboard {
+
+    private fun audioSourceLabel(source: Int): String = when (source) {
+        android.media.MediaRecorder.AudioSource.MIC               -> "MIC"
+        android.media.MediaRecorder.AudioSource.CAMCORDER         -> "CAMCORDER"
+        android.media.MediaRecorder.AudioSource.VOICE_RECOGNITION -> "VOICE_RECOGNITION"
+        android.media.MediaRecorder.AudioSource.VOICE_COMMUNICATION -> "VOICE_COMMUNICATION"
+        android.media.MediaRecorder.AudioSource.UNPROCESSED       -> "UNPROCESSED"
+        android.media.MediaRecorder.AudioSource.VOICE_CALL        -> "VOICE_CALL"
+        android.media.MediaRecorder.AudioSource.VOICE_DOWNLINK    -> "VOICE_DOWNLINK"
+        android.media.MediaRecorder.AudioSource.VOICE_UPLINK      -> "VOICE_UPLINK"
+        android.media.MediaRecorder.AudioSource.DEFAULT           -> "DEFAULT"
+        else                                                      -> "SOURCE_$source"
+    }
 
     fun snapshot(context: Context): AudioState {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -48,9 +65,7 @@ object AudioDashboard {
         }
 
         val activeRecording = if (Build.VERSION.SDK_INT >= 24) {
-            am.activeRecordingConfigurations.mapNotNull { cfg ->
-                if (Build.VERSION.SDK_INT >= 29) cfg.clientPackageName else null
-            }
+            am.activeRecordingConfigurations.map { cfg -> audioSourceLabel(cfg.clientAudioSource) }
         } else emptyList()
 
         val inputDevices = if (Build.VERSION.SDK_INT >= 23) {
@@ -70,7 +85,7 @@ object AudioDashboard {
             streamVolumes = volumes,
             audioMode = audioModeLabel(am.mode),
             focusState = "UNKNOWN",
-            activeRecordingPackages = activeRecording,
+            activeRecordingSources = activeRecording,
             inputDevices = inputDevices,
             outputDevices = outputDevices
         )
@@ -95,8 +110,8 @@ object AudioDashboard {
             append("  Bluetooth SCO: ${state.isBluetoothScoOn}  Speakerphone: ${state.isSpeakerphoneOn}\n")
             append("  Volumes: ${state.streamVolumes.entries.joinToString(" ") { "${it.key}=${it.value}" }}\n")
             append("  Input devices: ${state.inputDevices.size}  Output: ${state.outputDevices.size}\n")
-            if (state.activeRecordingPackages.isNotEmpty()) {
-                append("  ACTIVE RECORDING: ${state.activeRecordingPackages.joinToString()}\n")
+            if (state.activeRecordingSources.isNotEmpty()) {
+                append("  ACTIVE RECORDING: ${state.activeRecordingSources.joinToString()}\n")
             }
         }
     }

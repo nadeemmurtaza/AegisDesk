@@ -188,7 +188,7 @@ object FileQueryPlanner {
                 }
                 IndexPath.METADATA_APP -> q.sourceAppHint?.let { add(db.fileDao().bySourceApp(it, limit)) }
                 IndexPath.ENTITY -> {
-                    val label = q.entityHint ?: return@forEach
+                    val label = q.entityHint ?: continue
                     // Try resolving to a graph entity ID for precision
                     val gid = PersonRegistry.resolve(db, label)
                     if (gid != null) add(db.fileDao().filesByGraphEntity(gid, limit))

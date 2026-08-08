@@ -91,8 +91,9 @@ class LegacyMigrationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx
             val arr = runCatching { JSONArray(factsRaw) }.getOrNull() ?: continue
 
             // Ensure person exists
-            val personId = db.personDao().insertIfAbsent(PersonEntity(name = name))
-                .let { id -> if (id > 0L) id else db.personDao().idForName(name) ?: continue }
+            val insertedId = db.personDao().insertIfAbsent(PersonEntity(name = name))
+            val personId = if (insertedId > 0L) insertedId
+                           else db.personDao().idForName(name) ?: continue
 
             val facts = (0 until arr.length()).mapNotNull { i ->
                 runCatching {
@@ -125,7 +126,8 @@ class LegacyMigrationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx
             val mentionsRaw = memory.getRaw("pm_$slug") ?: continue
             val obj = runCatching { JSONObject(mentionsRaw) }.getOrNull() ?: continue
 
-            val personId = db.personDao().idForName(name) ?: run {
+            val existingId = db.personDao().idForName(name)
+            val personId = if (existingId != null) existingId else {
                 val id = db.personDao().insertIfAbsent(PersonEntity(name = name))
                 if (id > 0L) id else db.personDao().idForName(name) ?: continue
             }

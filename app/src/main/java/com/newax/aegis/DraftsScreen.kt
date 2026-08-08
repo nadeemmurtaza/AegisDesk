@@ -79,6 +79,14 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
     var showApproveAll by remember { mutableStateOf(false) }
     var showRejectAll  by remember { mutableStateOf(false) }
 
+    // Hoisted out of the LazyColumn body: LazyListScope is not a @Composable scope,
+    // so remember/mutableStateOf cannot be called inside it.
+    var selectedCat by remember { mutableStateOf<String?>(null) }
+    val allCategories = remember(drafts) { drafts.map { it.category }.distinct().sorted() }
+    val visible = remember(drafts, selectedCat) {
+        if (selectedCat == null) drafts else drafts.filter { it.category == selectedCat }
+    }
+
     // Refresh drafts every time this screen is entered
     LaunchedEffect(Unit) { vm.refreshDrafts() }
 
@@ -197,9 +205,6 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
             }
 
             // ── Category filter chips ─────────────────────────────────────────
-            val allCategories = remember(drafts) { drafts.map { it.category }.distinct().sorted() }
-            var selectedCat   by remember { mutableStateOf<String?>(null) }
-
             if (allCategories.size > 1) {
                 item {
                     Row(
@@ -228,10 +233,6 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
             }
 
             // ── Draft cards ───────────────────────────────────────────────────
-            val visible = remember(drafts, selectedCat) {
-                if (selectedCat == null) drafts else drafts.filter { it.category == selectedCat }
-            }
-
             items(visible, key = { it.id }) { draft ->
                 AnimatedVisibility(
                     visible = true,

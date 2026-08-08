@@ -174,7 +174,7 @@ class DevConsoleViewModel(app: Application) : AndroidViewModel(app) {
         val stats = ALL_TABLES.map { table ->
             val count = runCatching {
                 db.openHelper.readableDatabase
-                    .rawQuery("SELECT COUNT(*) FROM $table", null)
+                    .query("SELECT COUNT(*) FROM $table")
                     .use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
             }.getOrDefault(-1)
             DbTableStat(table, count)
@@ -206,7 +206,7 @@ class DevConsoleViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val t0 = System.currentTimeMillis()
             val result = runCatching {
-                val cursor: Cursor = db.openHelper.readableDatabase.rawQuery(query.trim(), null)
+                val cursor: Cursor = db.openHelper.readableDatabase.query(query.trim())
                 cursor.use { c ->
                     val cols = (0 until c.columnCount).map { c.getColumnName(it) }
                     val rows = mutableListOf<List<String>>()

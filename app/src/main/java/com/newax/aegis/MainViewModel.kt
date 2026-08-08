@@ -10,6 +10,7 @@ import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.net.Uri
 import android.content.ContentValues
+import android.provider.CalendarContract
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.speech.tts.TextToSpeech

@@ -54,10 +54,11 @@ object HardwareBenchmark {
         actMgr.getMemoryInfo(memInfo)
         val ramMb = memInfo.totalMem / (1024 * 1024)
         val hasNnapi = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
-        val thermalHeadroom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // getThermalHeadroom was added in API 30 (R), not Q.
+        val thermalHeadroom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
                 val pm = context.getSystemService(android.os.PowerManager::class.java)
-                pm?.thermalHeadroom(5) ?: 1.0f
+                pm?.getThermalHeadroom(5) ?: 1.0f
             } catch (_: Exception) { 1.0f }
         } else 1.0f
 

@@ -110,12 +110,31 @@ class MigrationTest {
         cursor.close()
     }
 
+    /**
+     * v12 replaces the Callback-created person_facts_fts with a Room-managed FTS entity.
+     * Seeds a fact first so the rebuild is exercised, not just the CREATE.
+     */
     @Test
     @Throws(IOException::class)
-    fun migrateFullPath_1To11() {
+    fun migrate11To12() {
+        helper.createDatabase(TEST_DB, 11).apply {
+            execSQL("INSERT INTO persons (name, importanceScore, sourceCount, totalMentions, lastSeenMs, profileBuilt) VALUES ('Ayesha', 0.5, 1, 1, 0, 0)")
+            execSQL("INSERT INTO person_facts (personId, fact, category, confidence, source, timestampMs) VALUES (1, 'lives in Karachi', 'personal', 0.9, 'test', 0)")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 12, true, AegisDatabase.MIGRATION_11_12)
+        val cursor = db.query(
+            "SELECT rowid FROM person_facts_fts WHERE person_facts_fts MATCH 'Karachi'"
+        )
+        cursor.use { assert(it.moveToFirst()) { "FTS index was not rebuilt from person_facts" } }
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrateFullPath_1To12() {
         helper.createDatabase(TEST_DB, 1).apply { close() }
         helper.runMigrationsAndValidate(
-            TEST_DB, 11, true,
+            TEST_DB, 12, true,
             AegisDatabase.MIGRATION_1_2,
             AegisDatabase.MIGRATION_2_3,
             AegisDatabase.MIGRATION_3_4,
@@ -125,7 +144,8 @@ class MigrationTest {
             AegisDatabase.MIGRATION_7_8,
             AegisDatabase.MIGRATION_8_9,
             AegisDatabase.MIGRATION_9_10,
-            AegisDatabase.MIGRATION_10_11
+            AegisDatabase.MIGRATION_10_11,
+            AegisDatabase.MIGRATION_11_12
         )
     }
 

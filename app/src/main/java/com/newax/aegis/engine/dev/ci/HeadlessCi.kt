@@ -87,7 +87,7 @@ object HeadlessCi {
         if (db == null) return "ERROR:db_null"
         return try {
             val rawDb = db.openHelper.readableDatabase
-            val cursor = rawDb.rawQuery("SELECT steps FROM ui_procedures WHERE id = ?", arrayOf(procedureId))
+            val cursor = rawDb.query("SELECT steps FROM ui_procedures WHERE id = ?", arrayOf(procedureId))
             cursor.use { c ->
                 if (c.moveToFirst()) {
                     val stepsJson = c.getString(0) ?: return "ERROR:no_steps"
@@ -169,7 +169,7 @@ object HeadlessCi {
     }
 
     private fun dbVersion(db: AegisDatabase?): String = try {
-        val cursor = db?.openHelper?.readableDatabase?.rawQuery("PRAGMA user_version", null)
+        val cursor = db?.openHelper?.readableDatabase?.query("PRAGMA user_version")
         cursor?.use { c -> if (c.moveToFirst()) c.getInt(0).toString() else "?" } ?: "?"
     } catch (_: Exception) { "?" }
 }
