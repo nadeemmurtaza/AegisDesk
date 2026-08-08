@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "file_objects",
     indices = [
+        Index("path", unique = true),
         Index("sha256"),
         Index("pHash"),
         Index("extension"),

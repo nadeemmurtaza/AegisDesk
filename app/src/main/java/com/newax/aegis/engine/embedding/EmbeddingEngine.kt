@@ -65,7 +65,7 @@ object EmbeddingEngine {
                 loadEmbedder(context, file)
                 Log.d(TAG, "USE model ready (${file.length() / 1_048_576} MB)")
                 onComplete(true)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.w(TAG, "Model download failed: ${e.message}")
                 onComplete(false)
             }
@@ -104,7 +104,7 @@ object EmbeddingEngine {
                 .build()
             embedder = TextEmbedder.createFromOptions(context, options)
             Log.d(TAG, "Embedder initialized")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Embedder load failed: ${e.message}")
             embedder = null
         }

@@ -57,7 +57,17 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_persons_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`name`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -90,7 +100,17 @@
           ],
           "autoGenerate": false
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_person_mentions_personId",
+            "unique": false,
+            "columnNames": [
+              "personId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`personId`)"
+          }
+        ],
         "foreignKeys": [
           {
             "table": "persons",
@@ -158,7 +178,36 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_person_facts_personId",
+            "unique": false,
+            "columnNames": [
+              "personId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`personId`)"
+          },
+          {
+            "name": "index_person_facts_category",
+            "unique": false,
+            "columnNames": [
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`category`)"
+          },
+          {
+            "name": "index_person_facts_personId_category",
+            "unique": false,
+            "columnNames": [
+              "personId",
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`personId`, `category`)"
+          }
+        ],
         "foreignKeys": [
           {
             "table": "persons",
@@ -238,7 +287,36 @@
           ],
           "autoGenerate": false
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_learning_drafts_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_learning_drafts_subjectName",
+            "unique": false,
+            "columnNames": [
+              "subjectName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subjectName`)"
+          },
+          {
+            "name": "index_learning_drafts_status_timestampMs",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "timestampMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`status`, `timestampMs`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -314,7 +392,26 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_embeddings_sourceType",
+            "unique": false,
+            "columnNames": [
+              "sourceType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`sourceType`)"
+          },
+          {
+            "name": "index_embeddings_sourceId",
+            "unique": true,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`sourceId`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -370,7 +467,45 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_triples_subject",
+            "unique": false,
+            "columnNames": [
+              "subject"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subject`)"
+          },
+          {
+            "name": "index_triples_predicate",
+            "unique": false,
+            "columnNames": [
+              "predicate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`predicate`)"
+          },
+          {
+            "name": "index_triples_subject_predicate",
+            "unique": false,
+            "columnNames": [
+              "subject",
+              "predicate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subject`, `predicate`)"
+          },
+          {
+            "name": "index_triples_objectValue",
+            "unique": false,
+            "columnNames": [
+              "objectValue"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`objectValue`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -415,7 +550,17 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_entities_canonicalName",
+            "unique": false,
+            "columnNames": [
+              "canonicalName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`canonicalName`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -442,7 +587,17 @@
           ],
           "autoGenerate": false
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_entity_aliases_alias",
+            "unique": false,
+            "columnNames": [
+              "alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`alias`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -468,7 +623,17 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_predicates_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`name`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -550,7 +715,48 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_edges_subjectId_predicateId",
+            "unique": false,
+            "columnNames": [
+              "subjectId",
+              "predicateId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subjectId`, `predicateId`)"
+          },
+          {
+            "name": "index_edges_predicateId_objectId",
+            "unique": false,
+            "columnNames": [
+              "predicateId",
+              "objectId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`predicateId`, `objectId`)"
+          },
+          {
+            "name": "index_edges_subjectId_predicateId_objectId",
+            "unique": false,
+            "columnNames": [
+              "subjectId",
+              "predicateId",
+              "objectId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subjectId`, `predicateId`, `objectId`)"
+          },
+          {
+            "name": "index_edges_validUntil",
+            "unique": false,
+            "columnNames": [
+              "validUntil"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`validUntil`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -694,7 +900,53 @@
           ],
           "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_memory_records_contentHash",
+            "unique": false,
+            "columnNames": [
+              "contentHash"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`contentHash`)"
+          },
+          {
+            "name": "index_memory_records_subject",
+            "unique": false,
+            "columnNames": [
+              "subject"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subject`)"
+          },
+          {
+            "name": "index_memory_records_type",
+            "unique": false,
+            "columnNames": [
+              "type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`type`)"
+          },
+          {
+            "name": "index_memory_records_createdAt",
+            "unique": false,
+            "columnNames": [
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`createdAt`)"
+          },
+          {
+            "name": "index_memory_records_validUntil",
+            "unique": false,
+            "columnNames": [
+              "validUntil"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`validUntil`)"
+          }
+        ],
         "foreignKeys": []
       }
     ],
@@ -713,6 +965,32 @@
       "CREATE TABLE IF NOT EXISTS `edges` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subjectId` INTEGER NOT NULL, `predicateId` INTEGER NOT NULL, `objectId` INTEGER, `objectValue` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `sourceId` INTEGER)",
       "CREATE TABLE IF NOT EXISTS `blobs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
       "CREATE TABLE IF NOT EXISTS `memory_records` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL, `subject` TEXT NOT NULL, `source` TEXT NOT NULL, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL, `graphEdgeId` INTEGER, `embeddingId` TEXT)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS `index_persons_name` ON `persons` (`name`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_mentions_personId` ON `person_mentions` (`personId`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_facts_personId` ON `person_facts` (`personId`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_facts_category` ON `person_facts` (`category`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_facts_personId_category` ON `person_facts` (`personId`, `category`)",
+      "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status` ON `learning_drafts` (`status`)",
+      "CREATE INDEX IF NOT EXISTS `index_learning_drafts_subjectName` ON `learning_drafts` (`subjectName`)",
+      "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status_timestampMs` ON `learning_drafts` (`status`, `timestampMs`)",
+      "CREATE INDEX IF NOT EXISTS `index_embeddings_sourceType` ON `embeddings` (`sourceType`)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS `index_embeddings_sourceId` ON `embeddings` (`sourceId`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_subject` ON `triples` (`subject`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_predicate` ON `triples` (`predicate`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_subject_predicate` ON `triples` (`subject`, `predicate`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_objectValue` ON `triples` (`objectValue`)",
+      "CREATE INDEX IF NOT EXISTS `index_entities_canonicalName` ON `entities` (`canonicalName`)",
+      "CREATE INDEX IF NOT EXISTS `index_entity_aliases_alias` ON `entity_aliases` (`alias`)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS `index_predicates_name` ON `predicates` (`name`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId` ON `edges` (`subjectId`, `predicateId`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_predicateId_objectId` ON `edges` (`predicateId`, `objectId`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId_objectId` ON `edges` (`subjectId`, `predicateId`, `objectId`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_validUntil` ON `edges` (`validUntil`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_contentHash` ON `memory_records` (`contentHash`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_subject` ON `memory_records` (`subject`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_type` ON `memory_records` (`type`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_createdAt` ON `memory_records` (`createdAt`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_validUntil` ON `memory_records` (`validUntil`)",
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)"
     ]
   }
