@@ -88,10 +88,8 @@ object ContextBuilder {
     private suspend fun buildMemorySection(db: AegisDatabase, query: String, limit: Int): String =
         withContext(Dispatchers.IO) {
             runCatching {
-                val records = db.memoryRecordDao().getAll()
-                    .filter { it.validUntil == null }
+                val records = db.memoryRecordDao().current(limit)
                     .sortedByDescending { it.importance * 100 + it.confidence }
-                    .take(limit)
                 if (records.isEmpty()) return@withContext ""
                 buildString {
                     append("MEMORY:\n")

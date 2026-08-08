@@ -140,7 +140,7 @@ object ConnectivityDashboard {
     private fun simStateName(state: Int) = when (state) {
         TelephonyManager.SIM_STATE_READY -> "READY"
         TelephonyManager.SIM_STATE_ABSENT -> "ABSENT"
-        TelephonyManager.SIM_STATE_LOCKED -> "LOCKED"
+        3 -> "LOCKED"
         TelephonyManager.SIM_STATE_UNKNOWN -> "UNKNOWN"
         else -> "STATE_$state"
     }

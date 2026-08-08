@@ -47,7 +47,7 @@ object DatabaseInspector {
         val rawDb = db.openHelper.readableDatabase
         KNOWN_TABLES.mapNotNull { table ->
             runCatching {
-                val cursor = rawDb.rawQuery("SELECT COUNT(*) FROM $table", null)
+                val cursor = rawDb.query("SELECT COUNT(*) FROM $table", null)
                 cursor.use { c ->
                     if (c.moveToFirst()) {
                         val count = c.getLong(0)
@@ -68,7 +68,7 @@ object DatabaseInspector {
                     return@withContext QueryResult(emptyList(), emptyList(), 0, 0, "Only SELECT and PRAGMA queries allowed")
                 }
                 val rawDb = db.openHelper.readableDatabase
-                val cursor: Cursor = rawDb.rawQuery(safeSql, null)
+                val cursor: Cursor = rawDb.query(safeSql, null)
                 cursor.use { c ->
                     val cols = (0 until c.columnCount).map { c.getColumnName(it) }
                     val rows = mutableListOf<List<String>>()
@@ -91,7 +91,7 @@ object DatabaseInspector {
     suspend fun detectOrphans(db: AegisDatabase): OrphanReport = withContext(Dispatchers.IO) {
         val rawDb = db.openHelper.readableDatabase
         fun count(sql: String): Int = runCatching {
-            rawDb.rawQuery(sql, null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+            rawDb.query(sql, null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
         }.getOrDefault(0)
 
         OrphanReport(
@@ -106,7 +106,7 @@ object DatabaseInspector {
         val rawDb = db.openHelper.readableDatabase
         val results = mutableListOf<IndexHealth>()
         runCatching {
-            val cursor = rawDb.rawQuery(
+            val cursor = rawDb.query(
                 "SELECT m.tbl_name, m.name, il.'unique' FROM sqlite_master m JOIN pragma_index_list(m.tbl_name) il ON il.name = m.name WHERE m.type='index'",
                 null
             )
@@ -115,7 +115,7 @@ object DatabaseInspector {
                     val table = c.getString(0)
                     val indexName = c.getString(1)
                     val isUnique = c.getInt(2) == 1
-                    val colCursor = rawDb.rawQuery("PRAGMA index_info($indexName)", null)
+                    val colCursor = rawDb.query("PRAGMA index_info($indexName)", null)
                     val cols = mutableListOf<String>()
                     colCursor.use { cc -> while (cc.moveToNext()) cols.add(cc.getString(2)) }
                     results.add(IndexHealth(table, indexName, isUnique, cols.joinToString(", ")))
@@ -128,7 +128,7 @@ object DatabaseInspector {
     suspend fun sqlCipherState(db: AegisDatabase): String = withContext(Dispatchers.IO) {
         runCatching {
             val rawDb = db.openHelper.readableDatabase
-            val cursor = rawDb.rawQuery("PRAGMA cipher_version", null)
+            val cursor = rawDb.query("PRAGMA cipher_version", null)
             cursor.use { c ->
                 if (c.moveToFirst()) "SQLCipher ${c.getString(0)}" else "SQLCipher (version unknown)"
             }
@@ -138,7 +138,7 @@ object DatabaseInspector {
     suspend fun migrationHistory(db: AegisDatabase): String = withContext(Dispatchers.IO) {
         runCatching {
             val rawDb = db.openHelper.readableDatabase
-            val cursor = rawDb.rawQuery("PRAGMA user_version", null)
+            val cursor = rawDb.query("PRAGMA user_version", null)
             cursor.use { c ->
                 if (c.moveToFirst()) "Current schema version: ${c.getInt(0)}" else "Unknown"
             }

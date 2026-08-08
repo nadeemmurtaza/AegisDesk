@@ -87,7 +87,7 @@ object ProcedureReplayer {
 
     suspend fun replayFromDb(procedureId: Long, context: Context, db: AegisDatabase): ReplaySession {
         val stepsJson = try {
-            val cursor = db.openHelper.readableDatabase.rawQuery(
+            val cursor = db.openHelper.readableDatabase.query(
                 "SELECT steps FROM ui_procedures WHERE id = ?", arrayOf(procedureId.toString())
             )
             cursor.use { c -> if (c.moveToFirst()) c.getString(0) else null }

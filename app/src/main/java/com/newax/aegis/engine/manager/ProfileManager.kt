@@ -38,55 +38,55 @@ object ProfileManager {
 
     fun getProfile(): UserProfile {
         return UserProfile(
-            name = memory.getString(KEY_NAME) ?: "",
-            language = memory.getString(KEY_LANGUAGE) ?: "en",
-            timezone = memory.getString(KEY_TIMEZONE) ?: java.util.TimeZone.getDefault().id,
+            name = memory.getRaw(KEY_NAME) ?: "",
+            language = memory.getRaw(KEY_LANGUAGE) ?: "en",
+            timezone = memory.getRaw(KEY_TIMEZONE) ?: java.util.TimeZone.getDefault().id,
             communicationStyle = runCatching {
-                CommunicationStyle.valueOf(memory.getString(KEY_COMMUNICATION_STYLE) ?: "BALANCED")
+                CommunicationStyle.valueOf(memory.getRaw(KEY_COMMUNICATION_STYLE) ?: "BALANCED")
             }.getOrDefault(CommunicationStyle.BALANCED),
             responseLength = runCatching {
-                ResponseLength.valueOf(memory.getString(KEY_RESPONSE_LENGTH) ?: "MEDIUM")
+                ResponseLength.valueOf(memory.getRaw(KEY_RESPONSE_LENGTH) ?: "MEDIUM")
             }.getOrDefault(ResponseLength.MEDIUM),
-            persona = memory.getString(KEY_PERSONA) ?: "helpful assistant",
-            interests = memory.getStringSet(KEY_INTERESTS) ?: emptySet(),
-            dislikes = memory.getStringSet(KEY_DISLIKES) ?: emptySet(),
-            wakeWord = memory.getString(KEY_WAKE_WORD) ?: "Aegis"
+            persona = memory.getRaw(KEY_PERSONA) ?: "helpful assistant",
+            interests = memory.getCategory(KEY_INTERESTS).toSet(),
+            dislikes = memory.getCategory(KEY_DISLIKES).toSet(),
+            wakeWord = memory.getRaw(KEY_WAKE_WORD) ?: "Aegis"
         )
     }
 
-    fun updateName(name: String) = memory.put(KEY_NAME, name)
-    fun updateLanguage(lang: String) = memory.put(KEY_LANGUAGE, lang)
-    fun updateTimezone(tz: String) = memory.put(KEY_TIMEZONE, tz)
-    fun updateStyle(style: CommunicationStyle) = memory.put(KEY_COMMUNICATION_STYLE, style.name)
-    fun updateResponseLength(length: ResponseLength) = memory.put(KEY_RESPONSE_LENGTH, length.name)
-    fun updatePersona(persona: String) = memory.put(KEY_PERSONA, persona)
-    fun updateWakeWord(word: String) = memory.put(KEY_WAKE_WORD, word)
+    fun updateName(name: String) = memory.storeRaw(KEY_NAME, name)
+    fun updateLanguage(lang: String) = memory.storeRaw(KEY_LANGUAGE, lang)
+    fun updateTimezone(tz: String) = memory.storeRaw(KEY_TIMEZONE, tz)
+    fun updateStyle(style: CommunicationStyle) = memory.storeRaw(KEY_COMMUNICATION_STYLE, style.name)
+    fun updateResponseLength(length: ResponseLength) = memory.storeRaw(KEY_RESPONSE_LENGTH, length.name)
+    fun updatePersona(persona: String) = memory.storeRaw(KEY_PERSONA, persona)
+    fun updateWakeWord(word: String) = memory.storeRaw(KEY_WAKE_WORD, word)
 
     fun addInterest(interest: String) {
-        val set = memory.getStringSet(KEY_INTERESTS)?.toMutableSet() ?: mutableSetOf()
+        val set = memory.getCategory(KEY_INTERESTS).toMutableSet()
         set.add(interest.lowercase().trim())
-        memory.put(KEY_INTERESTS, set)
+        memory.setCategory(KEY_INTERESTS, set.toList())
     }
 
     fun removeInterest(interest: String) {
-        val set = memory.getStringSet(KEY_INTERESTS)?.toMutableSet() ?: return
-        set.remove(interest.lowercase().trim())
-        memory.put(KEY_INTERESTS, set)
+        val set = memory.getCategory(KEY_INTERESTS).toMutableSet()
+        if (!set.remove(interest.lowercase().trim())) return
+        memory.setCategory(KEY_INTERESTS, set.toList())
     }
 
     fun addDislike(dislike: String) {
-        val set = memory.getStringSet(KEY_DISLIKES)?.toMutableSet() ?: mutableSetOf()
+        val set = memory.getCategory(KEY_DISLIKES).toMutableSet()
         set.add(dislike.lowercase().trim())
-        memory.put(KEY_DISLIKES, set)
+        memory.setCategory(KEY_DISLIKES, set.toList())
     }
 
     fun isInterested(topic: String): Boolean {
-        val interests = memory.getStringSet(KEY_INTERESTS) ?: return false
+        val interests = memory.getCategory(KEY_INTERESTS).takeIf { it.isNotEmpty() } ?: return false
         return interests.any { topic.lowercase().contains(it) }
     }
 
     fun dislikes(topic: String): Boolean {
-        val dislikes = memory.getStringSet(KEY_DISLIKES) ?: return false
+        val dislikes = memory.getCategory(KEY_DISLIKES).takeIf { it.isNotEmpty() } ?: return false
         return dislikes.any { topic.lowercase().contains(it) }
     }
 

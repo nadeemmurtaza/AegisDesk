@@ -104,10 +104,10 @@ object TotpManager {
         "otpauth://totp/Aegis:$accountName?secret=$secret&issuer=Aegis&algorithm=SHA1&digits=$DIGITS&period=$TIME_STEP"
 
     /** Generates a QR code Bitmap from the current otpauth URI. Null if not enrolled. */
-    fun qrBitmap(size: Int = 400): Bitmap? = qrBitmapForSecret(
-        secret = prefs?.getString(KEY_SECRET, null) ?: return null,
-        size   = size
-    )
+    fun qrBitmap(size: Int = 400): Bitmap? {
+        val secret = prefs?.getString(KEY_SECRET, null) ?: return null
+        return qrBitmapForSecret(secret, size)
+    }
 
     /**
      * Generates a QR code Bitmap for an arbitrary secret string.

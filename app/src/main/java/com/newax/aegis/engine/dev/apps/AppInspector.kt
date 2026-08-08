@@ -50,19 +50,19 @@ object AppInspector {
             val pm = context.packageManager
             val packages = pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)
             packages
-                .filter { pkg -> includeSystem || (pkg.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
+                .filter { pkg -> includeSystem || pkg.applicationInfo?.let { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 } == true }
                 .map { pkg ->
                     val habits = HabitTracker.getPatternForPackage(pkg.packageName)
                     val perms = pkg.requestedPermissions?.toList() ?: emptyList()
                     val caps = runCatching { AppIntelligence.capabilitiesFor(db, pkg.packageName).map { it.name } }.getOrDefault(emptyList())
-                    val label = runCatching { pm.getApplicationLabel(pkg.applicationInfo).toString() }.getOrDefault(pkg.packageName)
+                    val label = runCatching { pm.getApplicationLabel(pkg.applicationInfo!!).toString() }.getOrDefault(pkg.packageName)
                     InstalledApp(
                         packageName = pkg.packageName,
                         label = label,
                         versionName = pkg.versionName ?: "",
                         versionCode = if (android.os.Build.VERSION.SDK_INT >= 28) pkg.longVersionCode else pkg.versionCode.toLong(),
-                        isSystem = (pkg.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
-                        targetSdk = pkg.applicationInfo.targetSdkVersion,
+                        isSystem = (pkg.applicationInfo!!.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                        targetSdk = pkg.applicationInfo!!.targetSdkVersion,
                         installedMs = pkg.firstInstallTime,
                         lastUpdatedMs = pkg.lastUpdateTime,
                         permissions = perms.take(10),
@@ -81,14 +81,14 @@ object AppInspector {
             val pkg = runCatching { pm.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS) }.getOrNull() ?: return@withContext null
             val habits = HabitTracker.getPatternForPackage(packageName)
             val caps = runCatching { AppIntelligence.capabilitiesFor(db, packageName).map { it.name } }.getOrDefault(emptyList())
-            val label = runCatching { pm.getApplicationLabel(pkg.applicationInfo).toString() }.getOrDefault(packageName)
+            val label = runCatching { pm.getApplicationLabel(pkg.applicationInfo!!).toString() }.getOrDefault(packageName)
             InstalledApp(
                 packageName = packageName,
                 label = label,
                 versionName = pkg.versionName ?: "",
                 versionCode = if (android.os.Build.VERSION.SDK_INT >= 28) pkg.longVersionCode else pkg.versionCode.toLong(),
-                isSystem = (pkg.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
-                targetSdk = pkg.applicationInfo.targetSdkVersion,
+                isSystem = (pkg.applicationInfo!!.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                targetSdk = pkg.applicationInfo!!.targetSdkVersion,
                 installedMs = pkg.firstInstallTime,
                 lastUpdatedMs = pkg.lastUpdateTime,
                 permissions = pkg.requestedPermissions?.toList() ?: emptyList(),
@@ -123,7 +123,7 @@ object AppInspector {
             runCatching {
                 val rawDb = db.openHelper.readableDatabase
                 val results = mutableListOf<Map<String, String>>()
-                val cursor = rawDb.rawQuery(
+                val cursor = rawDb.query(
                     "SELECT id, taskCapability, successCount, failureCount FROM ui_procedures WHERE packageName = ? LIMIT 50",
                     arrayOf(packageName)
                 )
@@ -160,7 +160,7 @@ object AppInspector {
         val rawDb = db.openHelper.readableDatabase
         val result = mutableMapOf<String, MutableList<String>>()
         runCatching {
-            val cursor = rawDb.rawQuery(
+            val cursor = rawDb.query(
                 "SELECT packageName, capability FROM app_capability_links GROUP BY packageName, capability LIMIT 500",
                 null
             )

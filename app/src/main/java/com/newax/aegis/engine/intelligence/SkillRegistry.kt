@@ -51,7 +51,7 @@ object SkillRegistry {
         stats[definition.id] = SkillStats()
     }
 
-    fun has(id: String): Boolean = id in definitions
+    fun has(id: String): Boolean = definitions.containsKey(id)
 
     fun get(id: String): SkillDefinition? = definitions[id]
 

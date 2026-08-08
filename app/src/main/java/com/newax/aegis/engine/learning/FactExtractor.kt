@@ -145,7 +145,7 @@ object FactExtractor {
     private fun extractSentence(
         sentence: String,
         defaultSubject: String?,
-        tone: ToneAnalyzer.ToneResult,
+        tone: ToneAnalyzer.ToneProfile,
         docType: DocumentClassifier.ClassificationResult
     ): List<ExtractedFact> {
         val results = mutableListOf<ExtractedFact>()

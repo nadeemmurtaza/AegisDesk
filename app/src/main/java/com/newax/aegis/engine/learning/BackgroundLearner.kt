@@ -59,8 +59,8 @@ object BackgroundLearner {
                 ScanSource.SMS_INBOX   -> scanSms(context, Telephony.Sms.Inbox.CONTENT_URI, source, db, memory, llmBudget, triplesBudget)
                 ScanSource.SMS_SENT    -> scanSms(context, Telephony.Sms.Sent.CONTENT_URI, source, db, memory, llmBudget, triplesBudget)
                 ScanSource.CALL_LOGS   -> scanCallLogs(context, source, db, memory)
-                ScanSource.GALLERY_OCR -> scanGallery(context, source, llmBudget, triplesBudget)
-                ScanSource.DOWNLOADS   -> scanDownloads(context, source, llmBudget, triplesBudget)
+                ScanSource.GALLERY_OCR -> scanGallery(context, source, db, llmBudget, triplesBudget)
+                ScanSource.DOWNLOADS   -> scanDownloads(context, source, db, llmBudget, triplesBudget)
             }
         } catch (e: SecurityException) {
             Log.w(TAG, "Permission denied for ${source.label}: ${e.message}"); emptyList()
@@ -260,7 +260,7 @@ object BackgroundLearner {
 
     // ── Gallery OCR ──────────────────────────────────────────────────────────
 
-    private fun scanGallery(context: Context, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
+    private fun scanGallery(context: Context, source: ScanSource, db: AegisDatabase, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 
@@ -308,7 +308,7 @@ object BackgroundLearner {
 
     // ── Downloads ────────────────────────────────────────────────────────────
 
-    private fun scanDownloads(context: Context, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
+    private fun scanDownloads(context: Context, source: ScanSource, db: AegisDatabase, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 

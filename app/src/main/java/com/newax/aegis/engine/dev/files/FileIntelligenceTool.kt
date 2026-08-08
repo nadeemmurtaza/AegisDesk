@@ -118,7 +118,7 @@ object FileIntelligenceTool {
         val rawDb = db.openHelper.readableDatabase
         val groups = mutableListOf<DuplicateGroup>()
         runCatching {
-            val cursor = rawDb.rawQuery(
+            val cursor = rawDb.query(
                 "SELECT contentHash, COUNT(*) as cnt FROM file_records WHERE contentHash IS NOT NULL AND contentHash != '' GROUP BY contentHash HAVING cnt > 1 ORDER BY cnt DESC LIMIT $limit",
                 null
             )

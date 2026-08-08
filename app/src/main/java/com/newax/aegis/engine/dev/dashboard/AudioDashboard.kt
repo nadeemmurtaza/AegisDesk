@@ -49,7 +49,7 @@ object AudioDashboard {
 
         val activeRecording = if (Build.VERSION.SDK_INT >= 24) {
             am.activeRecordingConfigurations.mapNotNull { cfg ->
-                if (Build.VERSION.SDK_INT >= 29) cfg.clientPackageName else null
+                if (Build.VERSION.SDK_INT >= 29) cfg.getClientPackageName() else null
             }
         } else emptyList()
 
