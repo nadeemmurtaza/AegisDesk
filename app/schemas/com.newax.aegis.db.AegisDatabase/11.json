@@ -1,0 +1,2045 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 11,
+    "identityHash": "placeholder_v11",
+    "entities": [
+      {
+        "tableName": "persons",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `importanceScore` REAL NOT NULL, `sourceCount` INTEGER NOT NULL, `totalMentions` INTEGER NOT NULL, `lastSeenMs` INTEGER NOT NULL, `profileBuilt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "importanceScore",
+            "columnName": "importanceScore",
+            "affinity": "REAL",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "sourceCount",
+            "columnName": "sourceCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "totalMentions",
+            "columnName": "totalMentions",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "lastSeenMs",
+            "columnName": "lastSeenMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "profileBuilt",
+            "columnName": "profileBuilt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "person_mentions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personId` INTEGER NOT NULL, `sourceName` TEXT NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`personId`, `sourceName`), FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "personId",
+            "columnName": "personId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "sourceName",
+            "columnName": "sourceName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 2,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "count",
+            "columnName": "count",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personId",
+            "sourceName"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "person_facts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `personId` INTEGER NOT NULL, `fact` TEXT NOT NULL, `category` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `timestampMs` INTEGER NOT NULL, FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "personId",
+            "columnName": "personId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "fact",
+            "columnName": "fact",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "timestampMs",
+            "columnName": "timestampMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "learning_drafts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `category` TEXT NOT NULL, `fact` TEXT NOT NULL, `source` TEXT NOT NULL, `sourceSnippet` TEXT NOT NULL, `confidence` REAL NOT NULL, `status` TEXT NOT NULL, `subjectName` TEXT, `timestampMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "fact",
+            "columnName": "fact",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "sourceSnippet",
+            "columnName": "sourceSnippet",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "subjectName",
+            "columnName": "subjectName",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "timestampMs",
+            "columnName": "timestampMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "kv_store",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, `updatedMs` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "updatedMs",
+            "columnName": "updatedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "embeddings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceType` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `text` TEXT NOT NULL, `embedding` BLOB NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "sourceType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "embedding",
+            "columnName": "embedding",
+            "affinity": "BLOB",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "triples",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subject` TEXT NOT NULL, `predicate` TEXT NOT NULL, `objectValue` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `createdMs` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "subject",
+            "columnName": "subject",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "predicate",
+            "columnName": "predicate",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "objectValue",
+            "columnName": "objectValue",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "entities",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL DEFAULT 0, `canonicalName` TEXT NOT NULL, `payloadPointer` INTEGER, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canonicalName",
+            "columnName": "canonicalName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "payloadPointer",
+            "columnName": "payloadPointer",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "entity_aliases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`entityId` INTEGER NOT NULL, `alias` TEXT NOT NULL, PRIMARY KEY(`entityId`, `alias`))",
+        "fields": [
+          {
+            "fieldPath": "entityId",
+            "columnName": "entityId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 2,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "entityId",
+            "alias"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "predicates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "edges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subjectId` INTEGER NOT NULL, `predicateId` INTEGER NOT NULL, `objectId` INTEGER, `objectValue` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `sourceId` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "subjectId",
+            "columnName": "subjectId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "predicateId",
+            "columnName": "predicateId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "objectId",
+            "columnName": "objectId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "objectValue",
+            "columnName": "objectValue",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "importance",
+            "columnName": "importance",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "50"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "validFrom",
+            "columnName": "validFrom",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "validUntil",
+            "columnName": "validUntil",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "blobs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "memory_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `subject` TEXT NOT NULL DEFAULT '', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL DEFAULT '', `graphEdgeId` INTEGER, `embeddingId` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "subject",
+            "columnName": "subject",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "importance",
+            "columnName": "importance",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "50"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "validFrom",
+            "columnName": "validFrom",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "validUntil",
+            "columnName": "validUntil",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "contentHash",
+            "columnName": "contentHash",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "graphEdgeId",
+            "columnName": "graphEdgeId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "embeddingId",
+            "columnName": "embeddingId",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "app_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `label` TEXT NOT NULL, `version` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `launchActivity` TEXT, `needsValidation` INTEGER NOT NULL DEFAULT 0, `lastScanMs` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "launchActivity",
+            "columnName": "launchActivity",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "needsValidation",
+            "columnName": "needsValidation",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastScanMs",
+            "columnName": "lastScanMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "app_capability_links",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `intentAction` TEXT, `deepLinkPattern` TEXT, `mimeTypes` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, PRIMARY KEY(`packageName`, `capability`))",
+        "fields": [
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "capability",
+            "columnName": "capability",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 2,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "intentAction",
+            "columnName": "intentAction",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "deepLinkPattern",
+            "columnName": "deepLinkPattern",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "mimeTypes",
+            "columnName": "mimeTypes",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "80"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "packageName",
+            "capability"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ui_procedures",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `versionRange` TEXT NOT NULL, `taskCapability` TEXT NOT NULL, `steps` TEXT NOT NULL, `screenSignature` TEXT NOT NULL DEFAULT '', `prerequisites` TEXT NOT NULL DEFAULT '', `recoveryPaths` TEXT NOT NULL DEFAULT '', `successConditions` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `successCount` INTEGER NOT NULL DEFAULT 0, `failureCount` INTEGER NOT NULL DEFAULT 0, `lastRunMs` INTEGER NOT NULL DEFAULT 0, `needsValidation` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "versionRange",
+            "columnName": "versionRange",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "taskCapability",
+            "columnName": "taskCapability",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "steps",
+            "columnName": "steps",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "screenSignature",
+            "columnName": "screenSignature",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "prerequisites",
+            "columnName": "prerequisites",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "recoveryPaths",
+            "columnName": "recoveryPaths",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "successConditions",
+            "columnName": "successConditions",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "successCount",
+            "columnName": "successCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "failureCount",
+            "columnName": "failureCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastRunMs",
+            "columnName": "lastRunMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "needsValidation",
+            "columnName": "needsValidation",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "screen_nodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `screenSignature` TEXT NOT NULL, `screenType` TEXT NOT NULL DEFAULT '', `nodes` TEXT NOT NULL DEFAULT '', `appVersion` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`packageName`, `screenSignature`))",
+        "fields": [
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "screenSignature",
+            "columnName": "screenSignature",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 2,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "screenType",
+            "columnName": "screenType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "nodes",
+            "columnName": "nodes",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "appVersion",
+            "columnName": "appVersion",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "packageName",
+            "screenSignature"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "nav_edges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fromSignature` TEXT NOT NULL, `toSignature` TEXT NOT NULL, `actionViewId` TEXT NOT NULL DEFAULT '', `actionContentDesc` TEXT NOT NULL DEFAULT '', `actionText` TEXT NOT NULL DEFAULT '')",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "fromSignature",
+            "columnName": "fromSignature",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "toSignature",
+            "columnName": "toSignature",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "actionViewId",
+            "columnName": "actionViewId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "actionContentDesc",
+            "columnName": "actionContentDesc",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "actionText",
+            "columnName": "actionText",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "person_snapshots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `displayName` TEXT NOT NULL, `canonicalPhone` TEXT, `canonicalEmail` TEXT, `preferredChannel` TEXT, `preferredLanguage` TEXT NOT NULL DEFAULT '', `preferredTone` TEXT NOT NULL DEFAULT '', `relationshipType` TEXT NOT NULL DEFAULT '', `activeProjectId` TEXT, `pendingCommitmentCount` INTEGER NOT NULL DEFAULT 0, `recentTopics` TEXT NOT NULL DEFAULT '', `lastInteractionMs` INTEGER NOT NULL DEFAULT 0, `importanceScore` INTEGER NOT NULL DEFAULT 50, `snapshotUpdatedMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`personEntityId`))",
+        "fields": [
+          {
+            "fieldPath": "personEntityId",
+            "columnName": "personEntityId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "canonicalPhone",
+            "columnName": "canonicalPhone",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "canonicalEmail",
+            "columnName": "canonicalEmail",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "preferredChannel",
+            "columnName": "preferredChannel",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "preferredLanguage",
+            "columnName": "preferredLanguage",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "preferredTone",
+            "columnName": "preferredTone",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "relationshipType",
+            "columnName": "relationshipType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "activeProjectId",
+            "columnName": "activeProjectId",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "pendingCommitmentCount",
+            "columnName": "pendingCommitmentCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "recentTopics",
+            "columnName": "recentTopics",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "lastInteractionMs",
+            "columnName": "lastInteractionMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "importanceScore",
+            "columnName": "importanceScore",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "50"
+          },
+          {
+            "fieldPath": "snapshotUpdatedMs",
+            "columnName": "snapshotUpdatedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personEntityId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "person_policies",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `canAutoOpenChat` INTEGER NOT NULL DEFAULT 1, `canAutoDraft` INTEGER NOT NULL DEFAULT 1, `canAutoSend` INTEGER NOT NULL DEFAULT 0, `canCallWithoutConfirm` INTEGER NOT NULL DEFAULT 0, `canShareFiles` INTEGER NOT NULL DEFAULT 1, `sensitiveActionsRequireConfirm` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`personEntityId`))",
+        "fields": [
+          {
+            "fieldPath": "personEntityId",
+            "columnName": "personEntityId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "canAutoOpenChat",
+            "columnName": "canAutoOpenChat",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "canAutoDraft",
+            "columnName": "canAutoDraft",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "canAutoSend",
+            "columnName": "canAutoSend",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canCallWithoutConfirm",
+            "columnName": "canCallWithoutConfirm",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canShareFiles",
+            "columnName": "canShareFiles",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "sensitiveActionsRequireConfirm",
+            "columnName": "sensitiveActionsRequireConfirm",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "1"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personEntityId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "person_channel_prefs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `taskContext` TEXT NOT NULL, `packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `probability` REAL NOT NULL DEFAULT 0.8, `evidenceCount` INTEGER NOT NULL DEFAULT 1, `lastUpdatedMs` INTEGER NOT NULL, PRIMARY KEY(`personEntityId`, `taskContext`))",
+        "fields": [
+          {
+            "fieldPath": "personEntityId",
+            "columnName": "personEntityId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "taskContext",
+            "columnName": "taskContext",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 2,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "capability",
+            "columnName": "capability",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "probability",
+            "columnName": "probability",
+            "affinity": "REAL",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0.8"
+          },
+          {
+            "fieldPath": "evidenceCount",
+            "columnName": "evidenceCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "lastUpdatedMs",
+            "columnName": "lastUpdatedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personEntityId",
+            "taskContext"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "commitments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `debtorPersonId` INTEGER, `creditorPersonId` INTEGER, `debtorLabel` TEXT NOT NULL, `creditorLabel` TEXT NOT NULL, `action` TEXT NOT NULL, `dueMs` INTEGER, `status` TEXT NOT NULL DEFAULT 'pending', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `createdMs` INTEGER NOT NULL, `resolvedMs` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "debtorPersonId",
+            "columnName": "debtorPersonId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "creditorPersonId",
+            "columnName": "creditorPersonId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "debtorLabel",
+            "columnName": "debtorLabel",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "creditorLabel",
+            "columnName": "creditorLabel",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "dueMs",
+            "columnName": "dueMs",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "'pending'"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "resolvedMs",
+            "columnName": "resolvedMs",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "trigger_rules",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `label` TEXT NOT NULL, `conditionType` TEXT NOT NULL, `conditionParams` TEXT NOT NULL, `actionType` TEXT NOT NULL, `actionParams` TEXT NOT NULL, `enabled` INTEGER NOT NULL DEFAULT 1, `debounceMs` INTEGER NOT NULL DEFAULT 30000, `lastFiredMs` INTEGER NOT NULL DEFAULT 0, `createdMs` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "conditionType",
+            "columnName": "conditionType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "conditionParams",
+            "columnName": "conditionParams",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "actionType",
+            "columnName": "actionType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "actionParams",
+            "columnName": "actionParams",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "debounceMs",
+            "columnName": "debounceMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "30000"
+          },
+          {
+            "fieldPath": "lastFiredMs",
+            "columnName": "lastFiredMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "file_objects",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `path` TEXT NOT NULL, `contentUriString` TEXT NOT NULL DEFAULT '', `mediaStoreId` INTEGER NOT NULL DEFAULT 0, `filename` TEXT NOT NULL, `extension` TEXT NOT NULL, `mimeType` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `createdMs` INTEGER NOT NULL DEFAULT 0, `modifiedMs` INTEGER NOT NULL DEFAULT 0, `receivedMs` INTEGER NOT NULL DEFAULT 0, `lastOpenedMs` INTEGER NOT NULL DEFAULT 0, `sourceApp` TEXT NOT NULL DEFAULT '', `folder` TEXT NOT NULL DEFAULT '', `sha256` TEXT NOT NULL DEFAULT '', `pHash` TEXT NOT NULL DEFAULT '', `metadataJson` TEXT NOT NULL DEFAULT '', `thumbnailPath` TEXT, `entitiesJson` TEXT NOT NULL DEFAULT '', `conceptsJson` TEXT NOT NULL DEFAULT '', `graphEntityId` INTEGER, `embeddingId` INTEGER, `indexState` INTEGER NOT NULL DEFAULT 0, `isDuplicate` INTEGER NOT NULL DEFAULT 0, `canonicalId` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "path",
+            "columnName": "path",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "contentUriString",
+            "columnName": "contentUriString",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "mediaStoreId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "filename",
+            "columnName": "filename",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "extension",
+            "columnName": "extension",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "sizeBytes",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "modifiedMs",
+            "columnName": "modifiedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "receivedMs",
+            "columnName": "receivedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastOpenedMs",
+            "columnName": "lastOpenedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "sourceApp",
+            "columnName": "sourceApp",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "folder",
+            "columnName": "folder",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "pHash",
+            "columnName": "pHash",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "metadataJson",
+            "columnName": "metadataJson",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "thumbnailPath",
+            "columnName": "thumbnailPath",
+            "affinity": "TEXT",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "entitiesJson",
+            "columnName": "entitiesJson",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "conceptsJson",
+            "columnName": "conceptsJson",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "graphEntityId",
+            "columnName": "graphEntityId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "embeddingId",
+            "columnName": "embeddingId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "indexState",
+            "columnName": "indexState",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isDuplicate",
+            "columnName": "isDuplicate",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canonicalId",
+            "columnName": "canonicalId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "file_text_content",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fileId` INTEGER NOT NULL, `text` TEXT NOT NULL, `language` TEXT NOT NULL DEFAULT '', `pageCount` INTEGER NOT NULL DEFAULT 0, `wordCount` INTEGER NOT NULL DEFAULT 0, `extractedMs` INTEGER NOT NULL, PRIMARY KEY(`fileId`))",
+        "fields": [
+          {
+            "fieldPath": "fileId",
+            "columnName": "fileId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "pageCount",
+            "columnName": "pageCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "wordCount",
+            "columnName": "wordCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "extractedMs",
+            "columnName": "extractedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fileId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "file_text_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`text` TEXT NOT NULL, content=`file_text_content`)",
+        "fields": [
+          {
+            "fieldPath": "rowId",
+            "columnName": "rowid",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rowid"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "file_entity_links",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fileId` INTEGER NOT NULL, `entityLabel` TEXT NOT NULL, `entityType` TEXT NOT NULL, `graphEntityId` INTEGER, PRIMARY KEY(`fileId`, `entityLabel`))",
+        "fields": [
+          {
+            "fieldPath": "fileId",
+            "columnName": "fileId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "primaryKeyPosition": 1,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "entityLabel",
+            "columnName": "entityLabel",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 2,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "entityType",
+            "columnName": "entityType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          },
+          {
+            "fieldPath": "graphEntityId",
+            "columnName": "graphEntityId",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "primaryKeyPosition": 0,
+            "defaultValue": null
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fileId",
+            "entityLabel"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'placeholder_v11')"
+    ]
+  }
+}

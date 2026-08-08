@@ -29,6 +29,9 @@ android {
     ksp {
         arg("room.schemaLocation", "$projectDir/schemas")
     }
+    sourceSets {
+        getByName("androidTest").assets.srcDirs += files("$projectDir/schemas")
+    }
 }
 
 dependencies {
