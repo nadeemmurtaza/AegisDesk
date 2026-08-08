@@ -27,56 +27,56 @@ class MigrationTest {
     @Throws(IOException::class)
     fun migrate1To2() {
         helper.createDatabase(TEST_DB, 1).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 2, true)
+        helper.runMigrationsAndValidate(TEST_DB, 2, true, AegisDatabase.MIGRATION_1_2)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate2To3() {
         helper.createDatabase(TEST_DB, 2).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 3, true)
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, AegisDatabase.MIGRATION_2_3)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate3To4() {
         helper.createDatabase(TEST_DB, 3).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 4, true)
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, AegisDatabase.MIGRATION_3_4)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate4To5() {
         helper.createDatabase(TEST_DB, 4).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 5, true)
+        helper.runMigrationsAndValidate(TEST_DB, 5, true, AegisDatabase.MIGRATION_4_5)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate5To6() {
         helper.createDatabase(TEST_DB, 5).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 6, true)
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, AegisDatabase.MIGRATION_5_6)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate6To7() {
         helper.createDatabase(TEST_DB, 6).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 7, true)
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, AegisDatabase.MIGRATION_6_7)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate7To8() {
         helper.createDatabase(TEST_DB, 7).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 8, true)
+        helper.runMigrationsAndValidate(TEST_DB, 8, true, AegisDatabase.MIGRATION_7_8)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate8To9() {
         helper.createDatabase(TEST_DB, 8).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 9, true)
+        helper.runMigrationsAndValidate(TEST_DB, 9, true, AegisDatabase.MIGRATION_8_9)
     }
 
     @Test
@@ -86,7 +86,7 @@ class MigrationTest {
             execSQL("INSERT INTO file_objects (path, filename, extension, mimeType, sizeBytes, indexState) VALUES ('test.pdf', 'test.pdf', 'pdf', 'application/pdf', 1024, 0)")
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 10, true)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 10, true, AegisDatabase.MIGRATION_9_10)
         val cursor = db.query("SELECT contentUriString, mediaStoreId FROM file_objects WHERE path = 'test.pdf'")
         assert(cursor.moveToFirst())
         assert(cursor.getString(0) == "")
@@ -101,7 +101,7 @@ class MigrationTest {
             execSQL("INSERT INTO ui_procedures (packageName, versionRange, taskCapability, steps, confidence, successCount, failureCount, lastRunMs, needsValidation) VALUES ('com.test', '*', 'SEND_MESSAGE', '[]', 80, 0, 0, 0, 0)")
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 11, true)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 11, true, AegisDatabase.MIGRATION_10_11)
         val cursor = db.query("SELECT prerequisites, recoveryPaths, successConditions FROM ui_procedures WHERE packageName = 'com.test'")
         assert(cursor.moveToFirst())
         assert(cursor.getString(0) == "")
@@ -114,7 +114,19 @@ class MigrationTest {
     @Throws(IOException::class)
     fun migrateFullPath_1To11() {
         helper.createDatabase(TEST_DB, 1).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 11, true)
+        helper.runMigrationsAndValidate(
+            TEST_DB, 11, true,
+            AegisDatabase.MIGRATION_1_2,
+            AegisDatabase.MIGRATION_2_3,
+            AegisDatabase.MIGRATION_3_4,
+            AegisDatabase.MIGRATION_4_5,
+            AegisDatabase.MIGRATION_5_6,
+            AegisDatabase.MIGRATION_6_7,
+            AegisDatabase.MIGRATION_7_8,
+            AegisDatabase.MIGRATION_8_9,
+            AegisDatabase.MIGRATION_9_10,
+            AegisDatabase.MIGRATION_10_11
+        )
     }
 
     @Test

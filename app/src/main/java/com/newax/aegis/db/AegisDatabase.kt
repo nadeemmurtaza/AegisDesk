@@ -78,7 +78,7 @@ abstract class AegisDatabase : RoomDatabase() {
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS embeddings (
@@ -94,7 +94,7 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS triples (
@@ -114,7 +114,7 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_10_11 = object : Migration(10, 11) {
+        internal val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE ui_procedures ADD COLUMN prerequisites TEXT NOT NULL DEFAULT ''")
                 database.execSQL("ALTER TABLE ui_procedures ADD COLUMN recoveryPaths TEXT NOT NULL DEFAULT ''")
@@ -122,14 +122,14 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_9_10 = object : Migration(9, 10) {
+        internal val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE file_objects ADD COLUMN contentUriString TEXT NOT NULL DEFAULT ''")
                 database.execSQL("ALTER TABLE file_objects ADD COLUMN mediaStoreId INTEGER NOT NULL DEFAULT 0")
             }
         }
 
-        private val MIGRATION_8_9 = object : Migration(8, 9) {
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS file_objects (
@@ -202,7 +202,7 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_7_8 = object : Migration(7, 8) {
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS trigger_rules (
@@ -223,7 +223,7 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_6_7 = object : Migration(6, 7) {
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""CREATE TABLE IF NOT EXISTS person_snapshots (personEntityId INTEGER NOT NULL PRIMARY KEY, displayName TEXT NOT NULL, canonicalPhone TEXT, canonicalEmail TEXT, preferredChannel TEXT, preferredLanguage TEXT NOT NULL DEFAULT '', preferredTone TEXT NOT NULL DEFAULT '', relationshipType TEXT NOT NULL DEFAULT '', activeProjectId TEXT, pendingCommitmentCount INTEGER NOT NULL DEFAULT 0, recentTopics TEXT NOT NULL DEFAULT '', lastInteractionMs INTEGER NOT NULL DEFAULT 0, importanceScore INTEGER NOT NULL DEFAULT 50, snapshotUpdatedMs INTEGER NOT NULL DEFAULT 0)""")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_ps_interaction ON person_snapshots(lastInteractionMs)")
@@ -237,7 +237,7 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_5_6 = object : Migration(5, 6) {
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS app_records (
@@ -310,7 +310,7 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_4_5 = object : Migration(4, 5) {
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS memory_records (
@@ -357,7 +357,7 @@ abstract class AegisDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_3_4 = object : Migration(3, 4) {
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 // ── entities ─────────────────────────────────────────────────
                 database.execSQL("""
