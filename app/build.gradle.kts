@@ -30,7 +30,7 @@ android {
         arg("room.schemaLocation", "$projectDir/schemas")
     }
     sourceSets {
-        getByName("androidTest").assets.srcDirs += files("$projectDir/schemas")
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
     }
 }
 
