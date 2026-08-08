@@ -66,12 +66,12 @@ object TextExtractor {
         while (i < s.length) {
             if (s[i] == '\\' && i + 1 < s.length) {
                 when (s[i + 1]) {
-                    'n' -> append('\n'); i += 2
-                    'r' -> append('\r'); i += 2
-                    't' -> append('\t'); i += 2
-                    '(' -> append('('); i += 2
-                    ')' -> append(')'); i += 2
-                    '\\' -> append('\\'); i += 2
+                    'n' -> { append('\n'); i += 2 }
+                    'r' -> { append('\r'); i += 2 }
+                    't' -> { append('\t'); i += 2 }
+                    '(' -> { append('('); i += 2 }
+                    ')' -> { append(')'); i += 2 }
+                    '\\' -> { append('\\'); i += 2 }
                     else -> { append(s[i]); i++ }
                 }
             } else { append(s[i]); i++ }
