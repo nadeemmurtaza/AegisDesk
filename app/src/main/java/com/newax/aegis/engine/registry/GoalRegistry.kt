@@ -1,7 +1,6 @@
 package com.newax.aegis.engine.registry
 
 import com.newax.aegis.engine.intelligence.Goal
-import com.newax.aegis.engine.intelligence.GoalState
 import com.newax.aegis.engine.intelligence.GoalPlanner
 import com.newax.aegis.engine.state.GoalState as GoalStateEnum
 import java.util.concurrent.ConcurrentHashMap

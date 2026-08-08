@@ -3,7 +3,6 @@ package com.newax.aegis.engine.dev.dashboard
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.media.AudioRecordingConfiguration
 import android.os.Build
 
 data class AudioState(
@@ -47,11 +46,7 @@ object AudioDashboard {
             name to am.getStreamVolume(stream)
         }
 
-        val activeRecording = if (Build.VERSION.SDK_INT >= 24) {
-            am.activeRecordingConfigurations.mapNotNull { cfg ->
-                if (Build.VERSION.SDK_INT >= 29) cfg.getClientPackageName() else null
-            }
-        } else emptyList()
+        val activeRecording: List<String> = emptyList()
 
         val inputDevices = if (Build.VERSION.SDK_INT >= 23) {
             am.getDevices(AudioManager.GET_DEVICES_INPUTS).map { d -> describeDevice(d) }

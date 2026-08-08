@@ -1,6 +1,7 @@
 package com.newax.aegis.engine.manager
 
 import android.content.Context
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.memory.EncryptedMemory
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +97,7 @@ object ExportManager {
                 val root = JSONObject()
                 for (table in allTables) {
                     runCatching {
-                        val cursor = rawDb.query("SELECT * FROM $table LIMIT 1000", null)
+                        val cursor = rawDb.query(SimpleSQLiteQuery("SELECT * FROM $table LIMIT 1000"))
                         val cols = Array(cursor.columnCount) { cursor.getColumnName(it) }
                         val rows = JSONArray()
                         while (cursor.moveToNext()) {
@@ -116,7 +117,7 @@ object ExportManager {
                     for (table in allTables) {
                         runCatching {
                             pw.println("# TABLE: $table")
-                            val cursor = rawDb.query("SELECT * FROM $table LIMIT 1000", null)
+                            val cursor = rawDb.query(SimpleSQLiteQuery("SELECT * FROM $table LIMIT 1000"))
                             val cols = Array(cursor.columnCount) { cursor.getColumnName(it) }
                             pw.println(cols.joinToString(",") { csvEscape(it) })
                             while (cursor.moveToNext()) {
@@ -133,7 +134,7 @@ object ExportManager {
                     for (table in allTables) {
                         pw.println("=== $table ===")
                         runCatching {
-                            val cursor = rawDb.query("SELECT COUNT(*) FROM $table", null)
+                            val cursor = rawDb.query(SimpleSQLiteQuery("SELECT COUNT(*) FROM $table"))
                             if (cursor.moveToFirst()) pw.println("${cursor.getLong(0)} rows")
                             cursor.close()
                             totalRows++

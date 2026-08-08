@@ -1,6 +1,7 @@
 package com.newax.aegis.engine.dev.ci
 
 import android.content.Context
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.MemoryRecord
 import com.newax.aegis.db.entity.PersonEntity
@@ -169,7 +170,7 @@ object HeadlessCi {
     }
 
     private fun dbVersion(db: AegisDatabase?): String = try {
-        val cursor = db?.openHelper?.readableDatabase?.query("PRAGMA user_version", null)
+        val cursor = db?.openHelper?.readableDatabase?.query(SimpleSQLiteQuery("PRAGMA user_version"))
         cursor?.use { c -> if (c.moveToFirst()) c.getInt(0).toString() else "?" } ?: "?"
     } catch (_: Exception) { "?" }
 }

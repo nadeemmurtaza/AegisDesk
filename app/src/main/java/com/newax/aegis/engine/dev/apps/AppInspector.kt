@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.engine.HabitTracker
 import com.newax.aegis.engine.apps.AppCapability
@@ -123,10 +124,10 @@ object AppInspector {
             runCatching {
                 val rawDb = db.openHelper.readableDatabase
                 val results = mutableListOf<Map<String, String>>()
-                val cursor = rawDb.query(
+                val cursor = rawDb.query(SimpleSQLiteQuery(
                     "SELECT id, taskCapability, successCount, failureCount FROM ui_procedures WHERE packageName = ? LIMIT 50",
                     arrayOf(packageName)
-                )
+                ))
                 cursor.use { c ->
                     while (c.moveToNext()) {
                         results.add(mapOf(
@@ -160,10 +161,9 @@ object AppInspector {
         val rawDb = db.openHelper.readableDatabase
         val result = mutableMapOf<String, MutableList<String>>()
         runCatching {
-            val cursor = rawDb.query(
-                "SELECT packageName, capability FROM app_capability_links GROUP BY packageName, capability LIMIT 500",
-                null
-            )
+            val cursor = rawDb.query(SimpleSQLiteQuery(
+                "SELECT packageName, capability FROM app_capability_links GROUP BY packageName, capability LIMIT 500"
+            ))
             cursor.use { c ->
                 while (c.moveToNext()) {
                     val pkg = c.getString(0)

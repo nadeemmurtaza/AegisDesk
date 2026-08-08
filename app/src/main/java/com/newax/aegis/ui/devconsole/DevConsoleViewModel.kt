@@ -7,6 +7,7 @@ import android.content.Context
 import android.database.Cursor
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.FileObject
 import com.newax.aegis.db.entity.TriggerRule
@@ -174,7 +175,7 @@ class DevConsoleViewModel(app: Application) : AndroidViewModel(app) {
         val stats = ALL_TABLES.map { table ->
             val count = runCatching {
                 db.openHelper.readableDatabase
-                    .query("SELECT COUNT(*) FROM $table", null)
+                    .query(SimpleSQLiteQuery("SELECT COUNT(*) FROM $table"))
                     .use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
             }.getOrDefault(-1)
             DbTableStat(table, count)
@@ -206,7 +207,7 @@ class DevConsoleViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val t0 = System.currentTimeMillis()
             val result = runCatching {
-                val cursor: Cursor = db.openHelper.readableDatabase.query(query.trim(), null)
+                val cursor: Cursor = db.openHelper.readableDatabase.query(SimpleSQLiteQuery(query.trim()))
                 cursor.use { c ->
                     val cols = (0 until c.columnCount).map { c.getColumnName(it) }
                     val rows = mutableListOf<List<String>>()
