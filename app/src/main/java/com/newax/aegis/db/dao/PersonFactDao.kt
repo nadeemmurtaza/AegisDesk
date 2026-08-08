@@ -19,6 +19,7 @@ interface PersonFactDao {
     fun countForPerson(personId: Long): Int
 
     /** Full-text search via FTS4 virtual table (created by AegisDatabase.Callback). */
+    @SkipQueryVerification
     @Query("""
         SELECT * FROM person_facts
         WHERE id IN (SELECT rowid FROM person_facts_fts WHERE person_facts_fts MATCH :query)
