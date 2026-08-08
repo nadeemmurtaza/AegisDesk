@@ -55,19 +55,27 @@ class AegisApplication : Application() {
         AegisDatabase.init(this, memory)
         CoreTriggerEngine.start(this, AegisDatabase.get) { _, _ -> }
         // One-shot migration from legacy EncryptedSharedPreferences storage
-        if (AegisDatabase.get.kvStoreDao().get("migration_v1_done") != "1") {
-            LegacyMigrationWorker.schedule(this)
-        }
+        Thread {
+            if (AegisDatabase.get.kvStoreDao().get("migration_v1_done") != "1") {
+                LegacyMigrationWorker.schedule(this@AegisApplication)
+            }
+        }.start()
         // Load USE model from disk if already downloaded; try to download if not
         EmbeddingEngine.init(this)
         if (!EmbeddingEngine.isReady()) {
             EmbeddingEngine.downloadModelIfNeeded(this) { success ->
-                if (success && EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
-                    EmbeddingIndexWorker.schedule(this)
-                }
+                if (success) Thread {
+                    if (EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
+                        EmbeddingIndexWorker.schedule(this@AegisApplication)
+                    }
+                }.start()
             }
-        } else if (EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
-            EmbeddingIndexWorker.schedule(this)
+        } else {
+            Thread {
+                if (EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
+                    EmbeddingIndexWorker.schedule(this@AegisApplication)
+                }
+            }.start()
         }
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             val sw = StringWriter()
