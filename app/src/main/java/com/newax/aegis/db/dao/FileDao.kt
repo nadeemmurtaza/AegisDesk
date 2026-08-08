@@ -113,6 +113,7 @@ interface FileDao {
 
     // ── FTS / BM25 ────────────────────────────────────────────────────────────
 
+    @SkipQueryVerification
     @Query("""
         SELECT f.* FROM file_objects f
         INNER JOIN file_text_fts t ON f.id = t.rowid

@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "file_objects",
     indices = [
+        Index("path", unique = true),
         Index("sha256"),
         Index("pHash"),
         Index("extension"),
@@ -69,7 +70,7 @@ data class FileTextContent(
     val extractedMs: Long = System.currentTimeMillis()
 )
 
-@Fts4
+@Fts4(contentEntity = FileTextContent::class)
 @Entity(tableName = "file_text_fts")
 data class FileTextFts(
     @PrimaryKey @ColumnInfo(name = "rowid") val rowId: Long = 0,

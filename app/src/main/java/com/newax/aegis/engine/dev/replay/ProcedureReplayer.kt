@@ -9,6 +9,7 @@ import com.newax.aegis.engine.dev.procedure.ProcedureDebugger
 import com.newax.aegis.engine.dev.procedure.StepDebugResult
 import com.newax.aegis.engine.procedure.ProcedureExecutor
 import com.newax.aegis.engine.procedure.ProcedureStep
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.newax.aegis.engine.procedure.StepSerializer
 import kotlinx.coroutines.delay
 
@@ -87,8 +88,8 @@ object ProcedureReplayer {
 
     suspend fun replayFromDb(procedureId: Long, context: Context, db: AegisDatabase): ReplaySession {
         val stepsJson = try {
-            val cursor = db.openHelper.readableDatabase.rawQuery(
-                "SELECT steps FROM ui_procedures WHERE id = ?", arrayOf(procedureId.toString())
+            val cursor = db.openHelper.readableDatabase.query(
+                SimpleSQLiteQuery("SELECT steps FROM ui_procedures WHERE id = ?", arrayOf(procedureId.toString()))
             )
             cursor.use { c -> if (c.moveToFirst()) c.getString(0) else null }
         } catch (_: Exception) { null }

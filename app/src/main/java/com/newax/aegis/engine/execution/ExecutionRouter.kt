@@ -62,21 +62,22 @@ object ExecutionRouter {
 
     fun resolveCapability(context: Context, db: AegisDatabase, capability: AppCapability, pkgHint: String? = null): ExecutionTier {
         val cap = when (capability) {
-            AppCapability.OPEN_APP         -> Capability.CAN_OPEN_APP
-            AppCapability.SEND_MESSAGE     -> Capability.CAN_SEND_MESSAGE
-            AppCapability.MAKE_CALL        -> Capability.CAN_CALL
-            AppCapability.SHARE_FILE       -> Capability.CAN_SHARE_FILE
-            AppCapability.CREATE_EVENT     -> Capability.CAN_CREATE_EVENT
-            else                           -> null
+            AppCapability.OPEN_APP     -> Capability.CAN_OPEN_APP
+            AppCapability.SEND_TEXT    -> Capability.CAN_SEND_MESSAGE
+            AppCapability.CALL         -> Capability.CAN_CALL
+            AppCapability.SEND_FILE    -> Capability.CAN_SHARE_FILE
+            AppCapability.CREATE_EVENT -> Capability.CAN_CREATE_EVENT
+            else                       -> null
         }
         if (cap != null && !CapabilityRegistry.isAvailable(cap)) return ExecutionTier.LLM_REASONING
 
         val resolution = AppIntelligence.resolve(db, context, capability, pkgHint)
-        return when {
-            resolution?.intentAction != null   -> ExecutionTier.INTENT
-            resolution?.deepLinkPattern != null -> ExecutionTier.DEEP_LINK
-            resolution != null                  -> ExecutionTier.STORED_PROCEDURE
-            else                                -> ExecutionTier.ACCESSIBILITY_SEMANTIC
+        return when (resolution?.strategy) {
+            AppIntelligence.Strategy.LAUNCH_INTENT  -> ExecutionTier.ANDROID_API
+            AppIntelligence.Strategy.ACTION_INTENT  -> ExecutionTier.INTENT
+            AppIntelligence.Strategy.DEEP_LINK      -> ExecutionTier.DEEP_LINK
+            AppIntelligence.Strategy.UI_PROCEDURE   -> ExecutionTier.STORED_PROCEDURE
+            AppIntelligence.Strategy.NOT_FOUND, null -> ExecutionTier.ACCESSIBILITY_SEMANTIC
         }
     }
 }

@@ -57,7 +57,7 @@ object HardwareBenchmark {
         val thermalHeadroom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 val pm = context.getSystemService(android.os.PowerManager::class.java)
-                pm?.thermalHeadroom(5) ?: 1.0f
+                pm?.getThermalHeadroom(5) ?: 1.0f
             } catch (_: Exception) { 1.0f }
         } else 1.0f
 

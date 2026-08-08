@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "placeholder_v7",
+    "identityHash": "b1d958684f99e2e3ff845d9fecc23d25",
     "entities": [
       {
         "tableName": "persons",
@@ -12,66 +12,62 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "name",
             "columnName": "name",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "importanceScore",
             "columnName": "importanceScore",
             "affinity": "REAL",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "sourceCount",
             "columnName": "sourceCount",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "totalMentions",
             "columnName": "totalMentions",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "lastSeenMs",
             "columnName": "lastSeenMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "profileBuilt",
             "columnName": "profileBuilt",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_persons_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`name`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -82,36 +78,52 @@
             "fieldPath": "personId",
             "columnName": "personId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "sourceName",
             "columnName": "sourceName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 2,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "count",
             "columnName": "count",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "personId",
             "sourceName"
-          ]
+          ],
+          "autoGenerate": false
         },
-        "indices": [],
-        "foreignKeys": []
+        "indices": [
+          {
+            "name": "index_person_mentions_personId",
+            "unique": false,
+            "columnNames": [
+              "personId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`personId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "persons",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "personId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       },
       {
         "tableName": "person_facts",
@@ -121,67 +133,94 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "personId",
             "columnName": "personId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "fact",
             "columnName": "fact",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "REAL",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "timestampMs",
             "columnName": "timestampMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
-        "foreignKeys": []
+        "indices": [
+          {
+            "name": "index_person_facts_personId",
+            "unique": false,
+            "columnNames": [
+              "personId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`personId`)"
+          },
+          {
+            "name": "index_person_facts_category",
+            "unique": false,
+            "columnNames": [
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`category`)"
+          },
+          {
+            "name": "index_person_facts_personId_category",
+            "unique": false,
+            "columnNames": [
+              "personId",
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`personId`, `category`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "persons",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "personId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       },
       {
         "tableName": "learning_drafts",
@@ -191,82 +230,93 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "fact",
             "columnName": "fact",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "sourceSnippet",
             "columnName": "sourceSnippet",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "REAL",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "status",
             "columnName": "status",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "subjectName",
             "columnName": "subjectName",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "timestampMs",
             "columnName": "timestampMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": false
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_learning_drafts_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_learning_drafts_subjectName",
+            "unique": false,
+            "columnNames": [
+              "subjectName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subjectName`)"
+          },
+          {
+            "name": "index_learning_drafts_status_timestampMs",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "timestampMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`status`, `timestampMs`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -277,32 +327,26 @@
             "fieldPath": "key",
             "columnName": "key",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "value",
             "columnName": "value",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "updatedMs",
             "columnName": "updatedMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "key"
-          ]
+          ],
+          "autoGenerate": false
         },
         "indices": [],
         "foreignKeys": []
@@ -315,50 +359,59 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "sourceType",
             "columnName": "sourceType",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "sourceId",
             "columnName": "sourceId",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "text",
             "columnName": "text",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "embedding",
             "columnName": "embedding",
             "affinity": "BLOB",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_embeddings_sourceType",
+            "unique": false,
+            "columnNames": [
+              "sourceType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`sourceType`)"
+          },
+          {
+            "name": "index_embeddings_sourceId",
+            "unique": true,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`sourceId`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -369,66 +422,90 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "subject",
             "columnName": "subject",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "predicate",
             "columnName": "predicate",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "objectValue",
             "columnName": "objectValue",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "REAL",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "createdMs",
             "columnName": "createdMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_triples_subject",
+            "unique": false,
+            "columnNames": [
+              "subject"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subject`)"
+          },
+          {
+            "name": "index_triples_predicate",
+            "unique": false,
+            "columnNames": [
+              "predicate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`predicate`)"
+          },
+          {
+            "name": "index_triples_subject_predicate",
+            "unique": false,
+            "columnNames": [
+              "subject",
+              "predicate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subject`, `predicate`)"
+          },
+          {
+            "name": "index_triples_objectValue",
+            "unique": false,
+            "columnNames": [
+              "objectValue"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`objectValue`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -439,50 +516,51 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "type",
             "columnName": "type",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
             "fieldPath": "canonicalName",
             "columnName": "canonicalName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "payloadPointer",
             "columnName": "payloadPointer",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "createdAt",
             "columnName": "createdAt",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_entities_canonicalName",
+            "unique": false,
+            "columnNames": [
+              "canonicalName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`canonicalName`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -493,27 +571,33 @@
             "fieldPath": "entityId",
             "columnName": "entityId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "alias",
             "columnName": "alias",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 2,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "entityId",
             "alias"
-          ]
+          ],
+          "autoGenerate": false
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_entity_aliases_alias",
+            "unique": false,
+            "columnNames": [
+              "alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`alias`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -524,26 +608,32 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "name",
             "columnName": "name",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_predicates_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`name`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -554,48 +644,37 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "subjectId",
             "columnName": "subjectId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "predicateId",
             "columnName": "predicateId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "objectId",
             "columnName": "objectId",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "objectValue",
             "columnName": "objectValue",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "80"
           },
           {
@@ -603,49 +682,81 @@
             "columnName": "importance",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "50"
           },
           {
             "fieldPath": "createdAt",
             "columnName": "createdAt",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "validFrom",
             "columnName": "validFrom",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "validUntil",
             "columnName": "validUntil",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "sourceId",
             "columnName": "sourceId",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_edges_subjectId_predicateId",
+            "unique": false,
+            "columnNames": [
+              "subjectId",
+              "predicateId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subjectId`, `predicateId`)"
+          },
+          {
+            "name": "index_edges_predicateId_objectId",
+            "unique": false,
+            "columnNames": [
+              "predicateId",
+              "objectId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`predicateId`, `objectId`)"
+          },
+          {
+            "name": "index_edges_subjectId_predicateId_objectId",
+            "unique": false,
+            "columnNames": [
+              "subjectId",
+              "predicateId",
+              "objectId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subjectId`, `predicateId`, `objectId`)"
+          },
+          {
+            "name": "index_edges_validUntil",
+            "unique": false,
+            "columnNames": [
+              "validUntil"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`validUntil`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -656,102 +767,81 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "type",
             "columnName": "type",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "content",
             "columnName": "content",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "createdAt",
             "columnName": "createdAt",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
         "indices": [],
         "foreignKeys": []
       },
       {
         "tableName": "memory_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `subject` TEXT NOT NULL DEFAULT '', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL DEFAULT '', `graphEdgeId` INTEGER, `embeddingId` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL, `subject` TEXT NOT NULL, `source` TEXT NOT NULL, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL, `graphEdgeId` INTEGER, `embeddingId` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "type",
             "columnName": "type",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "content",
             "columnName": "content",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "notNull": true
           },
           {
             "fieldPath": "subject",
             "columnName": "subject",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "notNull": true
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "notNull": true
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "80"
           },
           {
@@ -759,73 +849,104 @@
             "columnName": "importance",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "50"
           },
           {
             "fieldPath": "createdAt",
             "columnName": "createdAt",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "updatedAt",
             "columnName": "updatedAt",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "validFrom",
             "columnName": "validFrom",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "validUntil",
             "columnName": "validUntil",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "contentHash",
             "columnName": "contentHash",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "notNull": true
           },
           {
             "fieldPath": "graphEdgeId",
             "columnName": "graphEdgeId",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "embeddingId",
             "columnName": "embeddingId",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_memory_records_contentHash",
+            "unique": false,
+            "columnNames": [
+              "contentHash"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`contentHash`)"
+          },
+          {
+            "name": "index_memory_records_subject",
+            "unique": false,
+            "columnNames": [
+              "subject"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`subject`)"
+          },
+          {
+            "name": "index_memory_records_type",
+            "unique": false,
+            "columnNames": [
+              "type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`type`)"
+          },
+          {
+            "name": "index_memory_records_createdAt",
+            "unique": false,
+            "columnNames": [
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`createdAt`)"
+          },
+          {
+            "name": "index_memory_records_validUntil",
+            "unique": false,
+            "columnNames": [
+              "validUntil"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`validUntil`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -836,74 +957,70 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "packageName",
             "columnName": "packageName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "label",
             "columnName": "label",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "version",
             "columnName": "version",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "launchActivity",
             "columnName": "launchActivity",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "needsValidation",
             "columnName": "needsValidation",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
             "fieldPath": "lastScanMs",
             "columnName": "lastScanMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_app_records_packageName",
+            "unique": true,
+            "columnNames": [
+              "packageName"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`packageName`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -914,59 +1031,58 @@
             "fieldPath": "packageName",
             "columnName": "packageName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "capability",
             "columnName": "capability",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 2,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "intentAction",
             "columnName": "intentAction",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "deepLinkPattern",
             "columnName": "deepLinkPattern",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "mimeTypes",
             "columnName": "mimeTypes",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "80"
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "packageName",
             "capability"
-          ]
+          ],
+          "autoGenerate": false
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_app_capability_links_capability",
+            "unique": false,
+            "columnNames": [
+              "capability"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`capability`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -977,56 +1093,44 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "packageName",
             "columnName": "packageName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "versionRange",
             "columnName": "versionRange",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "taskCapability",
             "columnName": "taskCapability",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "steps",
             "columnName": "steps",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "screenSignature",
             "columnName": "screenSignature",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "80"
           },
           {
@@ -1034,7 +1138,6 @@
             "columnName": "successCount",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
@@ -1042,7 +1145,6 @@
             "columnName": "failureCount",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
@@ -1050,7 +1152,6 @@
             "columnName": "lastRunMs",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
@@ -1058,17 +1159,35 @@
             "columnName": "needsValidation",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_ui_procedures_packageName",
+            "unique": false,
+            "columnNames": [
+              "packageName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`packageName`)"
+          },
+          {
+            "name": "index_ui_procedures_taskCapability",
+            "unique": false,
+            "columnNames": [
+              "taskCapability"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`taskCapability`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -1079,49 +1198,42 @@
             "fieldPath": "packageName",
             "columnName": "packageName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "screenSignature",
             "columnName": "screenSignature",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 2,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "screenType",
             "columnName": "screenType",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "nodes",
             "columnName": "nodes",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "appVersion",
             "columnName": "appVersion",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "packageName",
             "screenSignature"
-          ]
+          ],
+          "autoGenerate": false
         },
         "indices": [],
         "foreignKeys": []
@@ -1134,58 +1246,68 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "fromSignature",
             "columnName": "fromSignature",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "toSignature",
             "columnName": "toSignature",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "actionViewId",
             "columnName": "actionViewId",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "actionContentDesc",
             "columnName": "actionContentDesc",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "actionText",
             "columnName": "actionText",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_nav_edges_fromSignature",
+            "unique": false,
+            "columnNames": [
+              "fromSignature"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`fromSignature`)"
+          },
+          {
+            "name": "index_nav_edges_toSignature",
+            "unique": false,
+            "columnNames": [
+              "toSignature"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`toSignature`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -1196,80 +1318,64 @@
             "fieldPath": "personEntityId",
             "columnName": "personEntityId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "displayName",
             "columnName": "displayName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "canonicalPhone",
             "columnName": "canonicalPhone",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "canonicalEmail",
             "columnName": "canonicalEmail",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "preferredChannel",
             "columnName": "preferredChannel",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "preferredLanguage",
             "columnName": "preferredLanguage",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "preferredTone",
             "columnName": "preferredTone",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "relationshipType",
             "columnName": "relationshipType",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "activeProjectId",
             "columnName": "activeProjectId",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "pendingCommitmentCount",
             "columnName": "pendingCommitmentCount",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
@@ -1277,15 +1383,13 @@
             "columnName": "recentTopics",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "lastInteractionMs",
             "columnName": "lastInteractionMs",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
@@ -1293,7 +1397,6 @@
             "columnName": "importanceScore",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "50"
           },
           {
@@ -1301,17 +1404,26 @@
             "columnName": "snapshotUpdatedMs",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "personEntityId"
-          ]
+          ],
+          "autoGenerate": false
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_person_snapshots_lastInteractionMs",
+            "unique": false,
+            "columnNames": [
+              "lastInteractionMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`lastInteractionMs`)"
+          }
+        ],
         "foreignKeys": []
       },
       {
@@ -1322,16 +1434,13 @@
             "fieldPath": "personEntityId",
             "columnName": "personEntityId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "canAutoOpenChat",
             "columnName": "canAutoOpenChat",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "1"
           },
           {
@@ -1339,7 +1448,6 @@
             "columnName": "canAutoDraft",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "1"
           },
           {
@@ -1347,7 +1455,6 @@
             "columnName": "canAutoSend",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
@@ -1355,7 +1462,6 @@
             "columnName": "canCallWithoutConfirm",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0"
           },
           {
@@ -1363,7 +1469,6 @@
             "columnName": "canShareFiles",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "1"
           },
           {
@@ -1371,15 +1476,14 @@
             "columnName": "sensitiveActionsRequireConfirm",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "1"
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "personEntityId"
-          ]
+          ],
+          "autoGenerate": false
         },
         "indices": [],
         "foreignKeys": []
@@ -1392,40 +1496,31 @@
             "fieldPath": "personEntityId",
             "columnName": "personEntityId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "taskContext",
             "columnName": "taskContext",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 2,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "packageName",
             "columnName": "packageName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "capability",
             "columnName": "capability",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "probability",
             "columnName": "probability",
             "affinity": "REAL",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "0.8"
           },
           {
@@ -1433,24 +1528,21 @@
             "columnName": "evidenceCount",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "1"
           },
           {
             "fieldPath": "lastUpdatedMs",
             "columnName": "lastUpdatedMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "personEntityId",
             "taskContext"
-          ]
+          ],
+          "autoGenerate": false
         },
         "indices": [],
         "foreignKeys": []
@@ -1463,112 +1555,187 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "debtorPersonId",
             "columnName": "debtorPersonId",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "creditorPersonId",
             "columnName": "creditorPersonId",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "debtorLabel",
             "columnName": "debtorLabel",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "creditorLabel",
             "columnName": "creditorLabel",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "action",
             "columnName": "action",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "dueMs",
             "columnName": "dueMs",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           },
           {
             "fieldPath": "status",
             "columnName": "status",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "'pending'"
+            "defaultValue": "pending"
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
             "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "''"
+            "defaultValue": ""
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
             "notNull": true,
-            "primaryKeyPosition": 0,
             "defaultValue": "80"
           },
           {
             "fieldPath": "createdMs",
             "columnName": "createdMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": true
           },
           {
             "fieldPath": "resolvedMs",
             "columnName": "resolvedMs",
             "affinity": "INTEGER",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": null
+            "notNull": false
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_commitments_debtorPersonId",
+            "unique": false,
+            "columnNames": [
+              "debtorPersonId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`debtorPersonId`)"
+          },
+          {
+            "name": "index_commitments_creditorPersonId",
+            "unique": false,
+            "columnNames": [
+              "creditorPersonId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`creditorPersonId`)"
+          },
+          {
+            "name": "index_commitments_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_commitments_dueMs",
+            "unique": false,
+            "columnNames": [
+              "dueMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `${INDEX_NAME}` ON `${TABLE_NAME}` (`dueMs`)"
+          }
+        ],
         "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'placeholder_v7')"
+      "CREATE TABLE IF NOT EXISTS `persons` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `importanceScore` REAL NOT NULL, `sourceCount` INTEGER NOT NULL, `totalMentions` INTEGER NOT NULL, `lastSeenMs` INTEGER NOT NULL, `profileBuilt` INTEGER NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `person_mentions` (`personId` INTEGER NOT NULL, `sourceName` TEXT NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`personId`, `sourceName`), FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+      "CREATE TABLE IF NOT EXISTS `person_facts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `personId` INTEGER NOT NULL, `fact` TEXT NOT NULL, `category` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `timestampMs` INTEGER NOT NULL, FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+      "CREATE TABLE IF NOT EXISTS `learning_drafts` (`id` TEXT NOT NULL, `category` TEXT NOT NULL, `fact` TEXT NOT NULL, `source` TEXT NOT NULL, `sourceSnippet` TEXT NOT NULL, `confidence` REAL NOT NULL, `status` TEXT NOT NULL, `subjectName` TEXT, `timestampMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+      "CREATE TABLE IF NOT EXISTS `kv_store` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, `updatedMs` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+      "CREATE TABLE IF NOT EXISTS `embeddings` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceType` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `text` TEXT NOT NULL, `embedding` BLOB NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `triples` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subject` TEXT NOT NULL, `predicate` TEXT NOT NULL, `objectValue` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `createdMs` INTEGER NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `entities` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL DEFAULT 0, `canonicalName` TEXT NOT NULL, `payloadPointer` INTEGER, `createdAt` INTEGER NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `entity_aliases` (`entityId` INTEGER NOT NULL, `alias` TEXT NOT NULL, PRIMARY KEY(`entityId`, `alias`))",
+      "CREATE TABLE IF NOT EXISTS `predicates` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `edges` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subjectId` INTEGER NOT NULL, `predicateId` INTEGER NOT NULL, `objectId` INTEGER, `objectValue` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `sourceId` INTEGER)",
+      "CREATE TABLE IF NOT EXISTS `blobs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `memory_records` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL, `subject` TEXT NOT NULL, `source` TEXT NOT NULL, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL, `graphEdgeId` INTEGER, `embeddingId` TEXT)",
+      "CREATE TABLE IF NOT EXISTS `app_records` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `label` TEXT NOT NULL, `version` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `launchActivity` TEXT, `needsValidation` INTEGER NOT NULL DEFAULT 0, `lastScanMs` INTEGER NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `app_capability_links` (`packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `intentAction` TEXT, `deepLinkPattern` TEXT, `mimeTypes` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, PRIMARY KEY(`packageName`, `capability`))",
+      "CREATE TABLE IF NOT EXISTS `ui_procedures` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `versionRange` TEXT NOT NULL, `taskCapability` TEXT NOT NULL, `steps` TEXT NOT NULL, `screenSignature` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `successCount` INTEGER NOT NULL DEFAULT 0, `failureCount` INTEGER NOT NULL DEFAULT 0, `lastRunMs` INTEGER NOT NULL DEFAULT 0, `needsValidation` INTEGER NOT NULL DEFAULT 0)",
+      "CREATE TABLE IF NOT EXISTS `screen_nodes` (`packageName` TEXT NOT NULL, `screenSignature` TEXT NOT NULL, `screenType` TEXT NOT NULL DEFAULT '', `nodes` TEXT NOT NULL DEFAULT '', `appVersion` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`packageName`, `screenSignature`))",
+      "CREATE TABLE IF NOT EXISTS `nav_edges` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fromSignature` TEXT NOT NULL, `toSignature` TEXT NOT NULL, `actionViewId` TEXT NOT NULL DEFAULT '', `actionContentDesc` TEXT NOT NULL DEFAULT '', `actionText` TEXT NOT NULL DEFAULT '')",
+      "CREATE TABLE IF NOT EXISTS `person_snapshots` (`personEntityId` INTEGER NOT NULL, `displayName` TEXT NOT NULL, `canonicalPhone` TEXT, `canonicalEmail` TEXT, `preferredChannel` TEXT, `preferredLanguage` TEXT NOT NULL DEFAULT '', `preferredTone` TEXT NOT NULL DEFAULT '', `relationshipType` TEXT NOT NULL DEFAULT '', `activeProjectId` TEXT, `pendingCommitmentCount` INTEGER NOT NULL DEFAULT 0, `recentTopics` TEXT NOT NULL DEFAULT '', `lastInteractionMs` INTEGER NOT NULL DEFAULT 0, `importanceScore` INTEGER NOT NULL DEFAULT 50, `snapshotUpdatedMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`personEntityId`))",
+      "CREATE TABLE IF NOT EXISTS `person_policies` (`personEntityId` INTEGER NOT NULL, `canAutoOpenChat` INTEGER NOT NULL DEFAULT 1, `canAutoDraft` INTEGER NOT NULL DEFAULT 1, `canAutoSend` INTEGER NOT NULL DEFAULT 0, `canCallWithoutConfirm` INTEGER NOT NULL DEFAULT 0, `canShareFiles` INTEGER NOT NULL DEFAULT 1, `sensitiveActionsRequireConfirm` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`personEntityId`))",
+      "CREATE TABLE IF NOT EXISTS `person_channel_prefs` (`personEntityId` INTEGER NOT NULL, `taskContext` TEXT NOT NULL, `packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `probability` REAL NOT NULL DEFAULT 0.8, `evidenceCount` INTEGER NOT NULL DEFAULT 1, `lastUpdatedMs` INTEGER NOT NULL, PRIMARY KEY(`personEntityId`, `taskContext`))",
+      "CREATE TABLE IF NOT EXISTS `commitments` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `debtorPersonId` INTEGER, `creditorPersonId` INTEGER, `debtorLabel` TEXT NOT NULL, `creditorLabel` TEXT NOT NULL, `action` TEXT NOT NULL, `dueMs` INTEGER, `status` TEXT NOT NULL DEFAULT 'pending', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `createdMs` INTEGER NOT NULL, `resolvedMs` INTEGER)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS `index_persons_name` ON `persons` (`name`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_mentions_personId` ON `person_mentions` (`personId`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_facts_personId` ON `person_facts` (`personId`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_facts_category` ON `person_facts` (`category`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_facts_personId_category` ON `person_facts` (`personId`, `category`)",
+      "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status` ON `learning_drafts` (`status`)",
+      "CREATE INDEX IF NOT EXISTS `index_learning_drafts_subjectName` ON `learning_drafts` (`subjectName`)",
+      "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status_timestampMs` ON `learning_drafts` (`status`, `timestampMs`)",
+      "CREATE INDEX IF NOT EXISTS `index_embeddings_sourceType` ON `embeddings` (`sourceType`)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS `index_embeddings_sourceId` ON `embeddings` (`sourceId`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_subject` ON `triples` (`subject`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_predicate` ON `triples` (`predicate`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_subject_predicate` ON `triples` (`subject`, `predicate`)",
+      "CREATE INDEX IF NOT EXISTS `index_triples_objectValue` ON `triples` (`objectValue`)",
+      "CREATE INDEX IF NOT EXISTS `index_entities_canonicalName` ON `entities` (`canonicalName`)",
+      "CREATE INDEX IF NOT EXISTS `index_entity_aliases_alias` ON `entity_aliases` (`alias`)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS `index_predicates_name` ON `predicates` (`name`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId` ON `edges` (`subjectId`, `predicateId`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_predicateId_objectId` ON `edges` (`predicateId`, `objectId`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId_objectId` ON `edges` (`subjectId`, `predicateId`, `objectId`)",
+      "CREATE INDEX IF NOT EXISTS `index_edges_validUntil` ON `edges` (`validUntil`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_contentHash` ON `memory_records` (`contentHash`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_subject` ON `memory_records` (`subject`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_type` ON `memory_records` (`type`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_createdAt` ON `memory_records` (`createdAt`)",
+      "CREATE INDEX IF NOT EXISTS `index_memory_records_validUntil` ON `memory_records` (`validUntil`)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS `index_app_records_packageName` ON `app_records` (`packageName`)",
+      "CREATE INDEX IF NOT EXISTS `index_app_capability_links_capability` ON `app_capability_links` (`capability`)",
+      "CREATE INDEX IF NOT EXISTS `index_ui_procedures_packageName` ON `ui_procedures` (`packageName`)",
+      "CREATE INDEX IF NOT EXISTS `index_ui_procedures_taskCapability` ON `ui_procedures` (`taskCapability`)",
+      "CREATE INDEX IF NOT EXISTS `index_nav_edges_fromSignature` ON `nav_edges` (`fromSignature`)",
+      "CREATE INDEX IF NOT EXISTS `index_nav_edges_toSignature` ON `nav_edges` (`toSignature`)",
+      "CREATE INDEX IF NOT EXISTS `index_person_snapshots_lastInteractionMs` ON `person_snapshots` (`lastInteractionMs`)",
+      "CREATE INDEX IF NOT EXISTS `index_commitments_debtorPersonId` ON `commitments` (`debtorPersonId`)",
+      "CREATE INDEX IF NOT EXISTS `index_commitments_creditorPersonId` ON `commitments` (`creditorPersonId`)",
+      "CREATE INDEX IF NOT EXISTS `index_commitments_status` ON `commitments` (`status`)",
+      "CREATE INDEX IF NOT EXISTS `index_commitments_dueMs` ON `commitments` (`dueMs`)",
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)"
     ]
   }
 }

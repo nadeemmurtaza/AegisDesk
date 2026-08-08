@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "person_snapshots",
-    indices = [Index("personEntityId", unique = true), Index("lastInteractionMs")]
+    indices = [Index("lastInteractionMs")]
 )
 data class PersonSnapshot(
     @PrimaryKey val personEntityId: Long,

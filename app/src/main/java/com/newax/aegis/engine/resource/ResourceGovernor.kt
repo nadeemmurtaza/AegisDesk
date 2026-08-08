@@ -117,19 +117,24 @@ object ResourceGovernor {
 
     private fun drainQueue() {
         if (heavyJob?.isActive == true) return
-        val next = queue.poll() ?: return
-        val isC  = next.resourceClass == ResourceClass.CRITICAL
+        val next  = queue.poll() ?: return
+        val isC   = next.resourceClass == ResourceClass.CRITICAL
+        val myId  = next.id
         if (isC) criticalRunning = true
-        heavyLabel = next.id
+        heavyLabel = myId
         heavyJob   = scope.launch(Dispatchers.IO) {
             try {
                 runSafe(next)
             } finally {
                 mutex.withLock {
-                    heavyJob = null
-                    heavyLabel = null
-                    if (isC) criticalRunning = false
-                    drainQueue()
+                    // Only clear our own slot — a concurrent preempt may have already
+                    // replaced heavyLabel with a new job's ID before this finally runs.
+                    if (heavyLabel == myId) {
+                        heavyJob = null
+                        heavyLabel = null
+                        if (isC) criticalRunning = false
+                        drainQueue()
+                    }
                 }
             }
         }

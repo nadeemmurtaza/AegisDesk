@@ -5,13 +5,27 @@ import org.json.JSONObject
 
 object StepSerializer {
 
+    private fun serializeCondition(c: StepCondition): JSONObject =
+        JSONObject().put("target", c.target).put("abort", c.abortIfFailed)
+
+    private fun deserializeCondition(o: JSONObject): StepCondition =
+        StepCondition(o.getString("target"), o.optBoolean("abort", true))
+
     fun serialize(steps: List<ProcedureStep>): String {
         val arr = JSONArray()
         steps.forEach { step ->
             val o = JSONObject()
             when (step) {
-                is ProcedureStep.Tap         -> o.put("t","TAP").put("target",step.target).put("fx",step.fallbackX).put("fy",step.fallbackY)
-                is ProcedureStep.TypeText    -> o.put("t","TYPE").put("target",step.target).put("text",step.text).put("clear",step.clearFirst)
+                is ProcedureStep.Tap -> {
+                    o.put("t","TAP").put("target",step.target).put("fx",step.fallbackX).put("fy",step.fallbackY)
+                    step.pre?.let  { o.put("pre",  serializeCondition(it)) }
+                    step.post?.let { o.put("post", serializeCondition(it)) }
+                }
+                is ProcedureStep.TypeText -> {
+                    o.put("t","TYPE").put("target",step.target).put("text",step.text).put("clear",step.clearFirst)
+                    step.pre?.let  { o.put("pre",  serializeCondition(it)) }
+                    step.post?.let { o.put("post", serializeCondition(it)) }
+                }
                 is ProcedureStep.WaitFor     -> o.put("t","WAIT").put("target",step.target).put("ms",step.timeoutMs)
                 is ProcedureStep.Verify      -> o.put("t","VERIFY").put("target",step.target).put("abort",step.abortIfMissing)
                 is ProcedureStep.ScrollDown  -> o.put("t","SCROLL_DOWN").put("max",step.maxSwipes)
@@ -19,7 +33,10 @@ object StepSerializer {
                 is ProcedureStep.Back        -> o.put("t","BACK").put("n",step.count)
                 is ProcedureStep.Home        -> o.put("t","HOME")
                 is ProcedureStep.Sleep       -> o.put("t","SLEEP").put("ms",step.ms)
-                is ProcedureStep.LaunchApp   -> o.put("t","LAUNCH").put("pkg",step.packageName)
+                is ProcedureStep.LaunchApp -> {
+                    o.put("t","LAUNCH").put("pkg",step.packageName)
+                    step.post?.let { o.put("post", serializeCondition(it)) }
+                }
                 is ProcedureStep.SelectItem  -> o.put("t","SELECT").put("list",step.listTarget).put("item",step.itemText)
                 is ProcedureStep.TapCoord    -> o.put("t","TAP_COORD").put("x",step.x).put("y",step.y)
                 is ProcedureStep.DismissDialog -> {
@@ -41,8 +58,20 @@ object StepSerializer {
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val step: ProcedureStep = when (o.getString("t")) {
-                "TAP"         -> ProcedureStep.Tap(o.getString("target"), o.optDouble("fx",-1.0).toFloat(), o.optDouble("fy",-1.0).toFloat())
-                "TYPE"        -> ProcedureStep.TypeText(o.getString("target"), o.getString("text"), o.optBoolean("clear",true))
+                "TAP" -> ProcedureStep.Tap(
+                    target    = o.getString("target"),
+                    fallbackX = o.optDouble("fx",-1.0).toFloat(),
+                    fallbackY = o.optDouble("fy",-1.0).toFloat(),
+                    pre  = o.optJSONObject("pre")?.let  { deserializeCondition(it) },
+                    post = o.optJSONObject("post")?.let { deserializeCondition(it) }
+                )
+                "TYPE" -> ProcedureStep.TypeText(
+                    target     = o.getString("target"),
+                    text       = o.getString("text"),
+                    clearFirst = o.optBoolean("clear", true),
+                    pre  = o.optJSONObject("pre")?.let  { deserializeCondition(it) },
+                    post = o.optJSONObject("post")?.let { deserializeCondition(it) }
+                )
                 "WAIT"        -> ProcedureStep.WaitFor(o.getString("target"), o.optLong("ms",4000L))
                 "VERIFY"      -> ProcedureStep.Verify(o.getString("target"), o.optBoolean("abort",true))
                 "SCROLL_DOWN" -> ProcedureStep.ScrollDown(o.optInt("max",3))
@@ -50,7 +79,10 @@ object StepSerializer {
                 "BACK"        -> ProcedureStep.Back(o.optInt("n",1))
                 "HOME"        -> ProcedureStep.Home()
                 "SLEEP"       -> ProcedureStep.Sleep(o.getLong("ms"))
-                "LAUNCH"      -> ProcedureStep.LaunchApp(o.getString("pkg"))
+                "LAUNCH" -> ProcedureStep.LaunchApp(
+                    packageName = o.getString("pkg"),
+                    post = o.optJSONObject("post")?.let { deserializeCondition(it) }
+                )
                 "SELECT"      -> ProcedureStep.SelectItem(o.getString("list"), o.getString("item"))
                 "TAP_COORD"   -> ProcedureStep.TapCoord(o.getDouble("x").toFloat(), o.getDouble("y").toFloat())
                 "DISMISS"     -> {

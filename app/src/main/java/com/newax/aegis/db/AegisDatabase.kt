@@ -89,8 +89,17 @@ abstract class AegisDatabase : RoomDatabase() {
                         embedding BLOB NOT NULL
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_emb_type ON embeddings(sourceType)")
-                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_emb_sourceid ON embeddings(sourceId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_embeddings_sourceType` ON `embeddings` (`sourceType`)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_embeddings_sourceId` ON `embeddings` (`sourceId`)")
+                // Backfill indices for initial entities that v1 schema was created without
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_persons_name` ON `persons` (`name`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_person_mentions_personId` ON `person_mentions` (`personId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_person_facts_personId` ON `person_facts` (`personId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_person_facts_category` ON `person_facts` (`category`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_person_facts_personId_category` ON `person_facts` (`personId`, `category`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_learning_drafts_status` ON `learning_drafts` (`status`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_learning_drafts_subjectName` ON `learning_drafts` (`subjectName`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_learning_drafts_status_timestampMs` ON `learning_drafts` (`status`, `timestampMs`)")
             }
         }
 
@@ -107,10 +116,10 @@ abstract class AegisDatabase : RoomDatabase() {
                         createdMs INTEGER NOT NULL
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subject ON triples(subject)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_predicate ON triples(predicate)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subj_pred ON triples(subject, predicate)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_object ON triples(objectValue)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_triples_subject` ON `triples` (`subject`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_triples_predicate` ON `triples` (`predicate`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_triples_subject_predicate` ON `triples` (`subject`, `predicate`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_triples_objectValue` ON `triples` (`objectValue`)")
             }
         }
 
@@ -158,18 +167,18 @@ abstract class AegisDatabase : RoomDatabase() {
                         canonicalId INTEGER
                     )
                 """)
-                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_fo_path ON file_objects(path)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_sha256 ON file_objects(sha256)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_phash ON file_objects(pHash)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_ext ON file_objects(extension)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_folder ON file_objects(folder)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_mime ON file_objects(mimeType)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_src ON file_objects(sourceApp)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_mod ON file_objects(modifiedMs)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_cre ON file_objects(createdMs)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_recv ON file_objects(receivedMs)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_state ON file_objects(indexState)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fo_geid ON file_objects(graphEntityId)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_file_objects_path` ON `file_objects` (`path`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_sha256` ON `file_objects` (`sha256`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_pHash` ON `file_objects` (`pHash`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_extension` ON `file_objects` (`extension`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_folder` ON `file_objects` (`folder`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_mimeType` ON `file_objects` (`mimeType`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_sourceApp` ON `file_objects` (`sourceApp`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_modifiedMs` ON `file_objects` (`modifiedMs`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_createdMs` ON `file_objects` (`createdMs`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_receivedMs` ON `file_objects` (`receivedMs`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_indexState` ON `file_objects` (`indexState`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_objects_graphEntityId` ON `file_objects` (`graphEntityId`)")
 
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS file_text_content (
@@ -196,9 +205,9 @@ abstract class AegisDatabase : RoomDatabase() {
                         PRIMARY KEY (fileId, entityLabel)
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fel_label ON file_entity_links(entityLabel)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fel_type  ON file_entity_links(entityType)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_fel_geid  ON file_entity_links(graphEntityId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_entity_links_entityLabel` ON `file_entity_links` (`entityLabel`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_entity_links_entityType` ON `file_entity_links` (`entityType`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_file_entity_links_graphEntityId` ON `file_entity_links` (`graphEntityId`)")
             }
         }
 
@@ -218,22 +227,22 @@ abstract class AegisDatabase : RoomDatabase() {
                         createdMs INTEGER NOT NULL
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tr_enabled ON trigger_rules(enabled)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_tr_cond ON trigger_rules(conditionType)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_trigger_rules_enabled` ON `trigger_rules` (`enabled`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_trigger_rules_conditionType` ON `trigger_rules` (`conditionType`)")
             }
         }
 
         internal val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""CREATE TABLE IF NOT EXISTS person_snapshots (personEntityId INTEGER NOT NULL PRIMARY KEY, displayName TEXT NOT NULL, canonicalPhone TEXT, canonicalEmail TEXT, preferredChannel TEXT, preferredLanguage TEXT NOT NULL DEFAULT '', preferredTone TEXT NOT NULL DEFAULT '', relationshipType TEXT NOT NULL DEFAULT '', activeProjectId TEXT, pendingCommitmentCount INTEGER NOT NULL DEFAULT 0, recentTopics TEXT NOT NULL DEFAULT '', lastInteractionMs INTEGER NOT NULL DEFAULT 0, importanceScore INTEGER NOT NULL DEFAULT 50, snapshotUpdatedMs INTEGER NOT NULL DEFAULT 0)""")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ps_interaction ON person_snapshots(lastInteractionMs)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_person_snapshots_lastInteractionMs` ON `person_snapshots` (`lastInteractionMs`)")
                 database.execSQL("""CREATE TABLE IF NOT EXISTS person_policies (personEntityId INTEGER NOT NULL PRIMARY KEY, canAutoOpenChat INTEGER NOT NULL DEFAULT 1, canAutoDraft INTEGER NOT NULL DEFAULT 1, canAutoSend INTEGER NOT NULL DEFAULT 0, canCallWithoutConfirm INTEGER NOT NULL DEFAULT 0, canShareFiles INTEGER NOT NULL DEFAULT 1, sensitiveActionsRequireConfirm INTEGER NOT NULL DEFAULT 1)""")
                 database.execSQL("""CREATE TABLE IF NOT EXISTS person_channel_prefs (personEntityId INTEGER NOT NULL, taskContext TEXT NOT NULL, packageName TEXT NOT NULL, capability TEXT NOT NULL, probability REAL NOT NULL DEFAULT 0.8, evidenceCount INTEGER NOT NULL DEFAULT 1, lastUpdatedMs INTEGER NOT NULL, PRIMARY KEY (personEntityId, taskContext))""")
                 database.execSQL("""CREATE TABLE IF NOT EXISTS commitments (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, debtorPersonId INTEGER, creditorPersonId INTEGER, debtorLabel TEXT NOT NULL, creditorLabel TEXT NOT NULL, action TEXT NOT NULL, dueMs INTEGER, status TEXT NOT NULL DEFAULT 'pending', source TEXT NOT NULL DEFAULT '', confidence INTEGER NOT NULL DEFAULT 80, createdMs INTEGER NOT NULL, resolvedMs INTEGER)""")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_debtor ON commitments(debtorPersonId)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_creditor ON commitments(creditorPersonId)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_status ON commitments(status)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_com_due ON commitments(dueMs)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_commitments_debtorPersonId` ON `commitments` (`debtorPersonId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_commitments_creditorPersonId` ON `commitments` (`creditorPersonId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_commitments_status` ON `commitments` (`status`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_commitments_dueMs` ON `commitments` (`dueMs`)")
             }
         }
 
@@ -251,7 +260,7 @@ abstract class AegisDatabase : RoomDatabase() {
                         lastScanMs INTEGER NOT NULL
                     )
                 """)
-                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_ar_pkg ON app_records(packageName)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_app_records_packageName` ON `app_records` (`packageName`)")
 
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS app_capability_links (
@@ -264,7 +273,7 @@ abstract class AegisDatabase : RoomDatabase() {
                         PRIMARY KEY (packageName, capability)
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_acl_cap ON app_capability_links(capability)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_app_capability_links_capability` ON `app_capability_links` (`capability`)")
 
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS ui_procedures (
@@ -281,8 +290,8 @@ abstract class AegisDatabase : RoomDatabase() {
                         needsValidation INTEGER NOT NULL DEFAULT 0
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_up_pkg ON ui_procedures(packageName)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_up_cap ON ui_procedures(taskCapability)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_ui_procedures_packageName` ON `ui_procedures` (`packageName`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_ui_procedures_taskCapability` ON `ui_procedures` (`taskCapability`)")
 
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS screen_nodes (
@@ -305,8 +314,8 @@ abstract class AegisDatabase : RoomDatabase() {
                         actionText TEXT NOT NULL DEFAULT ''
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ne_from ON nav_edges(fromSignature)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ne_to   ON nav_edges(toSignature)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_nav_edges_fromSignature` ON `nav_edges` (`fromSignature`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_nav_edges_toSignature` ON `nav_edges` (`toSignature`)")
             }
         }
 
@@ -331,11 +340,11 @@ abstract class AegisDatabase : RoomDatabase() {
                         embeddingId TEXT
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_hash    ON memory_records(contentHash)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_subject ON memory_records(subject)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_type    ON memory_records(type)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_created ON memory_records(createdAt)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_mr_valid   ON memory_records(validUntil)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_records_contentHash` ON `memory_records` (`contentHash`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_records_subject` ON `memory_records` (`subject`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_records_type` ON `memory_records` (`type`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_records_createdAt` ON `memory_records` (`createdAt`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_memory_records_validUntil` ON `memory_records` (`validUntil`)")
 
                 // Backfill: migrate person_facts → memory_records (type=FACT=1)
                 val now = System.currentTimeMillis()
@@ -369,7 +378,7 @@ abstract class AegisDatabase : RoomDatabase() {
                         createdAt INTEGER NOT NULL
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_ent_name ON entities(canonicalName)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_entities_canonicalName` ON `entities` (`canonicalName`)")
 
                 // ── entity_aliases ────────────────────────────────────────────
                 database.execSQL("""
@@ -379,7 +388,7 @@ abstract class AegisDatabase : RoomDatabase() {
                         PRIMARY KEY (entityId, alias)
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_alias_alias ON entity_aliases(alias)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_entity_aliases_alias` ON `entity_aliases` (`alias`)")
 
                 // ── predicates ────────────────────────────────────────────────
                 database.execSQL("""
@@ -388,7 +397,7 @@ abstract class AegisDatabase : RoomDatabase() {
                         name TEXT NOT NULL
                     )
                 """)
-                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_pred_name ON predicates(name)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_predicates_name` ON `predicates` (`name`)")
 
                 // ── edges ─────────────────────────────────────────────────────
                 database.execSQL("""
@@ -406,10 +415,10 @@ abstract class AegisDatabase : RoomDatabase() {
                         sourceId INTEGER
                     )
                 """)
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_subj_pred ON edges(subjectId, predicateId)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_pred_obj ON edges(predicateId, objectId)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_subj_pred_obj ON edges(subjectId, predicateId, objectId)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS idx_edge_valid ON edges(validUntil)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId` ON `edges` (`subjectId`, `predicateId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_edges_predicateId_objectId` ON `edges` (`predicateId`, `objectId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId_objectId` ON `edges` (`subjectId`, `predicateId`, `objectId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_edges_validUntil` ON `edges` (`validUntil`)")
 
                 // ── blobs ─────────────────────────────────────────────────────
                 database.execSQL("""

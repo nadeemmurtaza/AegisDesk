@@ -82,6 +82,12 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
     // Refresh drafts every time this screen is entered
     LaunchedEffect(Unit) { vm.refreshDrafts() }
 
+    val allCategories = remember(drafts) { drafts.map { it.category }.distinct().sorted() }
+    var selectedCat   by remember { mutableStateOf<String?>(null) }
+    val visible = remember(drafts, selectedCat) {
+        if (selectedCat == null) drafts else drafts.filter { it.category == selectedCat }
+    }
+
     LazyColumn(
         modifier            = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
         state               = listState,
@@ -197,9 +203,6 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
             }
 
             // ── Category filter chips ─────────────────────────────────────────
-            val allCategories = remember(drafts) { drafts.map { it.category }.distinct().sorted() }
-            var selectedCat   by remember { mutableStateOf<String?>(null) }
-
             if (allCategories.size > 1) {
                 item {
                     Row(
@@ -228,10 +231,6 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
             }
 
             // ── Draft cards ───────────────────────────────────────────────────
-            val visible = remember(drafts, selectedCat) {
-                if (selectedCat == null) drafts else drafts.filter { it.category == selectedCat }
-            }
-
             items(visible, key = { it.id }) { draft ->
                 AnimatedVisibility(
                     visible = true,
