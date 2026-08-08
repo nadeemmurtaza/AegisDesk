@@ -148,8 +148,9 @@ fun AutomationSettingsSection(vm: MainViewModel) {
 
     fun start2faSetup() {
         launchBiometric {
+            // Generate and hold the secret in Compose state only — do not enroll yet.
+            // Enrollment happens only after the user confirms a valid authenticator code.
             setupSecret = TotpManager.generateSecret()
-            TotpManager.enroll(setupSecret)
             setupCode = ""
             setupError = false
             authState = SettingsAuthState.TOTP_SETUP
@@ -220,10 +221,9 @@ fun AutomationSettingsSection(vm: MainViewModel) {
 
     // ── TOTP setup dialog ─────────────────────────────────────────────────────
     if (authState == SettingsAuthState.TOTP_SETUP) {
-        val qrBitmap: Bitmap? = remember(setupSecret) { TotpManager.qrBitmap(320) }
+        val qrBitmap: Bitmap? = remember(setupSecret) { TotpManager.qrBitmapForSecret(setupSecret, 320) }
         AlertDialog(
             onDismissRequest = {
-                if (setupSecret.isNotEmpty()) TotpManager.clearEnrollment()
                 authState = SettingsAuthState.IDLE; setupSecret = ""; setupCode = ""; setupError = false
             },
             containerColor = Surface,
@@ -286,7 +286,8 @@ fun AutomationSettingsSection(vm: MainViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
-                        if (TotpManager.verify(setupCode)) {
+                        if (TotpManager.verifyCode(setupCode, setupSecret)) {
+                            TotpManager.enroll(setupSecret)  // persist only after code confirmed
                             authState = SettingsAuthState.IDLE; setupSecret = ""; setupCode = ""
                             vm.bumpAutomationVersion()
                         } else {
@@ -299,7 +300,6 @@ fun AutomationSettingsSection(vm: MainViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = {
-                    TotpManager.clearEnrollment()
                     authState = SettingsAuthState.IDLE; setupSecret = ""; setupCode = ""; setupError = false
                 }) { Text("Cancel", color = TextSec) }
             }

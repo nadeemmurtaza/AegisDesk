@@ -40,6 +40,7 @@ object StandardPredicates {
     const val USUAL_TIME          = "usual_time"
     const val FREQUENCY           = "frequency"
     const val SUPPORTED_BY        = "supported_by"
+    const val SUPPORTS            = "supports"
     const val PROFILE_POINTER     = "profile_pointer"
     const val CONTENT_POINTER     = "content_pointer"
     const val PARENT_OF           = "parent_of"
@@ -55,8 +56,19 @@ object StandardPredicates {
         RELATIONSHIP_TYPE, NICKNAME, PREFERRED_TONE, ATTENDED_BY, ABOUT,
         PARTICIPANT, TOPIC, OCCURRED_AT, WORKS_ON, HAS_ISSUE, MENTIONED_IN,
         EVIDENCE, ACTOR, ACTION, USUAL_TIME, FREQUENCY,
-        SUPPORTED_BY, PROFILE_POINTER, CONTENT_POINTER, PARENT_OF, CHILD_OF,
-        REPORTS_TO, OWNS
+        SUPPORTED_BY, SUPPORTS, PROFILE_POINTER, CONTENT_POINTER, PARENT_OF,
+        CHILD_OF, REPORTS_TO, OWNS
+    )
+
+    /**
+     * Multi-valued predicates: multiple distinct edges with the same subject+predicate
+     * are all valid simultaneously. saveEdge() uses addEdge() for these instead of
+     * updateEdge(), which would expire previous values.
+     */
+    val MULTI_VALUED: Set<String> = setOf(
+        KNOWS, LIKES, DISLIKES, HOBBY_IS, HAS_CONDITION, TAKES_MEDICATION, ALLERGIC_TO,
+        MEMBER_OF, CALLED, TEXTED, MET, ATTENDED_BY, PARTICIPANT, WORKS_ON,
+        HAS_ISSUE, MENTIONED_IN, EVIDENCE, SUPPORTED_BY, SUPPORTS
     )
 
     /** Predicates whose object is a named entity (not a primitive value). */

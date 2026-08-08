@@ -291,7 +291,13 @@ object GraphStore {
     ) {
         val subjectId = resolveOrCreate(db, from, EntityType.UNKNOWN)
         val objectId  = resolveOrCreate(db, to,   EntityType.UNKNOWN)
-        updateEdge(db, subjectId, relation, newObjectId = objectId, confidence = 100)
+        if (relation in StandardPredicates.MULTI_VALUED) {
+            // Multi-valued: accumulate edges; never expire previous values
+            addEdge(db, subjectId, relation, objectId = objectId, confidence = 100)
+        } else {
+            // Single-valued: expire previous edge and insert replacement
+            updateEdge(db, subjectId, relation, newObjectId = objectId, confidence = 100)
+        }
     }
 
     // ── Blob store ────────────────────────────────────────────────────────────

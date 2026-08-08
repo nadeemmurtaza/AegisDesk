@@ -72,11 +72,20 @@ object TotpManager {
     }
 
     /**
-     * Verifies a 6-digit TOTP code. Accepts DRIFT_WINDOWS steps in either direction
-     * to handle clock skew between device and Google Authenticator.
+     * Verifies a 6-digit TOTP code against the enrolled secret.
+     * Returns false if not yet enrolled.
      */
     fun verify(code: String): Boolean {
         val secret = prefs?.getString(KEY_SECRET, null) ?: return false
+        return verifyCode(code, secret)
+    }
+
+    /**
+     * Verifies a 6-digit TOTP code against an arbitrary secret.
+     * Use this during setup to confirm the user's authenticator app is working
+     * BEFORE persisting enrollment.
+     */
+    fun verifyCode(code: String, secret: String): Boolean {
         val secretBytes = base32Decode(secret)
         val timeStep = System.currentTimeMillis() / 1000L / TIME_STEP
         for (i in -DRIFT_WINDOWS..DRIFT_WINDOWS) {
@@ -88,12 +97,25 @@ object TotpManager {
     /** Returns the otpauth URI for Google Authenticator enrollment. */
     fun otpauthUri(accountName: String = "AegisDevice"): String {
         val secret = prefs?.getString(KEY_SECRET, null) ?: return ""
-        return "otpauth://totp/Aegis:$accountName?secret=$secret&issuer=Aegis&algorithm=SHA1&digits=$DIGITS&period=$TIME_STEP"
+        return otpauthUriForSecret(secret, accountName)
     }
 
+    private fun otpauthUriForSecret(secret: String, accountName: String = "AegisDevice"): String =
+        "otpauth://totp/Aegis:$accountName?secret=$secret&issuer=Aegis&algorithm=SHA1&digits=$DIGITS&period=$TIME_STEP"
+
     /** Generates a QR code Bitmap from the current otpauth URI. Null if not enrolled. */
-    fun qrBitmap(size: Int = 400): Bitmap? {
-        val uri = otpauthUri().takeIf { it.isNotEmpty() } ?: return null
+    fun qrBitmap(size: Int = 400): Bitmap? = qrBitmapForSecret(
+        secret = prefs?.getString(KEY_SECRET, null) ?: return null,
+        size   = size
+    )
+
+    /**
+     * Generates a QR code Bitmap for an arbitrary secret string.
+     * Use during setup before calling enroll(), so the QR is shown from the
+     * pending secret rather than requiring premature enrollment.
+     */
+    fun qrBitmapForSecret(secret: String, size: Int = 400): Bitmap? {
+        val uri = otpauthUriForSecret(secret)
         return try {
             val hints = mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M)
             val matrix = QRCodeWriter().encode(uri, BarcodeFormat.QR_CODE, size, size, hints)

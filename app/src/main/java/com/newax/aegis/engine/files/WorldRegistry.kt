@@ -81,15 +81,13 @@ object WorldRegistry {
 
     fun linkFileToPerson(db: AegisDatabase, fileId: Long, personIdentifier: String, predicate: String = "sent_by") {
         val personId = PersonRegistry.resolve(db, personIdentifier) ?: return
-        val fo = db.fileDao().recentFiles(1).firstOrNull() ?: return
-        fo.graphEntityId?.let { fileEntityId ->
-            val personNode = db.graphDao().entityById(personId)?.canonicalName ?: return
-            GraphStore.saveEdge(db, "file:${fo.filename}", predicate, personNode, "world_registry")
-        }
+        val fo = db.fileDao().byId(fileId) ?: return
+        val personNode = db.graphDao().entityById(personId)?.canonicalName ?: return
+        GraphStore.saveEdge(db, "file:${fo.filename}", predicate, personNode, "world_registry")
     }
 
     fun linkFileToProject(db: AegisDatabase, fileId: Long, projectId: String, predicate: String = "belongs_to") {
-        val fo = db.fileDao().recentFiles(1).firstOrNull() ?: return
+        val fo = db.fileDao().byId(fileId) ?: return
         GraphStore.saveEdge(db, "file:${fo.filename}", predicate, "project:$projectId", "world_registry")
     }
 

@@ -107,10 +107,18 @@ object FileQueryPlanner {
                 cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
                 toMs = cal.timeInMillis
             }
-            lower.contains("this month") || lower.contains("last month") -> {
-                if (lower.contains("last month")) cal.add(Calendar.MONTH, -1)
+            lower.contains("last month") -> {
+                cal.add(Calendar.MONTH, -1)
                 cal.set(Calendar.DAY_OF_MONTH, 1)
-                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+                fromMs = cal.timeInMillis
+                // end = start of current month (exclusive upper bound)
+                cal.add(Calendar.MONTH, 1)
+                toMs = cal.timeInMillis
+            }
+            lower.contains("this month") -> {
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
                 fromMs = cal.timeInMillis
                 toMs = nowMs
             }
@@ -188,7 +196,7 @@ object FileQueryPlanner {
                 }
                 IndexPath.METADATA_APP -> q.sourceAppHint?.let { add(db.fileDao().bySourceApp(it, limit)) }
                 IndexPath.ENTITY -> {
-                    val label = q.entityHint ?: return@forEach
+                    val label = q.entityHint ?: continue
                     // Try resolving to a graph entity ID for precision
                     val gid = PersonRegistry.resolve(db, label)
                     if (gid != null) add(db.fileDao().filesByGraphEntity(gid, limit))
