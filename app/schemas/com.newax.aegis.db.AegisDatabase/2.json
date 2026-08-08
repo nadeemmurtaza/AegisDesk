@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "4a42d971d9a96dbb699ef3c7d6b5e82a",
+    "identityHash": "39d1353b5ea47190252e1f905be4aca4",
     "entities": [
       {
         "tableName": "persons",
@@ -12,76 +12,52 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "name",
             "columnName": "name",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "importanceScore",
             "columnName": "importanceScore",
             "affinity": "REAL",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "sourceCount",
             "columnName": "sourceCount",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "totalMentions",
             "columnName": "totalMentions",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "lastSeenMs",
             "columnName": "lastSeenMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "profileBuilt",
             "columnName": "profileBuilt",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [
-          {
-            "name": "index_persons_name",
-            "unique": true,
-            "columnNames": [
-              "name"
-            ],
-            "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_persons_name` ON `${TABLE_NAME}` (`name`)"
-          }
-        ],
+        "indices": [],
         "foreignKeys": []
       },
       {
@@ -92,51 +68,34 @@
             "fieldPath": "personId",
             "columnName": "personId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "sourceName",
             "columnName": "sourceName",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 2,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "count",
             "columnName": "count",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "personId",
             "sourceName"
-          ]
+          ],
+          "autoGenerate": false
         },
-        "indices": [
-          {
-            "name": "index_person_mentions_personId",
-            "unique": false,
-            "columnNames": [
-              "personId"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_mentions_personId` ON `${TABLE_NAME}` (`personId`)"
-          }
-        ],
+        "indices": [],
         "foreignKeys": [
           {
             "table": "persons",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
-            "junction": null,
             "columns": [
               "personId"
             ],
@@ -154,101 +113,57 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "personId",
             "columnName": "personId",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "fact",
             "columnName": "fact",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "REAL",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "timestampMs",
             "columnName": "timestampMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [
-          {
-            "name": "index_person_facts_personId",
-            "unique": false,
-            "columnNames": [
-              "personId"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_facts_personId` ON `${TABLE_NAME}` (`personId`)"
-          },
-          {
-            "name": "index_person_facts_category",
-            "unique": false,
-            "columnNames": [
-              "category"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_facts_category` ON `${TABLE_NAME}` (`category`)"
-          },
-          {
-            "name": "index_person_facts_personId_category",
-            "unique": false,
-            "columnNames": [
-              "personId",
-              "category"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_facts_personId_category` ON `${TABLE_NAME}` (`personId`, `category`)"
-          }
-        ],
+        "indices": [],
         "foreignKeys": [
           {
             "table": "persons",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
-            "junction": null,
             "columns": [
               "personId"
             ],
@@ -266,111 +181,64 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "fact",
             "columnName": "fact",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "sourceSnippet",
             "columnName": "sourceSnippet",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "REAL",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "status",
             "columnName": "status",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "subjectName",
             "columnName": "subjectName",
             "affinity": "TEXT",
-            "notNull": false,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": false
           },
           {
             "fieldPath": "timestampMs",
             "columnName": "timestampMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": false
         },
-        "indices": [
-          {
-            "name": "index_learning_drafts_status",
-            "unique": false,
-            "columnNames": [
-              "status"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status` ON `${TABLE_NAME}` (`status`)"
-          },
-          {
-            "name": "index_learning_drafts_subjectName",
-            "unique": false,
-            "columnNames": [
-              "subjectName"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_drafts_subjectName` ON `${TABLE_NAME}` (`subjectName`)"
-          },
-          {
-            "name": "index_learning_drafts_status_timestampMs",
-            "unique": false,
-            "columnNames": [
-              "status",
-              "timestampMs"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status_timestampMs` ON `${TABLE_NAME}` (`status`, `timestampMs`)"
-          }
-        ],
+        "indices": [],
         "foreignKeys": []
       },
       {
@@ -381,32 +249,26 @@
             "fieldPath": "key",
             "columnName": "key",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "value",
             "columnName": "value",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "updatedMs",
             "columnName": "updatedMs",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
           "columnNames": [
             "key"
-          ]
+          ],
+          "autoGenerate": false
         },
         "indices": [],
         "foreignKeys": []
@@ -419,76 +281,52 @@
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true,
-            "primaryKeyPosition": 1,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "sourceType",
             "columnName": "sourceType",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "sourceId",
             "columnName": "sourceId",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "text",
             "columnName": "text",
             "affinity": "TEXT",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           },
           {
             "fieldPath": "embedding",
             "columnName": "embedding",
             "affinity": "BLOB",
-            "notNull": true,
-            "primaryKeyPosition": 0,
-            "defaultValue": "null"
+            "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
           "columnNames": [
             "id"
-          ]
+          ],
+          "autoGenerate": true
         },
-        "indices": [
-          {
-            "name": "idx_emb_type",
-            "unique": false,
-            "columnNames": [
-              "sourceType"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `idx_emb_type` ON `${TABLE_NAME}` (`sourceType`)"
-          },
-          {
-            "name": "idx_emb_sourceid",
-            "unique": true,
-            "columnNames": [
-              "sourceId"
-            ],
-            "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `idx_emb_sourceid` ON `${TABLE_NAME}` (`sourceId`)"
-          }
-        ],
+        "indices": [],
         "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
-      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4a42d971d9a96dbb699ef3c7d6b5e82a')"
+      "CREATE TABLE IF NOT EXISTS `persons` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `importanceScore` REAL NOT NULL, `sourceCount` INTEGER NOT NULL, `totalMentions` INTEGER NOT NULL, `lastSeenMs` INTEGER NOT NULL, `profileBuilt` INTEGER NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS `person_mentions` (`personId` INTEGER NOT NULL, `sourceName` TEXT NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`personId`, `sourceName`), FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+      "CREATE TABLE IF NOT EXISTS `person_facts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `personId` INTEGER NOT NULL, `fact` TEXT NOT NULL, `category` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `timestampMs` INTEGER NOT NULL, FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+      "CREATE TABLE IF NOT EXISTS `learning_drafts` (`id` TEXT NOT NULL, `category` TEXT NOT NULL, `fact` TEXT NOT NULL, `source` TEXT NOT NULL, `sourceSnippet` TEXT NOT NULL, `confidence` REAL NOT NULL, `status` TEXT NOT NULL, `subjectName` TEXT, `timestampMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+      "CREATE TABLE IF NOT EXISTS `kv_store` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, `updatedMs` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+      "CREATE TABLE IF NOT EXISTS `embeddings` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceType` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `text` TEXT NOT NULL, `embedding` BLOB NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)"
     ]
   }
 }
