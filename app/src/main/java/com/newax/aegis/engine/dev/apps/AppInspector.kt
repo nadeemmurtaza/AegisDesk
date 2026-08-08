@@ -124,17 +124,16 @@ object AppInspector {
                 val rawDb = db.openHelper.readableDatabase
                 val results = mutableListOf<Map<String, String>>()
                 val cursor = rawDb.rawQuery(
-                    "SELECT id, title, triggerPhrase, successCount, failCount FROM procedures WHERE packageName = ? LIMIT 50",
+                    "SELECT id, taskCapability, successCount, failureCount FROM ui_procedures WHERE packageName = ? LIMIT 50",
                     arrayOf(packageName)
                 )
                 cursor.use { c ->
                     while (c.moveToNext()) {
                         results.add(mapOf(
                             "id" to c.getString(0),
-                            "title" to (c.getString(1) ?: ""),
-                            "trigger" to (c.getString(2) ?: ""),
-                            "success" to c.getString(3),
-                            "fail" to c.getString(4)
+                            "taskCapability" to (c.getString(1) ?: ""),
+                            "success" to c.getString(2),
+                            "fail" to c.getString(3)
                         ))
                     }
                 }

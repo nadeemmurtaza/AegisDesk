@@ -23,10 +23,10 @@ object PersonRegistry {
         // 1. Exact entity name in graph
         GraphStore.resolve(db, clean)?.let { return it }
         // 2. Alias table lookup (already covers nicknames added via seedAliases)
-        db.graphDao().findEntityByAlias(clean)?.let { return it.entityId }
+        db.graphDao().findEntityByAlias(clean)?.let { return it }
         // 3. Phone-format alias (digits only)
         val digits = clean.filter { it.isDigit() }
-        if (digits.length >= 7) db.graphDao().findEntityByAlias(digits)?.let { return it.entityId }
+        if (digits.length >= 7) db.graphDao().findEntityByAlias(digits)?.let { return it }
         return null
     }
 

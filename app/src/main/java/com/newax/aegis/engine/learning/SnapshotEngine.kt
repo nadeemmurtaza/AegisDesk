@@ -41,10 +41,11 @@ object SnapshotEngine {
                     )
                 )
             } else {
+                val personName = db.personDao().findById(personId)?.name ?: "Unknown"
                 db.personRegistryDao().upsertSnapshot(
                     PersonSnapshot(
                         personEntityId = personId,
-                        displayName = facts.firstOrNull()?.fact?.take(40) ?: "Unknown",
+                        displayName = personName,
                         recentTopics = topicsFact,
                         importanceScore = confidence,
                         snapshotUpdatedMs = now

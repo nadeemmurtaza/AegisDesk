@@ -12,11 +12,13 @@ object HabitTracker {
 
     /** pkg -> list of hour-of-day open times (0-23) */
     private val timeBuckets = mutableMapOf<String, MutableList<Int>>()
+    private val lastOpenMap = mutableMapOf<String, Long>()
     private var lastAiTrigger = 0L
     private var opensSinceLastTrigger = 0
 
     fun logAppOpen(packageName: String) {
         val now = java.util.Date()
+        val nowMs = System.currentTimeMillis()
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(now)
         val entry = "$time - Opened $packageName"
@@ -25,6 +27,7 @@ object HabitTracker {
             if (appLogs.size >= MAX_LOG_SIZE) appLogs.removeFirst()
             appLogs.addLast(entry)
             timeBuckets.getOrPut(packageName) { mutableListOf() }.add(hour)
+            lastOpenMap[packageName] = nowMs
             opensSinceLastTrigger++
         }
 
@@ -71,7 +74,7 @@ object HabitTracker {
         val hours = timeBuckets[packageName] ?: return@synchronized null
         val openCount = hours.size
         val peakHour = hours.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key ?: 0
-        val lastOpenMs = lastAiTrigger
+        val lastOpenMs = lastOpenMap[packageName] ?: 0L
         AppHabitPattern(packageName, openCount, peakHour, lastOpenMs)
     }
 
@@ -81,7 +84,7 @@ object HabitTracker {
                 packageName = pkg,
                 openCount = hours.size,
                 peakHour = hours.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key ?: 0,
-                lastOpenMs = lastAiTrigger
+                lastOpenMs = lastOpenMap[pkg] ?: 0L
             )
         }.sortedByDescending { it.openCount }
     }

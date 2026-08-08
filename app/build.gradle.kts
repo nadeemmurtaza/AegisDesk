@@ -26,6 +26,9 @@ android {
         jvmTarget = "17"
         freeCompilerArgs += listOf("-Xskip-metadata-version-check")
     }
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {

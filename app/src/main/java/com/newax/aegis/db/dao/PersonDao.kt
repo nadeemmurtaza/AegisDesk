@@ -12,6 +12,9 @@ interface PersonDao {
     @Query("SELECT id FROM persons WHERE name = :name")
     fun idForName(name: String): Long?
 
+    @Query("SELECT * FROM persons WHERE id = :id LIMIT 1")
+    fun findById(id: Long): PersonEntity?
+
     @Query("SELECT * FROM persons WHERE name = :name LIMIT 1")
     fun findByName(name: String): PersonEntity?
 

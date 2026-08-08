@@ -8,6 +8,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.migration.LegacyMigrationWorker
+import com.newax.aegis.engine.trigger.TriggerEngine as CoreTriggerEngine
 import com.newax.aegis.engine.ContactScannerWorker
 import com.newax.aegis.engine.GalleryScannerWorker
 import com.newax.aegis.engine.embedding.EmbeddingEngine
@@ -24,6 +25,7 @@ class AegisApplication : Application() {
         // Initialize encrypted DB before any workers or viewmodels access it
         val memory = EncryptedMemory(this)
         AegisDatabase.init(this, memory)
+        CoreTriggerEngine.start(this, AegisDatabase.get) { _, _ -> }
         // One-shot migration from legacy EncryptedSharedPreferences storage
         if (AegisDatabase.get.kvStoreDao().get("migration_v1_done") != "1") {
             LegacyMigrationWorker.schedule(this)

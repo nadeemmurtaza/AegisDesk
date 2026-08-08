@@ -24,6 +24,7 @@ object TriggerEngine {
     private var db: AegisDatabase? = null
     private var appContext: Context? = null
     private var onAction: ((TriggerRule, Map<String, String>) -> Unit)? = null
+    @Volatile private var started = false
 
     // ── Startup ───────────────────────────────────────────────────────────────
 
@@ -32,6 +33,11 @@ object TriggerEngine {
         database: AegisDatabase,
         actionCallback: (rule: TriggerRule, eventContext: Map<String, String>) -> Unit
     ) {
+        if (started) {
+            onAction = actionCallback
+            return
+        }
+        started = true
         db = database
         appContext = context.applicationContext
         onAction = actionCallback

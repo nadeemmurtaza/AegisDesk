@@ -41,6 +41,7 @@ class AdbBridge : BroadcastReceiver() {
             AegisLogger.i(TAG, "ADB RESULT [$cmd]: $result", module = "AdbBridge")
 
             val resultIntent = Intent("${ACTION}_RESULT").apply {
+                setPackage(context.packageName)
                 putExtra("cmd", cmd)
                 putExtra("result", result)
                 putExtra("timestampMs", System.currentTimeMillis())

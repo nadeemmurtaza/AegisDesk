@@ -50,7 +50,7 @@ data class MergeProposal(
 object PersonInspector {
 
     suspend fun inspect(entityId: Long, db: AegisDatabase): PersonProfile? = withContext(Dispatchers.IO) {
-        val person = db.personDao().getTopPeople(1000).find { it.id == entityId } ?: return@withContext null
+        val person = db.personDao().findById(entityId) ?: return@withContext null
         val facts = db.personFactDao().forPerson(entityId).map {
             PersonFact(it.id, it.category, it.fact, it.confidence, it.source)
         }

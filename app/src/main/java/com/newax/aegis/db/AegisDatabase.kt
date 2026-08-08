@@ -57,7 +57,7 @@ import net.sqlcipher.database.SupportFactory
         FileEntityLink::class
     ],
     version = 9,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AegisDatabase : RoomDatabase() {
 

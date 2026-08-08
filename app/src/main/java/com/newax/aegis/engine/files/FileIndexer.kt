@@ -198,13 +198,13 @@ object FileIndexer {
     }
 
     fun linkFileToEntity(db: AegisDatabase, fileId: Long, entityId: Long, predicate: String) {
-        val fo = db.fileDao().byPath("") ?: return
+        val fo = db.fileDao().byId(fileId) ?: return
         val fileEntityId = fo.graphEntityId ?: return
         GraphStore.saveEdge(db, "file:${File(fo.path).name}", predicate, entityId.toString(), "file_indexer")
     }
 
     fun linkFileToEntityByName(db: AegisDatabase, fileId: Long, entityName: String, predicate: String) {
-        val fo = db.fileDao().recentFiles(1).firstOrNull() ?: return
+        val fo = db.fileDao().byId(fileId) ?: return
         GraphStore.saveEdge(db, "file:${File(fo.path).name}", predicate, entityName, "file_indexer")
     }
 

@@ -40,7 +40,7 @@ object DatabaseInspector {
     private val KNOWN_TABLES = listOf(
         "memory_records", "edges", "entities", "predicates", "blobs",
         "person_snapshots", "person_facts", "person_mentions",
-        "file_records", "file_entity_links", "embeddings", "triple_entities"
+        "file_objects", "file_entity_links", "embeddings", "triples"
     )
 
     suspend fun tableStats(db: AegisDatabase): List<TableStats> = withContext(Dispatchers.IO) {

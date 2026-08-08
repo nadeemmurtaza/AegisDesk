@@ -30,6 +30,7 @@ object GraphStore {
         const val GOAL         = 14
         const val TOPIC        = 15
         const val SKILL        = 16
+        const val FILE         = 17
 
         fun label(type: Int): String = when (type) {
             PERSON       -> "Person"
@@ -47,6 +48,7 @@ object GraphStore {
             GOAL         -> "Goal"
             TOPIC        -> "Topic"
             SKILL        -> "Skill"
+            FILE         -> "File"
             else         -> "Entity"
         }
     }
@@ -287,9 +289,9 @@ object GraphStore {
         to: String,
         source: String = "manual"
     ) {
-        val subjectId = resolveOrCreate(db, from,  EntityType.UNKNOWN)
-        val objectId  = resolveOrCreate(db, to,    EntityType.UNKNOWN)
-        addEdge(db, subjectId, relation, objectId = objectId, confidence = 100)
+        val subjectId = resolveOrCreate(db, from, EntityType.UNKNOWN)
+        val objectId  = resolveOrCreate(db, to,   EntityType.UNKNOWN)
+        updateEdge(db, subjectId, relation, newObjectId = objectId, confidence = 100)
     }
 
     // ── Blob store ────────────────────────────────────────────────────────────
