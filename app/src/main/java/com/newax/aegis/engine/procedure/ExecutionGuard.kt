@@ -5,6 +5,15 @@ import android.content.Context
 object ExecutionGuard {
 
     enum class GuardResult { ALLOWED, BLOCKED }
+    enum class BlockReason { PROTECTED_PACKAGE, SENSITIVE_SCREEN, WRONG_PERSON, WRONG_FILE, FINANCIAL_ACTION }
+
+    data class GuardContext(
+        val expectedPackage: String? = null,
+        val expectedPersonEntityId: Long? = null,
+        val expectedFileId: Long? = null,
+        val isFinancialAction: Boolean = false,
+        val isDestructiveAction: Boolean = false
+    )
 
     private val PROTECTED_PACKAGES = setOf(
         "com.android.settings",
@@ -55,5 +64,23 @@ object ExecutionGuard {
     fun check(context: Context, packageName: String?): GuardResult {
         if (packageName.isNullOrBlank()) return GuardResult.ALLOWED
         return if (PROTECTED_PACKAGES.contains(packageName)) GuardResult.BLOCKED else GuardResult.ALLOWED
+    }
+
+    fun checkWithContext(
+        context: Context,
+        currentPackage: String?,
+        guardContext: GuardContext
+    ): Pair<GuardResult, BlockReason?> {
+        if (currentPackage != null && PROTECTED_PACKAGES.contains(currentPackage))
+            return GuardResult.BLOCKED to BlockReason.PROTECTED_PACKAGE
+
+        if (guardContext.expectedPackage != null && currentPackage != null
+            && currentPackage != guardContext.expectedPackage)
+            return GuardResult.BLOCKED to BlockReason.WRONG_PERSON
+
+        if (guardContext.isFinancialAction)
+            return GuardResult.BLOCKED to BlockReason.FINANCIAL_ACTION
+
+        return GuardResult.ALLOWED to null
     }
 }

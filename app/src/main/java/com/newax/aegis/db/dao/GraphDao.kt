@@ -28,6 +28,12 @@ interface GraphDao {
     @Query("SELECT entityId FROM entity_aliases WHERE LOWER(alias) = LOWER(:alias) LIMIT 1")
     fun findEntityByAlias(alias: String): Long?
 
+    @Query("SELECT entityId FROM entity_aliases WHERE LOWER(alias) = LOWER(:alias)")
+    fun findEntitiesByAlias(alias: String): List<Long>
+
+    @Query("SELECT * FROM entities WHERE id = :id LIMIT 1")
+    fun findEntityById(id: Long): com.newax.aegis.db.entity.GraphEntity?
+
     // ── Predicates ────────────────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

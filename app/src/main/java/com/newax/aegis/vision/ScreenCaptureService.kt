@@ -33,19 +33,27 @@ class ScreenCaptureService : Service() {
 
     companion object {
         private const val TAG = "AegisCapture"
-
-        /** OCR runs at most once every 2 seconds regardless of frame rate. */
         private const val OCR_SAMPLE_MS = 2_000L
 
-        /** Populated by the caller before startService() is called. */
         var projectionData: Intent? = null
         var resultCode: Int = 0
+
+        @Volatile var instance: ScreenCaptureService? = null
 
         private val _latestFrame = MutableStateFlow<Bitmap?>(null)
         val latestFrame: StateFlow<Bitmap?> = _latestFrame
 
         private val _latestOcrResult = MutableStateFlow<OcrEngine.OcrResult?>(null)
         val latestOcrResult: StateFlow<OcrEngine.OcrResult?> = _latestOcrResult
+
+        private val activeConsumers = java.util.concurrent.atomic.AtomicInteger(0)
+
+        fun acquireVisualContext(): AutoCloseable {
+            activeConsumers.incrementAndGet()
+            return AutoCloseable { activeConsumers.decrementAndGet() }
+        }
+
+        fun hasConsumer(): Boolean = activeConsumers.get() > 0
 
         private fun currentSourceApp(): String =
             com.newax.aegis.accessibility.AegisAccessibilityService.instance?.currentPackage
@@ -61,6 +69,7 @@ class ScreenCaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         OcrEngine.init()
 
         val channel = NotificationChannel("vision", "Vision Service", NotificationManager.IMPORTANCE_LOW)
@@ -93,6 +102,7 @@ class ScreenCaptureService : Service() {
             val image: Image? = reader.acquireLatestImage()
             if (image != null) {
                 try {
+                    if (!hasConsumer()) { image.close(); return@setOnImageAvailableListener }
                     val planes = image.planes
                     val buffer      = planes[0].buffer
                     val pixelStride = planes[0].pixelStride
@@ -100,9 +110,11 @@ class ScreenCaptureService : Service() {
                     val rowPadding  = rowStride - pixelStride * width
                     val raw = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888)
                     raw.copyPixelsFromBuffer(buffer)
-                    val cropped = Bitmap.createBitmap(raw, 0, 0, width, height)
+                    val scale = 0.5f
+                    val scaled = Bitmap.createScaledBitmap(raw, (width * scale).toInt(), (height * scale).toInt(), false)
                     raw.recycle()
-                    _latestFrame.value = cropped
+                    _latestFrame.value?.recycle()
+                    _latestFrame.value = scaled
                 } catch (e: Exception) {
                     Log.w(TAG, "Frame error: ${e.message}")
                 } finally {
@@ -126,15 +138,11 @@ class ScreenCaptureService : Service() {
                 .filterNotNull()
                 .sample(OCR_SAMPLE_MS)
                 .collect { bitmap ->
+                    if (!hasConsumer()) return@collect
                     val sourceApp = currentSourceApp()
                     val result = OcrEngine.analyzeAsync(bitmap, sourceApp) ?: return@collect
-
-                    // Skip if screen text hasn't changed (avoids redundant downstream work)
                     if (!result.isChanged) return@collect
-
                     _latestOcrResult.value = result
-
-                    // Route to TriggerEngine when doc type or alarm warrants it
                     if (shouldNotify(result)) {
                         OcrEngine.notifyTriggerEngine(this@ScreenCaptureService, result, sourceApp)
                     }
@@ -178,10 +186,13 @@ class ScreenCaptureService : Service() {
     // --- Lifecycle ---
 
     override fun onDestroy() {
+        instance = null
         ocrJob?.cancel()
         serviceScope.cancel()
         virtualDisplay?.release()
         imageReader?.close()
+        _latestFrame.value?.recycle()
+        _latestFrame.value = null
         mediaProjection?.stop()
         OcrEngine.close()
         super.onDestroy()

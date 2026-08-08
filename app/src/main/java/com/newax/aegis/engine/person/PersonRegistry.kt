@@ -10,24 +10,50 @@ import com.newax.aegis.engine.apps.AppCapability
 import com.newax.aegis.engine.apps.AppIntelligence
 import com.newax.aegis.engine.graph.GraphStore
 
+sealed class PersonResolution {
+    data class Resolved(val entityId: Long, val displayName: String) : PersonResolution()
+    data class Ambiguous(val candidates: List<Pair<Long, String>>) : PersonResolution()
+    object NotFound : PersonResolution()
+}
+
 object PersonRegistry {
 
     // ── Alias resolution ──────────────────────────────────────────────────────
 
-    /**
-     * Resolve any identifier (name, nickname, phone, email) to a graph entity ID.
-     * Order: entity alias table → exact name → phone ContactsManager → null.
-     */
-    fun resolve(db: AegisDatabase, identifier: String): Long? {
+    fun resolve(db: AegisDatabase, identifier: String): Long? =
+        when (val r = resolveAmbiguous(db, identifier)) {
+            is PersonResolution.Resolved  -> r.entityId
+            is PersonResolution.Ambiguous -> null
+            PersonResolution.NotFound     -> null
+        }
+
+    fun resolveAmbiguous(db: AegisDatabase, identifier: String): PersonResolution {
         val clean = identifier.trim()
-        // 1. Exact entity name in graph
-        GraphStore.resolve(db, clean)?.let { return it }
-        // 2. Alias table lookup (already covers nicknames added via seedAliases)
-        db.graphDao().findEntityByAlias(clean)?.let { return it }
-        // 3. Phone-format alias (digits only)
+        val candidates = mutableListOf<Pair<Long, String>>()
+
+        GraphStore.resolve(db, clean)?.let { id ->
+            val name = db.graphDao().findEntityById(id)?.canonicalName ?: clean
+            candidates.add(id to name)
+        }
+
+        db.graphDao().findEntitiesByAlias(clean).forEach { id ->
+            val name = db.graphDao().findEntityById(id)?.canonicalName ?: clean
+            if (candidates.none { it.first == id }) candidates.add(id to name)
+        }
+
         val digits = clean.filter { it.isDigit() }
-        if (digits.length >= 7) db.graphDao().findEntityByAlias(digits)?.let { return it }
-        return null
+        if (digits.length >= 7) {
+            db.graphDao().findEntitiesByAlias(digits).forEach { id ->
+                val name = db.graphDao().findEntityById(id)?.canonicalName ?: clean
+                if (candidates.none { it.first == id }) candidates.add(id to name)
+            }
+        }
+
+        return when {
+            candidates.isEmpty() -> PersonResolution.NotFound
+            candidates.size == 1 -> PersonResolution.Resolved(candidates[0].first, candidates[0].second)
+            else -> PersonResolution.Ambiguous(candidates)
+        }
     }
 
     /**

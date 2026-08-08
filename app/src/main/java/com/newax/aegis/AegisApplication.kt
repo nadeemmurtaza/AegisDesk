@@ -1,7 +1,9 @@
 package com.newax.aegis
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -13,8 +15,11 @@ import com.newax.aegis.memory.SecureKeyVault
 import com.newax.aegis.engine.trigger.TriggerEngine as CoreTriggerEngine
 import com.newax.aegis.engine.ContactScannerWorker
 import com.newax.aegis.engine.GalleryScannerWorker
+import com.newax.aegis.engine.background.IntelligenceWorker
 import com.newax.aegis.engine.embedding.EmbeddingEngine
 import com.newax.aegis.engine.embedding.EmbeddingIndexWorker
+import com.newax.aegis.engine.model.ModelManager
+import com.newax.aegis.engine.resource.ResourceGovernor
 import com.newax.aegis.memory.EncryptedMemory
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -22,8 +27,27 @@ import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 class AegisApplication : Application() {
+
+    private val memoryPressureCallbacks = object : ComponentCallbacks2 {
+        override fun onTrimMemory(level: Int) {
+            val pressureLevel = when {
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> 5
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW      -> 4
+                level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE         -> 3
+                level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND       -> 2
+                level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN        -> 1
+                else                                                       -> 0
+            }
+            ResourceGovernor.onMemoryPressure(pressureLevel)
+            ModelManager.unloadForPressure(pressureLevel)
+        }
+        override fun onLowMemory() { ResourceGovernor.onMemoryPressure(5); ModelManager.unloadForPressure(5) }
+        override fun onConfigurationChanged(newConfig: Configuration) {}
+    }
+
     override fun onCreate() {
         super.onCreate()
+        registerComponentCallbacks(memoryPressureCallbacks)
         // Initialize encrypted DB before any workers or viewmodels access it
         val memory = EncryptedMemory(this)
         SecureKeyVault.init(this)
@@ -59,6 +83,7 @@ class AegisApplication : Application() {
             exitProcess(1)
         }
         scheduleNightlyWork()
+        IntelligenceWorker.schedule(this)
     }
 
     private fun scheduleNightlyWork() {

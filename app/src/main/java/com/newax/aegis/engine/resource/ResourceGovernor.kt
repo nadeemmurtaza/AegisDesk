@@ -1,11 +1,13 @@
 package com.newax.aegis.engine.resource
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.PriorityQueue
@@ -134,9 +136,50 @@ object ResourceGovernor {
     }
 
     private suspend fun runSafe(job: AegisJob) {
-        try { job.block(); completedCount.incrementAndGet() }
+        if (System.currentTimeMillis() > job.deadlineMs) { failedCount.incrementAndGet(); return }
+        try {
+            if (job.deadlineMs == Long.MAX_VALUE) {
+                job.block()
+            } else {
+                val remaining = job.deadlineMs - System.currentTimeMillis()
+                withTimeout(remaining) { job.block() }
+            }
+            completedCount.incrementAndGet()
+        }
         catch (_: CancellationException) { }
-        catch (_: Exception) { failedCount.incrementAndGet() }
+        catch (e: Exception) { failedCount.incrementAndGet(); throw e }
+    }
+
+    suspend fun <T> submitForResult(
+        label: String,
+        resourceClass: ResourceClass = ResourceClass.HEAVY,
+        priority: JobPriority = JobPriority.P0_USER_VISIBLE,
+        ramBudgetMb: Int = 50,
+        deadlineMs: Long = Long.MAX_VALUE,
+        block: suspend () -> T
+    ): JobResult<T> {
+        if (pressureLevel.get() >= 5 && resourceClass == ResourceClass.HEAVY) return JobResult.ResourceDenied
+        val deferred = CompletableDeferred<JobResult<T>>()
+        val job = AegisJob(
+            id            = newId(),
+            label         = label,
+            resourceClass = resourceClass,
+            priority      = priority,
+            ramBudgetMb   = ramBudgetMb,
+            cancellable   = true,
+            deadlineMs    = deadlineMs
+        ) {
+            try {
+                val result = block()
+                deferred.complete(JobResult.Success(result))
+            } catch (_: CancellationException) {
+                deferred.complete(JobResult.Cancelled)
+            } catch (e: Exception) {
+                deferred.complete(JobResult.Failure(e))
+            }
+        }
+        submit(job)
+        return deferred.await()
     }
 
     private fun cancelByClass(cls: ResourceClass) {

@@ -25,6 +25,8 @@ import androidx.room.PrimaryKey
 data class FileObject(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val path: String,
+    val contentUriString: String = "",
+    val mediaStoreId: Long = 0,
     val filename: String,
     val extension: String,
     val mimeType: String,
@@ -36,16 +38,16 @@ data class FileObject(
     val sourceApp: String = "",
     val folder: String = "",
     val sha256: String = "",
-    val pHash: String = "",          // 16-char hex (64-bit average hash)
-    val metadataJson: String = "",   // EXIF, GPS, camera, page count, author
+    val pHash: String = "",
+    val metadataJson: String = "",
     val thumbnailPath: String? = null,
-    val entitiesJson: String = "",   // JSON array of entity labels
-    val conceptsJson: String = "",   // JSON array of concept tags
-    val graphEntityId: Long? = null, // this file's node in GraphStore
+    val entitiesJson: String = "",
+    val conceptsJson: String = "",
+    val graphEntityId: Long? = null,
     val embeddingId: Long? = null,
     val indexState: Int = INDEX_STATE_BARE,
-    val isDuplicate: Boolean = false, // true if another file has same sha256
-    val canonicalId: Long? = null    // points to the canonical copy if isDuplicate
+    val isDuplicate: Boolean = false,
+    val canonicalId: Long? = null
 ) {
     companion object {
         const val INDEX_STATE_BARE     = 0   // metadata + hash only

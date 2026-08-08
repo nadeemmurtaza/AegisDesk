@@ -40,10 +40,28 @@ object ProcedureExecutor {
             if (ExecutionGuard.check(context, currentPkg) == ExecutionGuard.GuardResult.BLOCKED) {
                 return ExecutionResult(false, completed, steps.size, idx, "Blocked: protected package $currentPkg")
             }
+            // Pre-condition check
+            step.pre?.let { cond ->
+                if (!checkCondition(cond.target, svc)) {
+                    if (cond.abortIfFailed)
+                        return ExecutionResult(false, completed, steps.size, idx, "Pre-condition failed: ${cond.target}")
+                }
+            }
             val ok = executeStep(step, svc, context)
             if (!ok) {
-                val reason = "Step ${idx + 1} failed: ${step::class.simpleName}"
-                return ExecutionResult(false, completed, steps.size, idx, reason)
+                val repaired = tryRepair(step, svc, context)
+                if (!repaired) {
+                    val reason = "Step ${idx + 1} failed: ${step::class.simpleName}"
+                    return ExecutionResult(false, completed, steps.size, idx, reason)
+                }
+            }
+            // Post-condition check
+            step.post?.let { cond ->
+                waitSettle(svc)
+                if (!checkCondition(cond.target, svc)) {
+                    if (cond.abortIfFailed)
+                        return ExecutionResult(false, completed, steps.size, idx, "Post-condition failed: ${cond.target}")
+                }
             }
             completed++
             // Screen settle after every mutating step
@@ -185,6 +203,26 @@ object ProcedureExecutor {
                 true
             }
         }
+    }
+
+    // ── Pre/Post condition check ──────────────────────────────────────────────
+
+    private fun checkCondition(target: String, svc: AegisAccessibilityService): Boolean {
+        val root = svc.getRootNode() ?: return false
+        val grounded = ScreenGrounder.findTarget(root, target)
+        if (grounded != null && grounded.confidence >= 0.4f) return true
+        return root.findAccessibilityNodeInfosByText(target)?.isNotEmpty() == true
+    }
+
+    private suspend fun tryRepair(step: ProcedureStep, svc: AegisAccessibilityService, context: Context): Boolean {
+        if (step !is ProcedureStep.Tap) return false
+        val root = svc.getRootNode() ?: return false
+        val words = step.target.split(Regex("\\W+")).filter { it.length > 1 }
+        for (word in words) {
+            val node = root.findAccessibilityNodeInfosByText(word)?.firstOrNull() ?: continue
+            if (svc.tapNode(node)) return true
+        }
+        return false
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

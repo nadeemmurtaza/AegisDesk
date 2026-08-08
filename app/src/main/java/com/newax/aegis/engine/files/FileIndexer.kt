@@ -65,7 +65,8 @@ object FileIndexer {
             val dataCol  = c.getColumnIndex(MediaStore.Files.FileColumns.DATA)
 
             while (c.moveToNext()) {
-                val path = if (dataCol >= 0) c.getString(dataCol) ?: continue else continue
+                val mediaStoreId = if (idCol >= 0) c.getLong(idCol) else continue
+                val path = if (dataCol >= 0) c.getString(dataCol) ?: "" else ""
                 val name = if (nameCol >= 0) c.getString(nameCol) ?: "" else ""
                 val mime = if (mimeCol >= 0) c.getString(mimeCol) ?: "" else ""
                 val size = if (sizeCol >= 0) c.getLong(sizeCol) else 0L
@@ -73,14 +74,19 @@ object FileIndexer {
                 val add  = if (dateAddCol >= 0) c.getLong(dateAddCol) * 1000L else 0L
                 val rel  = if (pathCol >= 0) c.getString(pathCol) ?: "" else ""
 
-                val existing = db.fileDao().byPath(path)
-                if (existing != null && existing.modifiedMs >= mod) continue  // no change
+                val contentUri = Uri.withAppendedPath(uri, mediaStoreId.toString())
+                val contentUriString = contentUri.toString()
+
+                val existing = db.fileDao().byMediaStoreId(mediaStoreId)
+                    ?: if (path.isNotBlank()) db.fileDao().byPath(path) else null
+                if (existing != null && existing.modifiedMs >= mod) continue
 
                 val ext = name.substringAfterLast('.', "").lowercase()
-                val contentUri = Uri.withAppendedPath(uri, c.getLong(idCol).toString())
                 val record = FileObject(
                     id = existing?.id ?: 0,
                     path = path,
+                    contentUriString = contentUriString,
+                    mediaStoreId = mediaStoreId,
                     filename = name,
                     extension = ext,
                     mimeType = mime,

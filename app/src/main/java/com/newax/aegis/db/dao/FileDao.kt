@@ -73,6 +73,12 @@ interface FileDao {
     @Query("SELECT * FROM file_objects WHERE path = :path LIMIT 1")
     fun byPath(path: String): FileObject?
 
+    @Query("SELECT * FROM file_objects WHERE mediaStoreId = :mediaStoreId AND mediaStoreId != 0 LIMIT 1")
+    fun byMediaStoreId(mediaStoreId: Long): FileObject?
+
+    @Query("SELECT * FROM file_objects WHERE contentUriString = :uri LIMIT 1")
+    fun byContentUri(uri: String): FileObject?
+
     @Query("SELECT id FROM file_objects WHERE sha256 = :hash")
     fun idsWithHash(hash: String): List<Long>
 

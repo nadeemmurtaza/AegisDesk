@@ -56,7 +56,7 @@ import net.sqlcipher.database.SupportFactory
         FileTextFts::class,
         FileEntityLink::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = true
 )
 abstract class AegisDatabase : RoomDatabase() {
@@ -111,6 +111,21 @@ abstract class AegisDatabase : RoomDatabase() {
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_predicate ON triples(predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_subj_pred ON triples(subject, predicate)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS idx_tri_object ON triples(objectValue)")
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE ui_procedures ADD COLUMN prerequisites TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE ui_procedures ADD COLUMN recoveryPaths TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE ui_procedures ADD COLUMN successConditions TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE file_objects ADD COLUMN contentUriString TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE file_objects ADD COLUMN mediaStoreId INTEGER NOT NULL DEFAULT 0")
             }
         }
 
@@ -449,7 +464,7 @@ abstract class AegisDatabase : RoomDatabase() {
                 )
                     .openHelperFactory(SupportFactory(passphrase))
                     .addCallback(FtsSetupCallback())
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .build()
                 passphrase.fill(0)
             }
