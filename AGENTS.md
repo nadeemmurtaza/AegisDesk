@@ -144,11 +144,12 @@ Cheapest first: **typecheck → build → lint → test → smoke run.** Stop at
 ```bash
 # Kotlin/KMP type signal (fast)
 ./gradlew :shared:database:compileCommonMainKotlinMetadata   # pure Kotlin — does NOT verify expect/actuals
-# Expect/actual + KSP (the real gates). For KMP androidTargets, `assembleDebug`
-# is the reliable task (compile tasks are named compileDebugKotlinAndroid, and
-# assembleDebug also runs the Android KSP/Room query verification).
-./gradlew :shared:database:compileDesktopKotlin :shared:database:assembleDebug
-./gradlew :shared:database:kspDesktopKotlin   # desktop Room KSP gate
+# Expect/actual + KSP (the real gates). KGP task naming is compileKotlin<Target> /
+# <target>Jar, NOT compileDesktopKotlin. For a jvm("desktop") target: desktopJar
+# (compiles + runs its Room KSP). For KMP androidTargets: assembleDebug (compiles
+# debug variant + runs its Room KSP).
+./gradlew :shared:database:desktopJar :shared:database:assembleDebug
+./gradlew :shared:core:compileKotlinJvm :shared:core:assembleDebug
 # Full app gates
 ./gradlew :apps:androidApp:assembleDebug :apps:androidApp:testDebugUnitTest
 ./gradlew :apps:androidApp:lintDebug

@@ -49,11 +49,11 @@ jobs:
       - name: Compile shared:core for every target (expect/actual gate)
         run: ./gradlew :shared:core:compileKotlinJvm :shared:core:assembleDebug --stacktrace
 
-      - name: Compile shared:database per target (expect/actual gate)
-        run: ./gradlew :shared:database:compileDesktopKotlin :shared:database:assembleDebug --stacktrace
-
-      - name: Run desktop Room KSP query verification (Android KSP runs inside assembleDebug)
-        run: ./gradlew :shared:database:kspDesktopKotlin --stacktrace
+      # desktopJar = jvm("desktop") compile + its Room KSP; assembleDebug = androidTarget
+      # compile + its Room KSP. Task naming is compileKotlin<Target>/<target>Jar — NOT
+      # compileDesktopKotlin (KGP convention; compileKotlinJvm confirmed for shared:core).
+      - name: Compile shared:database per target (expect/actual + Room KSP gate)
+        run: ./gradlew :shared:database:desktopJar :shared:database:assembleDebug --stacktrace
 
       - name: "Build Android app — invariant: Android stays green"
         run: ./gradlew :apps:androidApp:assembleDebug :apps:androidApp:testDebugUnitTest --stacktrace
