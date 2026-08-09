@@ -151,11 +151,11 @@ class LocalAssistantEngine {
                 AssistantReply("This will create a calendar event: $title.", ProposedAction.CreateEvent(title, time))
             }
             lower.startsWith("reply notification ") -> {
-                val args = clean.substringAfter("reply notification ").split("|").map { it.trim() }
+                val args = clean.substringAfter("reply notification ").split(":::", limit = 2).map { it.trim() }
                 if (args.size >= 2) {
                     AssistantReply("I will reply to the notification.", ProposedAction.ReplyNotification(args[0], args[1]))
                 } else {
-                    AssistantReply("Error: Format must be 'reply notification key | text'", ProposedAction.Type("Error"))
+                    AssistantReply("Error: Format must be 'reply notification key ::: text'", ProposedAction.Type("Error"))
                 }
             }
             lower.startsWith("reply ") || lower.startsWith("send ") -> {

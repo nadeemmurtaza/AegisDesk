@@ -193,7 +193,11 @@ class AegisNotificationListenerService : NotificationListenerService() {
             if (inbox.isEmpty()) return "Your inbox is clear."
             return inbox.joinToString("\n\n") { entry ->
                 buildString {
-                    appendLine("[${entry.appName}] ${entry.sender}")
+                    if (activeReplies.containsKey(entry.key)) {
+                        appendLine("[${entry.appName}] ${entry.sender} (Key: ${entry.key})")
+                    } else {
+                        appendLine("[${entry.appName}] ${entry.sender}")
+                    }
                     appendLine(entry.text)
                     if (entry.tone.urgency > 0.4f || entry.tone.phishingRisk > 0.3f)
                         appendLine("⚠ ${entry.tone.summary}")

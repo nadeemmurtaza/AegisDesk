@@ -476,7 +476,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             if (screen.isNotBlank()) append("Current screen:\n$screen\n\n")
                             if (ocrText.isNotBlank()) append("Screen OCR:\n$ocrText\n\n")
                             if (conversationHistory.isNotBlank()) append("Recent conversation:\n$conversationHistory\n\n")
-                            append("If you suggest replying to a notification, output EXACTLY on the first line: reply notification <key> | <reply_text>\n\n")
+                            append("If you suggest replying to a notification, output EXACTLY on the first line: reply notification <key> ::: <reply_text>\n\n")
                             append("User: ${text.trim().take(3000)}")
                         }.take(7000)
                         val frame = com.newax.aegis.vision.ScreenCaptureService.latestFrame.value
