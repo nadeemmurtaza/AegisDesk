@@ -50,6 +50,12 @@ android {
     }
 }
 
+// Keep the debug APK named app-debug.apk — the module dir is androidApp, which would
+// otherwise produce androidApp-debug.apk and break the CI artifact upload + preview link.
+base {
+    archivesName.set("app")
+}
+
 dependencies {
     implementation(project(":shared:core"))
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
