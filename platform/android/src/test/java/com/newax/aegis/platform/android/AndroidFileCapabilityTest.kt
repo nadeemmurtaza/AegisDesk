@@ -3,6 +3,8 @@ package com.newax.aegis.platform.android
 import com.newax.aegis.assistant.ActionOrigin
 import com.newax.aegis.platform.CapabilityResult
 import com.newax.aegis.platform.OperationContext
+import com.newax.aegis.platform.getOrNull
+import com.newax.aegis.platform.isSuccess
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

@@ -9,6 +9,7 @@ import com.newax.aegis.platform.CapabilityId
 import com.newax.aegis.platform.CapabilityResult
 import com.newax.aegis.platform.OperationContext
 import com.newax.aegis.platform.PrivilegeLevel
+import com.newax.aegis.platform.getOrNull
 import com.newax.aegis.platform.files.FileCapability
 import com.newax.aegis.platform.files.FileMetadata
 import com.newax.aegis.platform.files.FileRef

@@ -3,6 +3,7 @@ package com.newax.aegis.platform.android
 import com.newax.aegis.assistant.ActionOrigin
 import com.newax.aegis.platform.CapabilityResult
 import com.newax.aegis.platform.OperationContext
+import com.newax.aegis.platform.isSuccess
 import com.newax.aegis.platform.shell.ShellCommand
 import com.newax.aegis.platform.shell.ShellResult
 import org.junit.Assert.assertEquals

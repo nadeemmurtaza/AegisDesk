@@ -18,7 +18,7 @@ import com.newax.aegis.platform.desktop.UiTarget
  * ARCHITECTURE.md RULE 5. Returning false means "element not found / action failed",
  * which the capability maps to a typed failure.
  */
-fun interface SemanticAutomation {
+interface SemanticAutomation {
     fun listWindows(): List<AppWindow>
     fun click(label: String): Boolean
     fun typeText(label: String?, text: String): Boolean

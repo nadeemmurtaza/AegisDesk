@@ -26,6 +26,9 @@ class AndroidProcessCapability(
     private val androidContext: Context,
 ) : ProcessCapability {
 
+    /** Android exposes no pid for child processes started via ProcessBuilder. */
+    private const val UNKNOWN_PID = -1L
+
     override val id: CapabilityId get() = CapabilityId.PROCESSES
 
     override fun descriptor(): CapabilityDescriptor = CapabilityDescriptor(
@@ -57,17 +60,19 @@ class AndroidProcessCapability(
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             return try {
                 androidContext.startActivity(intent)
-                CapabilityResult.Success(ProcessRef(pid = android.os.Process.myPid(), name = command))
+                CapabilityResult.Success(ProcessRef(pid = android.os.Process.myPid().toLong(), name = command))
             } catch (e: Exception) {
                 CapabilityResult.Failed("cannot launch '$command': ${e.message}")
             }
         }
         // Otherwise treat it as an executable path inside the app sandbox.
         return try {
-            val process = ProcessBuilder(listOf(command) + args).apply {
+            ProcessBuilder(listOf(command) + args).apply {
                 workingDirectory?.let { directory(File(it)) }
             }.start()
-            CapabilityResult.Success(ProcessRef(pid = process.pid().toLong(), name = command))
+            // Android does not expose child-process pids via the SDK; the ref is a
+            // named handle (pid = UNKNOWN_PID), so info() reports "not running".
+            CapabilityResult.Success(ProcessRef(pid = UNKNOWN_PID, name = command))
         } catch (e: Exception) {
             CapabilityResult.Failed("cannot start '$command': ${e.message}")
         }

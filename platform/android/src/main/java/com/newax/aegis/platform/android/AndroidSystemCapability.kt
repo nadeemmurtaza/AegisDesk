@@ -52,7 +52,13 @@ class AndroidSystemCapability(
         val memory = try {
             val activityManager = androidContext.getSystemService(Context.ACTIVITY_SERVICE)
                 as? android.app.ActivityManager
-            activityManager?.memoryInfo?.totalMem
+            if (activityManager != null) {
+                val info = android.app.ActivityManager.MemoryInfo()
+                activityManager.getMemoryInfo(info)
+                info.totalMem
+            } else {
+                null
+            }
         } catch (e: Exception) {
             null
         }
