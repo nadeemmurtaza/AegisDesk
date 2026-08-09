@@ -65,7 +65,9 @@ object EmbeddingEngine {
                 loadEmbedder(context, file)
                 Log.d(TAG, "USE model ready (${file.length() / 1_048_576} MB)")
                 onComplete(true)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable, not Exception: a missing native lib (UnsatisfiedLinkError) or
+                // model corruption (Error) on a background download must never kill the app.
                 Log.w(TAG, "Model download failed: ${e.message}")
                 onComplete(false)
             }
@@ -104,7 +106,9 @@ object EmbeddingEngine {
                 .build()
             embedder = TextEmbedder.createFromOptions(context, options)
             Log.d(TAG, "Embedder initialized")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable, not Exception: the MediaPipe native library may be absent on some
+            // ABIs/emulators (UnsatisfiedLinkError). Embedding degrades to BM25, app survives.
             Log.w(TAG, "Embedder load failed: ${e.message}")
             embedder = null
         }
