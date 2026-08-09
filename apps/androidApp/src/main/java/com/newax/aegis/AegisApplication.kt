@@ -51,6 +51,9 @@ class AegisApplication : Application() {
         // Initialize encrypted DB before any workers or viewmodels access it
         val memory = EncryptedMemory(this)
         SecureKeyVault.init(this)
+        // Register the platform capability surface (files, processes, shell, desktop,
+        // secrets, system) so the UI and future executor can query their state.
+        PlatformCapabilitiesHolder.init(this)
         DbKeyManager.migrateFromMemoryIfNeeded(memory)
         AegisDatabase.init(com.newax.aegis.db.getAegisDatabase(this, DbKeyManager.getOrCreate()))
         CoreTriggerEngine.start(this, AegisDatabase.get) { _, _ -> }

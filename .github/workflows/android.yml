@@ -29,6 +29,12 @@ jobs:
       - name: Run unit tests
         run: ./gradlew :apps:androidApp:testDebugUnitTest --stacktrace
 
+      # The Android capability adapter (platform/android) implements the shared
+      # PlatformCapabilities contract; assembleDebug compiles it and testDebugUnitTest
+      # runs its JVM tests (file round-trip + bounded shell runner).
+      - name: Build platform:android adapter + run its unit tests
+        run: ./gradlew :platform:android:assembleDebug :platform:android:testDebugUnitTest --stacktrace
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

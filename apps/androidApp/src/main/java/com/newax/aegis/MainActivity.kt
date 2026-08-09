@@ -95,6 +95,7 @@ sealed class Screen(val label: String) {
     object Backup   : Screen("Backup")
     object People   : Screen("People")
     object AppPermissions : Screen("App Permissions")
+    object Capabilities : Screen("Capabilities")
 }
 
 class MainActivity : FragmentActivity() {
@@ -175,7 +176,8 @@ fun AegisApp(
                         NavEntry(Screen.Meeting,  Icons.Outlined.Groups,            "Meeting"),
                         NavEntry(Screen.People,   Icons.Outlined.Person,            "People"),
                         NavEntry(Screen.Backup,   Icons.Outlined.CloudSync,         "Backup"),
-                        NavEntry(Screen.Settings, Icons.Outlined.Settings,          "Settings")
+                        NavEntry(Screen.Settings, Icons.Outlined.Settings,          "Settings"),
+                        NavEntry(Screen.Capabilities, Icons.Rounded.Shield,         "Capabilities")
                     ).forEach { entry ->
                         NavigationDrawerItem(
                             label  = {
@@ -236,6 +238,7 @@ fun AegisApp(
                                         Screen.People   -> "People"
                                         Screen.Settings -> "Settings"
                                         Screen.AppPermissions -> "App Permissions"
+                                        Screen.Capabilities -> "Capabilities"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize   = 18.sp,
@@ -264,6 +267,7 @@ fun AegisApp(
                     Screen.Backup   -> BackupRestoreScreen(vm, padding)
                     Screen.People   -> PeopleScreen(vm, padding)
                     Screen.AppPermissions -> AppPermissionScreen(padding)
+                    Screen.Capabilities -> CapabilitiesScreen(padding)
                     Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions })
                 }
             }

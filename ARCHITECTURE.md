@@ -79,7 +79,7 @@ AegisAssistant/
 ├── shared/database/        Room KMP 2.7.0-alpha13 (android + jvm("desktop")): entities, DAOs, migrations, expect/actual
 ├── shared/platform-api/    Platform capability contracts (files, processes, shell, desktop, secrets, system) — contract layer landed (Phase 3); adapters pending
 ├── shared/model-api/       ModelProvider contract — placeholder
-├── platform/android/       Android adapters — placeholder
+├── platform/android/       Android adapters — landed (Phase 4): files, processes, shell, desktop, secrets, system
 └── platform/windows/       Windows adapters — placeholder
 ```
 
