@@ -2,6 +2,7 @@ package com.newax.aegis.db.entity
 
 import com.newax.aegis.db.currentTimeMillis
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -12,8 +13,10 @@ data class AppRecord(
     val packageName: String,
     val label: String,
     val version: String,
+    @ColumnInfo(defaultValue = "''")
     val category: String = "",
     val launchActivity: String? = null,
+    @ColumnInfo(defaultValue = "0")
     val needsValidation: Boolean = false,
     val lastScanMs: Long = currentTimeMillis()
 )
@@ -29,6 +32,7 @@ data class AppCapabilityLink(
     val intentAction: String? = null,
     val deepLinkPattern: String? = null,
     val mimeTypes: String? = null,
+    @ColumnInfo(defaultValue = "80")
     val confidence: Int = 80
 )
 
@@ -39,14 +43,23 @@ data class UiProcedure(
     val versionRange: String,
     val taskCapability: String,
     val steps: String,
+    @ColumnInfo(defaultValue = "''")
     val screenSignature: String = "",
+    @ColumnInfo(defaultValue = "''")
     val prerequisites: String = "",
+    @ColumnInfo(defaultValue = "''")
     val recoveryPaths: String = "",
+    @ColumnInfo(defaultValue = "''")
     val successConditions: String = "",
+    @ColumnInfo(defaultValue = "80")
     val confidence: Int = 80,
+    @ColumnInfo(defaultValue = "0")
     val successCount: Int = 0,
+    @ColumnInfo(defaultValue = "0")
     val failureCount: Int = 0,
+    @ColumnInfo(defaultValue = "0")
     val lastRunMs: Long = 0,
+    @ColumnInfo(defaultValue = "0")
     val needsValidation: Boolean = false
 )
 
@@ -54,8 +67,11 @@ data class UiProcedure(
 data class ScreenNode(
     val packageName: String,
     val screenSignature: String,
+    @ColumnInfo(defaultValue = "''")
     val screenType: String = "",
+    @ColumnInfo(defaultValue = "''")
     val nodes: String = "",
+    @ColumnInfo(defaultValue = "''")
     val appVersion: String = ""
 )
 
@@ -64,7 +80,10 @@ data class NavEdge(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val fromSignature: String,
     val toSignature: String,
+    @ColumnInfo(defaultValue = "''")
     val actionViewId: String = "",
+    @ColumnInfo(defaultValue = "''")
     val actionContentDesc: String = "",
+    @ColumnInfo(defaultValue = "''")
     val actionText: String = ""
 )

@@ -2,6 +2,7 @@ package com.newax.aegis.db.entity
 
 import com.newax.aegis.db.currentTimeMillis
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -27,10 +28,15 @@ data class MemoryRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val type: Int,
     val content: String,
+    @ColumnInfo(defaultValue = "''")
     val category: String  = "",
+    @ColumnInfo(defaultValue = "''")
     val subject: String   = "",
+    @ColumnInfo(defaultValue = "''")
     val source: String    = "",
+    @ColumnInfo(defaultValue = "80")
     val confidence: Int   = 80,
+    @ColumnInfo(defaultValue = "50")
     val importance: Int   = 50,
     val createdAt: Long   = currentTimeMillis(),
     val updatedAt: Long   = currentTimeMillis(),
@@ -38,6 +44,7 @@ data class MemoryRecord(
     /** Null means still current. Stamped when this fact is superseded. */
     val validUntil: Long? = null,
     /** First 24 hex chars of SHA-256(lower(content)) for deduplication. */
+    @ColumnInfo(defaultValue = "''")
     val contentHash: String = "",
     /** FK → edges.id if this record is backed by a normalized graph edge. */
     val graphEdgeId: Long?  = null,

@@ -28,27 +28,42 @@ import androidx.room.PrimaryKey
 data class FileObject(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val path: String,
+    @ColumnInfo(defaultValue = "''")
     val contentUriString: String = "",
+    @ColumnInfo(defaultValue = "0")
     val mediaStoreId: Long = 0,
     val filename: String,
     val extension: String,
     val mimeType: String,
     val sizeBytes: Long,
+    @ColumnInfo(defaultValue = "0")
     val createdMs: Long = 0,
+    @ColumnInfo(defaultValue = "0")
     val modifiedMs: Long = 0,
+    @ColumnInfo(defaultValue = "0")
     val receivedMs: Long = 0,
+    @ColumnInfo(defaultValue = "0")
     val lastOpenedMs: Long = 0,
+    @ColumnInfo(defaultValue = "''")
     val sourceApp: String = "",
+    @ColumnInfo(defaultValue = "''")
     val folder: String = "",
+    @ColumnInfo(defaultValue = "''")
     val sha256: String = "",
+    @ColumnInfo(defaultValue = "''")
     val pHash: String = "",
+    @ColumnInfo(defaultValue = "''")
     val metadataJson: String = "",
     val thumbnailPath: String? = null,
+    @ColumnInfo(defaultValue = "''")
     val entitiesJson: String = "",
+    @ColumnInfo(defaultValue = "''")
     val conceptsJson: String = "",
     val graphEntityId: Long? = null,
     val embeddingId: Long? = null,
+    @ColumnInfo(defaultValue = "0")
     val indexState: Int = INDEX_STATE_BARE,
+    @ColumnInfo(defaultValue = "0")
     val isDuplicate: Boolean = false,
     val canonicalId: Long? = null
 ) {
@@ -66,8 +81,11 @@ data class FileObject(
 data class FileTextContent(
     @PrimaryKey val fileId: Long,
     val text: String,
+    @ColumnInfo(defaultValue = "''")
     val language: String = "",
+    @ColumnInfo(defaultValue = "0")
     val pageCount: Int = 0,
+    @ColumnInfo(defaultValue = "0")
     val wordCount: Int = 0,
     val extractedMs: Long = currentTimeMillis()
 )

@@ -2,6 +2,7 @@ package com.newax.aegis.db.entity
 
 import com.newax.aegis.db.currentTimeMillis
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -24,7 +25,9 @@ data class GraphEdge(
     /** Inline primitive (text, number, date string). Null when objectId is set. */
     val objectValue: String? = null,
     /** 0–100 integer (triple float × 100). */
+    @ColumnInfo(defaultValue = "80")
     val confidence: Int = 80,
+    @ColumnInfo(defaultValue = "50")
     val importance: Int = 50,
     val createdAt: Long = currentTimeMillis(),
     /** Epoch ms when this fact became valid; null = valid from createdAt. */

@@ -2,6 +2,7 @@ package com.newax.aegis.db.entity
 
 import com.newax.aegis.db.currentTimeMillis
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -17,8 +18,11 @@ data class TriggerRule(
     val conditionParams: String, // JSON
     val actionType: String,      // SUBMIT_TO_AI | LAUNCH_APP | EXECUTE_PROCEDURE | REMEMBER_FACT | NOTIFY_USER
     val actionParams: String,    // JSON
+    @ColumnInfo(defaultValue = "1")
     val enabled: Boolean = true,
+    @ColumnInfo(defaultValue = "30000")
     val debounceMs: Long = 30_000L,
+    @ColumnInfo(defaultValue = "0")
     val lastFiredMs: Long = 0L,
     val createdMs: Long = currentTimeMillis()
 ) {

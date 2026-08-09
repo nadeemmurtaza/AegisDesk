@@ -6,7 +6,7 @@
     "entities": [
       {
         "tableName": "app_capability_links",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `intentAction` TEXT, `deepLinkPattern` TEXT, `mimeTypes` TEXT, `confidence` INTEGER NOT NULL, PRIMARY KEY(`packageName`, `capability`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `intentAction` TEXT, `deepLinkPattern` TEXT, `mimeTypes` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, PRIMARY KEY(`packageName`, `capability`))",
         "fields": [
           {
             "fieldPath": "packageName",
@@ -42,7 +42,8 @@
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "80"
           }
         ],
         "primaryKey": {
@@ -67,7 +68,7 @@
       },
       {
         "tableName": "app_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `label` TEXT NOT NULL, `version` TEXT NOT NULL, `category` TEXT NOT NULL, `launchActivity` TEXT, `needsValidation` INTEGER NOT NULL, `lastScanMs` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `label` TEXT NOT NULL, `version` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `launchActivity` TEXT, `needsValidation` INTEGER NOT NULL DEFAULT 0, `lastScanMs` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -97,7 +98,8 @@
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "launchActivity",
@@ -109,7 +111,8 @@
             "fieldPath": "needsValidation",
             "columnName": "needsValidation",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "lastScanMs",
@@ -177,7 +180,7 @@
       },
       {
         "tableName": "commitments",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `debtorPersonId` INTEGER, `creditorPersonId` INTEGER, `debtorLabel` TEXT NOT NULL, `creditorLabel` TEXT NOT NULL, `action` TEXT NOT NULL, `dueMs` INTEGER, `status` TEXT NOT NULL, `source` TEXT NOT NULL, `confidence` INTEGER NOT NULL, `createdMs` INTEGER NOT NULL, `resolvedMs` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `debtorPersonId` INTEGER, `creditorPersonId` INTEGER, `debtorLabel` TEXT NOT NULL, `creditorLabel` TEXT NOT NULL, `action` TEXT NOT NULL, `dueMs` INTEGER, `status` TEXT NOT NULL DEFAULT 'pending', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `createdMs` INTEGER NOT NULL, `resolvedMs` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -225,19 +228,22 @@
             "fieldPath": "status",
             "columnName": "status",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "'pending'"
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "80"
           },
           {
             "fieldPath": "createdMs",
@@ -300,7 +306,7 @@
       },
       {
         "tableName": "edges",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subjectId` INTEGER NOT NULL, `predicateId` INTEGER NOT NULL, `objectId` INTEGER, `objectValue` TEXT, `confidence` INTEGER NOT NULL, `importance` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `sourceId` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subjectId` INTEGER NOT NULL, `predicateId` INTEGER NOT NULL, `objectId` INTEGER, `objectValue` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `sourceId` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -336,13 +342,15 @@
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "80"
           },
           {
             "fieldPath": "importance",
             "columnName": "importance",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "50"
           },
           {
             "fieldPath": "createdAt",
@@ -484,7 +492,7 @@
       },
       {
         "tableName": "entities",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `canonicalName` TEXT NOT NULL, `payloadPointer` INTEGER, `createdAt` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL DEFAULT 0, `canonicalName` TEXT NOT NULL, `payloadPointer` INTEGER, `createdAt` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -496,7 +504,8 @@
             "fieldPath": "type",
             "columnName": "type",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "canonicalName",
@@ -642,7 +651,7 @@
       },
       {
         "tableName": "file_objects",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `path` TEXT NOT NULL, `contentUriString` TEXT NOT NULL, `mediaStoreId` INTEGER NOT NULL, `filename` TEXT NOT NULL, `extension` TEXT NOT NULL, `mimeType` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `createdMs` INTEGER NOT NULL, `modifiedMs` INTEGER NOT NULL, `receivedMs` INTEGER NOT NULL, `lastOpenedMs` INTEGER NOT NULL, `sourceApp` TEXT NOT NULL, `folder` TEXT NOT NULL, `sha256` TEXT NOT NULL, `pHash` TEXT NOT NULL, `metadataJson` TEXT NOT NULL, `thumbnailPath` TEXT, `entitiesJson` TEXT NOT NULL, `conceptsJson` TEXT NOT NULL, `graphEntityId` INTEGER, `embeddingId` INTEGER, `indexState` INTEGER NOT NULL, `isDuplicate` INTEGER NOT NULL, `canonicalId` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `path` TEXT NOT NULL, `contentUriString` TEXT NOT NULL DEFAULT '', `mediaStoreId` INTEGER NOT NULL DEFAULT 0, `filename` TEXT NOT NULL, `extension` TEXT NOT NULL, `mimeType` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `createdMs` INTEGER NOT NULL DEFAULT 0, `modifiedMs` INTEGER NOT NULL DEFAULT 0, `receivedMs` INTEGER NOT NULL DEFAULT 0, `lastOpenedMs` INTEGER NOT NULL DEFAULT 0, `sourceApp` TEXT NOT NULL DEFAULT '', `folder` TEXT NOT NULL DEFAULT '', `sha256` TEXT NOT NULL DEFAULT '', `pHash` TEXT NOT NULL DEFAULT '', `metadataJson` TEXT NOT NULL DEFAULT '', `thumbnailPath` TEXT, `entitiesJson` TEXT NOT NULL DEFAULT '', `conceptsJson` TEXT NOT NULL DEFAULT '', `graphEntityId` INTEGER, `embeddingId` INTEGER, `indexState` INTEGER NOT NULL DEFAULT 0, `isDuplicate` INTEGER NOT NULL DEFAULT 0, `canonicalId` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -660,13 +669,15 @@
             "fieldPath": "contentUriString",
             "columnName": "contentUriString",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "mediaStoreId",
             "columnName": "mediaStoreId",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "filename",
@@ -696,55 +707,64 @@
             "fieldPath": "createdMs",
             "columnName": "createdMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "modifiedMs",
             "columnName": "modifiedMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "receivedMs",
             "columnName": "receivedMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "lastOpenedMs",
             "columnName": "lastOpenedMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "sourceApp",
             "columnName": "sourceApp",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "folder",
             "columnName": "folder",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "sha256",
             "columnName": "sha256",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "pHash",
             "columnName": "pHash",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "metadataJson",
             "columnName": "metadataJson",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "thumbnailPath",
@@ -756,13 +776,15 @@
             "fieldPath": "entitiesJson",
             "columnName": "entitiesJson",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "conceptsJson",
             "columnName": "conceptsJson",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "graphEntityId",
@@ -780,13 +802,15 @@
             "fieldPath": "indexState",
             "columnName": "indexState",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "isDuplicate",
             "columnName": "isDuplicate",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "canonicalId",
@@ -915,7 +939,7 @@
       },
       {
         "tableName": "file_text_content",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fileId` INTEGER NOT NULL, `text` TEXT NOT NULL, `language` TEXT NOT NULL, `pageCount` INTEGER NOT NULL, `wordCount` INTEGER NOT NULL, `extractedMs` INTEGER NOT NULL, PRIMARY KEY(`fileId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fileId` INTEGER NOT NULL, `text` TEXT NOT NULL, `language` TEXT NOT NULL DEFAULT '', `pageCount` INTEGER NOT NULL DEFAULT 0, `wordCount` INTEGER NOT NULL DEFAULT 0, `extractedMs` INTEGER NOT NULL, PRIMARY KEY(`fileId`))",
         "fields": [
           {
             "fieldPath": "fileId",
@@ -933,19 +957,22 @@
             "fieldPath": "language",
             "columnName": "language",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "pageCount",
             "columnName": "pageCount",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "wordCount",
             "columnName": "wordCount",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "extractedMs",
@@ -1126,7 +1153,7 @@
       },
       {
         "tableName": "memory_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL, `subject` TEXT NOT NULL, `source` TEXT NOT NULL, `confidence` INTEGER NOT NULL, `importance` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL, `graphEdgeId` INTEGER, `embeddingId` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `subject` TEXT NOT NULL DEFAULT '', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL DEFAULT '', `graphEdgeId` INTEGER, `embeddingId` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -1150,31 +1177,36 @@
             "fieldPath": "category",
             "columnName": "category",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "subject",
             "columnName": "subject",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "source",
             "columnName": "source",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "80"
           },
           {
             "fieldPath": "importance",
             "columnName": "importance",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "50"
           },
           {
             "fieldPath": "createdAt",
@@ -1204,7 +1236,8 @@
             "fieldPath": "contentHash",
             "columnName": "contentHash",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "graphEdgeId",
@@ -1276,7 +1309,7 @@
       },
       {
         "tableName": "nav_edges",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fromSignature` TEXT NOT NULL, `toSignature` TEXT NOT NULL, `actionViewId` TEXT NOT NULL, `actionContentDesc` TEXT NOT NULL, `actionText` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fromSignature` TEXT NOT NULL, `toSignature` TEXT NOT NULL, `actionViewId` TEXT NOT NULL DEFAULT '', `actionContentDesc` TEXT NOT NULL DEFAULT '', `actionText` TEXT NOT NULL DEFAULT '')",
         "fields": [
           {
             "fieldPath": "id",
@@ -1300,19 +1333,22 @@
             "fieldPath": "actionViewId",
             "columnName": "actionViewId",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "actionContentDesc",
             "columnName": "actionContentDesc",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "actionText",
             "columnName": "actionText",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           }
         ],
         "primaryKey": {
@@ -1345,7 +1381,7 @@
       },
       {
         "tableName": "person_channel_prefs",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `taskContext` TEXT NOT NULL, `packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `probability` REAL NOT NULL, `evidenceCount` INTEGER NOT NULL, `lastUpdatedMs` INTEGER NOT NULL, PRIMARY KEY(`personEntityId`, `taskContext`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `taskContext` TEXT NOT NULL, `packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `probability` REAL NOT NULL DEFAULT 0.8, `evidenceCount` INTEGER NOT NULL DEFAULT 1, `lastUpdatedMs` INTEGER NOT NULL, PRIMARY KEY(`personEntityId`, `taskContext`))",
         "fields": [
           {
             "fieldPath": "personEntityId",
@@ -1375,13 +1411,15 @@
             "fieldPath": "probability",
             "columnName": "probability",
             "affinity": "REAL",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0.8"
           },
           {
             "fieldPath": "evidenceCount",
             "columnName": "evidenceCount",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "1"
           },
           {
             "fieldPath": "lastUpdatedMs",
@@ -1554,7 +1592,7 @@
       },
       {
         "tableName": "person_policies",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `canAutoOpenChat` INTEGER NOT NULL, `canAutoDraft` INTEGER NOT NULL, `canAutoSend` INTEGER NOT NULL, `canCallWithoutConfirm` INTEGER NOT NULL, `canShareFiles` INTEGER NOT NULL, `sensitiveActionsRequireConfirm` INTEGER NOT NULL, PRIMARY KEY(`personEntityId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `canAutoOpenChat` INTEGER NOT NULL DEFAULT 1, `canAutoDraft` INTEGER NOT NULL DEFAULT 1, `canAutoSend` INTEGER NOT NULL DEFAULT 0, `canCallWithoutConfirm` INTEGER NOT NULL DEFAULT 0, `canShareFiles` INTEGER NOT NULL DEFAULT 1, `sensitiveActionsRequireConfirm` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`personEntityId`))",
         "fields": [
           {
             "fieldPath": "personEntityId",
@@ -1566,37 +1604,43 @@
             "fieldPath": "canAutoOpenChat",
             "columnName": "canAutoOpenChat",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "1"
           },
           {
             "fieldPath": "canAutoDraft",
             "columnName": "canAutoDraft",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "1"
           },
           {
             "fieldPath": "canAutoSend",
             "columnName": "canAutoSend",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "canCallWithoutConfirm",
             "columnName": "canCallWithoutConfirm",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "canShareFiles",
             "columnName": "canShareFiles",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "1"
           },
           {
             "fieldPath": "sensitiveActionsRequireConfirm",
             "columnName": "sensitiveActionsRequireConfirm",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "1"
           }
         ],
         "primaryKey": {
@@ -1610,7 +1654,7 @@
       },
       {
         "tableName": "person_snapshots",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `displayName` TEXT NOT NULL, `canonicalPhone` TEXT, `canonicalEmail` TEXT, `preferredChannel` TEXT, `preferredLanguage` TEXT NOT NULL, `preferredTone` TEXT NOT NULL, `relationshipType` TEXT NOT NULL, `activeProjectId` TEXT, `pendingCommitmentCount` INTEGER NOT NULL, `recentTopics` TEXT NOT NULL, `lastInteractionMs` INTEGER NOT NULL, `importanceScore` INTEGER NOT NULL, `snapshotUpdatedMs` INTEGER NOT NULL, PRIMARY KEY(`personEntityId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `displayName` TEXT NOT NULL, `canonicalPhone` TEXT, `canonicalEmail` TEXT, `preferredChannel` TEXT, `preferredLanguage` TEXT NOT NULL DEFAULT '', `preferredTone` TEXT NOT NULL DEFAULT '', `relationshipType` TEXT NOT NULL DEFAULT '', `activeProjectId` TEXT, `pendingCommitmentCount` INTEGER NOT NULL DEFAULT 0, `recentTopics` TEXT NOT NULL DEFAULT '', `lastInteractionMs` INTEGER NOT NULL DEFAULT 0, `importanceScore` INTEGER NOT NULL DEFAULT 50, `snapshotUpdatedMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`personEntityId`))",
         "fields": [
           {
             "fieldPath": "personEntityId",
@@ -1646,19 +1690,22 @@
             "fieldPath": "preferredLanguage",
             "columnName": "preferredLanguage",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "preferredTone",
             "columnName": "preferredTone",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "relationshipType",
             "columnName": "relationshipType",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "activeProjectId",
@@ -1670,31 +1717,36 @@
             "fieldPath": "pendingCommitmentCount",
             "columnName": "pendingCommitmentCount",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "recentTopics",
             "columnName": "recentTopics",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "lastInteractionMs",
             "columnName": "lastInteractionMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "importanceScore",
             "columnName": "importanceScore",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "50"
           },
           {
             "fieldPath": "snapshotUpdatedMs",
             "columnName": "snapshotUpdatedMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -1829,7 +1881,7 @@
       },
       {
         "tableName": "screen_nodes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `screenSignature` TEXT NOT NULL, `screenType` TEXT NOT NULL, `nodes` TEXT NOT NULL, `appVersion` TEXT NOT NULL, PRIMARY KEY(`packageName`, `screenSignature`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `screenSignature` TEXT NOT NULL, `screenType` TEXT NOT NULL DEFAULT '', `nodes` TEXT NOT NULL DEFAULT '', `appVersion` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`packageName`, `screenSignature`))",
         "fields": [
           {
             "fieldPath": "packageName",
@@ -1847,19 +1899,22 @@
             "fieldPath": "screenType",
             "columnName": "screenType",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "nodes",
             "columnName": "nodes",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "appVersion",
             "columnName": "appVersion",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           }
         ],
         "primaryKey": {
@@ -1874,7 +1929,7 @@
       },
       {
         "tableName": "trigger_rules",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `label` TEXT NOT NULL, `conditionType` TEXT NOT NULL, `conditionParams` TEXT NOT NULL, `actionType` TEXT NOT NULL, `actionParams` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `debounceMs` INTEGER NOT NULL, `lastFiredMs` INTEGER NOT NULL, `createdMs` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `label` TEXT NOT NULL, `conditionType` TEXT NOT NULL, `conditionParams` TEXT NOT NULL, `actionType` TEXT NOT NULL, `actionParams` TEXT NOT NULL, `enabled` INTEGER NOT NULL DEFAULT 1, `debounceMs` INTEGER NOT NULL DEFAULT 30000, `lastFiredMs` INTEGER NOT NULL DEFAULT 0, `createdMs` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -1916,19 +1971,22 @@
             "fieldPath": "enabled",
             "columnName": "enabled",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "1"
           },
           {
             "fieldPath": "debounceMs",
             "columnName": "debounceMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "30000"
           },
           {
             "fieldPath": "lastFiredMs",
             "columnName": "lastFiredMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "createdMs",
@@ -2061,7 +2119,7 @@
       },
       {
         "tableName": "ui_procedures",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `versionRange` TEXT NOT NULL, `taskCapability` TEXT NOT NULL, `steps` TEXT NOT NULL, `screenSignature` TEXT NOT NULL, `confidence` INTEGER NOT NULL, `successCount` INTEGER NOT NULL, `failureCount` INTEGER NOT NULL, `lastRunMs` INTEGER NOT NULL, `needsValidation` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `versionRange` TEXT NOT NULL, `taskCapability` TEXT NOT NULL, `steps` TEXT NOT NULL, `screenSignature` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `successCount` INTEGER NOT NULL DEFAULT 0, `failureCount` INTEGER NOT NULL DEFAULT 0, `lastRunMs` INTEGER NOT NULL DEFAULT 0, `needsValidation` INTEGER NOT NULL DEFAULT 0)",
         "fields": [
           {
             "fieldPath": "id",
@@ -2097,37 +2155,43 @@
             "fieldPath": "screenSignature",
             "columnName": "screenSignature",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "confidence",
             "columnName": "confidence",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "80"
           },
           {
             "fieldPath": "successCount",
             "columnName": "successCount",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "failureCount",
             "columnName": "failureCount",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "lastRunMs",
             "columnName": "lastRunMs",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "needsValidation",
             "columnName": "needsValidation",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
