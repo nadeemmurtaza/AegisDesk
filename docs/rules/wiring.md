@@ -32,7 +32,7 @@ Ask these regardless of language:
 
 - **No platform imports in `commonMain`.** Zero `android.`, `java.awt`, Win32, Cocoa. Violations fail review and the invariant check.
 - **Expect/actual balance:** every `expect` in commonMain has an `actual` in **every** compiled target source set. `compileCommonMainKotlinMetadata` will NOT catch a missing actual — the per-target compiles will.
-- **Room KMP:** `expect object X : RoomDatabaseConstructor<X>` + `@ConstructedBy(X::class)` on the database class, with `actual` delegating to the KSP-generated `_Impl` in every target (androidMain/desktopMain — see the existing `AegisDatabaseConstructor.*.kt` files).
+- **Room KMP:** `expect object X : RoomDatabaseConstructor<X>` + `@ConstructedBy(X::class)` on the database class — and **nothing else**. Room's KSP generates the per-target `actual` implementations itself (into `build/generated/ksp/<target>/...`). Do **not** hand-write `actual` files for the constructor: they Redeclare what KSP generates and fail the build (lesson from CI run 31311027661). Hand-written `expect`/`actual` is still required for things Room doesn't generate (e.g. `TimeUtils`).
 - **KSP config per target** (`add("kspAndroid", ...)`, `add("kspDesktop", ...)`). **Never `kspCommonMainMetadata`** — it causes `MissingType` errors in Room KMP (explicit comment in `shared/database/build.gradle.kts`).
 - **Schema export:** `room { schemaDirectory(...) }` and `ksp.arg("room.schemaLocation", ...)`; new entities/columns change `schemas/<hash>/<version>.json`; instrumented `MigrationTest` assets must be refreshed in the same PR.
 - **SQLite driver:** desktop uses `sqlite-bundled`; Android keeps SQLCipher in `androidMain`. Encryption key never in source or config.
