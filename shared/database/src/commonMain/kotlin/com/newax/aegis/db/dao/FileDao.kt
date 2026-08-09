@@ -245,6 +245,3 @@ interface FileDao {
     @Query("SELECT COUNT(*) FROM file_entity_links")
     suspend fun entityLinkCount(): Int
 }
-
-// forward ref
-private val FileObject.Companion.INDEX_STATE_BARE get() = com.newax.aegis.db.entity.FileObject.INDEX_STATE_BARE
