@@ -7,3 +7,8 @@ local.properties
 node_modules/
 __pycache__/
 *.pyc
+
+# Release signing secrets — never commit (see keystore.properties.example)
+keystore.properties
+*.jks
+*.keystore

@@ -51,9 +51,9 @@ If any is unknown: **ask, or state the assumption in one line and take the conse
 | Modules | `:apps:androidApp`, `:apps:desktopApp`, `:shared:core`, `:shared:database`, `:shared:platform-api`, `:shared:model-api`, `:platform:android`, `:platform:windows` | add new modules to `settings.gradle.kts` in the same change |
 
 **Known blockers (do not silently inherit, do not silently "fix" unasked):**
-- `gradle.properties` still contains machine-specific `org.gradle.java.home=C:/Program Files/Android/Android Studio/jbr` — hard-fails every non-Windows build (CI, this sandbox). Needs removal.
-- `.github/workflows/android.yml` is stale: APK path `app/build/outputs/...` → `apps/androidApp/build/outputs/...`, and triggers on `master` while the branch is `main`.
-- `apps/androidApp/build.gradle.kts` commits a release signing config with plaintext passwords (`storePassword = "password"`).
+- ✅ RESOLVED — machine-specific `org.gradle.java.home` removed from `gradle.properties` (f1617ac); builds are portable across OSes again.
+- ✅ RESOLVED — `.github/workflows/android.yml` now triggers on `main` and uploads `apps/androidApp/build/outputs/apk/debug/app-debug.apk` (f1617ac); APK named `app-debug.apk` via `base { archivesName }` (90a56a8).
+- ✅ RESOLVED — release signing no longer commits plaintext passwords; credentials come from gitignored `keystore.properties` (template: `keystore.properties.example`), with debug-signing fallback when absent.
 - `-Xskip-metadata-version-check` in androidApp kotlinOptions is a symptom of a version mismatch; remove it when versions align, not before.
 
 ---

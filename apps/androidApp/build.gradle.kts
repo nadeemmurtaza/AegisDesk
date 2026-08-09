@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+}
+
+// Release signing credentials live in keystore.properties (gitignored — see
+// keystore.properties.example), never in source. When the file is absent the
+// release build falls back to debug signing so assembleRelease still builds;
+// production releases require the real keystore + properties to be present.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -19,17 +32,24 @@ android {
     buildFeatures { compose = true }
     signingConfigs {
         create("release") {
-            storeFile = file("keystore.jks")
-            storePassword = "password"
-            keyAlias = "key0"
-            keyPassword = "password"
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile") ?: "keystore.jks")
+                storePassword = keystoreProperties.getProperty("storePassword") ?: ""
+                keyAlias = keystoreProperties.getProperty("keyAlias") ?: "key0"
+                keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
+            }
         }
     }
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                // No keystore.properties: keep assembleRelease buildable with debug signing.
+                signingConfigs.getByName("debug")
+            }
         }
     }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }

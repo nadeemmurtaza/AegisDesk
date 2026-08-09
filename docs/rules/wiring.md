@@ -22,7 +22,7 @@ Ask these regardless of language:
 - `AndroidManifest.xml` — permissions for anything touching media, storage, contacts, location, camera, mic, notifications, background work, network. Runtime permission requests for anything dangerous-level; a declared permission alone is not enough on modern API levels.
 - `AndroidManifest.xml` — every Activity, Service, BroadcastReceiver, ContentProvider declared, with correct `exported` and `foregroundServiceType`.
 - `build.gradle.kts` — `testInstrumentationRunner` set, `androidTestImplementation` present, or instrumented tests cannot compile or run.
-- `build.gradle.kts` — release buildType with minify/shrink and a signing config. **Current repo violation:** `apps/androidApp/build.gradle.kts` commits plaintext `storePassword = "password"`; move signing to env/keystore properties.
+- `build.gradle.kts` — release buildType with minify/shrink and a signing config. Resolved: `apps/androidApp/build.gradle.kts` reads `keystore.properties` (gitignored, template `keystore.properties.example`); absent → debug-signing fallback so `assembleRelease` still builds.
 - ProGuard/R8 keep rules for anything reflective: serialization models, Room entities, JNI, dynamic class loading.
 - Room: entity declared, DAO registered, **version bumped, migration written**, schema exported, and anything created by raw SQL or callback also declared to the schema verifier.
 - WorkManager/AlarmManager: worker registered, constraints set, initialization path confirmed.
@@ -52,7 +52,7 @@ Ask these regardless of language:
 - The job fails the build on failure rather than warning.
 - New toolchain/SDK/service installed in the CI image.
 - Secrets the pipeline needs are configured — a job that silently skips on a missing secret is worse than one that fails.
-- **Current repo violation:** `.github/workflows/android.yml` triggers on `master` (branch is `main`) and references the old `app/build/outputs/...` APK path (now `apps/androidApp/build/outputs/...`) — CI is likely not running at all.
+- Resolved: `.github/workflows/android.yml` triggers on `main` and uploads `apps/androidApp/build/outputs/apk/debug/app-debug.apk`.
 
 ## Containers and deployment (Freebuff preview/hosting)
 
