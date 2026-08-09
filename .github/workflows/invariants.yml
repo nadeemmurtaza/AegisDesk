@@ -49,6 +49,12 @@ jobs:
       - name: Compile shared:core for every target (expect/actual gate)
         run: ./gradlew :shared:core:compileKotlinJvm :shared:core:assembleDebug --stacktrace
 
+      # platform-api is the capability contract (platform-free commonMain). jvmTest runs
+      # the commonTest contract tests on the JVM target; assembleDebug compiles the
+      # androidTarget. Same task naming as shared:core.
+      - name: Compile shared:platform-api per target + run contract tests
+        run: ./gradlew :shared:platform-api:compileKotlinJvm :shared:platform-api:assembleDebug :shared:platform-api:jvmTest --stacktrace
+
       # desktopJar = jvm("desktop") compile + its Room KSP; assembleDebug = androidTarget
       # compile + its Room KSP. Task naming is compileKotlin<Target>/<target>Jar — NOT
       # compileDesktopKotlin (KGP convention; compileKotlinJvm confirmed for shared:core).

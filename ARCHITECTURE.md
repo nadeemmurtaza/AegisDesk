@@ -77,7 +77,7 @@ AegisAssistant/
 ├── apps/desktopApp/        JVM application (Compose Desktop as it lands) — bootstrap shell exists
 ├── shared/core/            KMP (jvm + android): actions, planner, authority, capability — platform-free
 ├── shared/database/        Room KMP 2.7.0-alpha13 (android + jvm("desktop")): entities, DAOs, migrations, expect/actual
-├── shared/platform-api/    Platform capability contracts (files, processes, shell, desktop, secrets, system) — placeholder
+├── shared/platform-api/    Platform capability contracts (files, processes, shell, desktop, secrets, system) — contract layer landed (Phase 3); adapters pending
 ├── shared/model-api/       ModelProvider contract — placeholder
 ├── platform/android/       Android adapters — placeholder
 └── platform/windows/       Windows adapters — placeholder
