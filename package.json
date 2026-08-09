@@ -1,0 +1,10 @@
+{
+  "name": "aegisdesk-preview",
+  "private": true,
+  "description": "Freebuff preview server for AegisDesk — a native Android (Kotlin/Compose) app. The preview is a dependency-free Node server (scripts/preview.mjs) that documents the project and serves the debug APK once built.",
+  "scripts": {
+    "dev": "node scripts/preview.mjs",
+    "start": "node scripts/preview.mjs",
+    "build": "true"
+  }
+}
