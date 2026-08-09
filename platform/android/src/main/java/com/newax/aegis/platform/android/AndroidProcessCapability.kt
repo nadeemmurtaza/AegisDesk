@@ -27,7 +27,7 @@ class AndroidProcessCapability(
 ) : ProcessCapability {
 
     /** Android exposes no pid for child processes started via ProcessBuilder. */
-    private const val UNKNOWN_PID = -1L
+    private val UNKNOWN_PID = -1L
 
     override val id: CapabilityId get() = CapabilityId.PROCESSES
 
