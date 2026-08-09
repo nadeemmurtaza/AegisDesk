@@ -213,9 +213,13 @@ abstract class AegisDatabase : RoomDatabase() {
                     )
                 """)
 
+                // Must match the Room-generated schema exactly (schemas/*.json): self-contained
+                // FTS4 keyed by rowid, column declared NOT NULL. The previous external-content
+                // form (content="file_text_content") failed Room's schema validation with
+                // "Migration didn't properly handle: file_text_fts".
                 connection.execSQL("""
-                    CREATE VIRTUAL TABLE IF NOT EXISTS file_text_fts
-                    USING fts4(content="file_text_content", text)
+                    CREATE VIRTUAL TABLE IF NOT EXISTS `file_text_fts`
+                    USING FTS4(`text` TEXT NOT NULL)
                 """)
 
                 connection.execSQL("""
@@ -377,7 +381,7 @@ abstract class AegisDatabase : RoomDatabase() {
                         1,
                         fact,
                         COALESCE(category, ''),
-                        COALESCE((SELECT name FROM people WHERE id = personId), ''),
+                        COALESCE((SELECT name FROM persons WHERE id = personId), ''),
                         COALESCE(source, ''),
                         80,
                         50,

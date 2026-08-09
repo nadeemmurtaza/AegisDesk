@@ -5,3 +5,5 @@ local.properties
 *.apk
 *.aab
 node_modules/
+__pycache__/
+*.pyc
