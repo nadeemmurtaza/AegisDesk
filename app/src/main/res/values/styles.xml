@@ -1,9 +1,0 @@
-<resources>
-    <style name="Theme.Aegis" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#15C7B8</item>
-        <item name="android:navigationBarColor">#08111F</item>
-        <item name="android:statusBarColor">#08111F</item>
-        <item name="android:windowLightStatusBar">false</item>
-    </style>
-</resources>
