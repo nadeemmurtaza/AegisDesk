@@ -19,7 +19,10 @@ android {
 }
 
 dependencies {
-    implementation(project(":shared:platform-api"))
+    // The adapter's public API is built entirely on the platform-api contract
+    // types (CapabilityId, CapabilityStatus, PlatformCapabilities, ...), so the
+    // contract must be exported to consumers (the app) via api().
+    api(project(":shared:platform-api"))
     implementation(project(":shared:core"))
 
     // Same proven vault primitive the app already uses for its secure store
