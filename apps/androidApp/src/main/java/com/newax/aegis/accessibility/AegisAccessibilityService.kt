@@ -195,8 +195,10 @@ class AegisAccessibilityService : AccessibilityService(), SemanticAutomation {
 
     override fun listWindows(): List<AppWindow> = windows.mapNotNull { win ->
         val root = win.root ?: return@mapNotNull null
+        // AccessibilityWindowInfo has no package field — the package lives on the
+        // window's root node, with currentPackage as the last-known fallback.
         AppWindow(
-            appName = win.packageName?.toString() ?: currentPackage,
+            appName = root.packageName?.toString()?.ifBlank { null } ?: currentPackage,
             title = root.text?.toString()?.ifBlank { null } ?: root.contentDescription?.toString(),
             windowId = win.id.toString(),
         )
