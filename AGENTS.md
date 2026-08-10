@@ -47,7 +47,7 @@ If any is unknown: **ask, or state the assumption in one line and take the conse
 | Room | **2.7.0-alpha13 (KMP alpha)** | `shared:database`; alpha line — do not treat as stable; see docs/rules/compatibility.md |
 | sqlite driver | **androidx.sqlite:sqlite-bundled 2.5.0-alpha13** (desktop); SQLCipher 4.5.4 (androidMain) | |
 | coroutines / datetime | **1.9.0 / 0.6.1** | |
-| LiteRT LM | **0.14.0** (androidApp) | offline model runtime |
+| LiteRT LM | **0.14.0** (platform:android — engine + provider; app consumes via shared:model-api) | offline model runtime |
 | Modules | `:apps:androidApp`, `:apps:desktopApp`, `:shared:core`, `:shared:database`, `:shared:platform-api`, `:shared:model-api`, `:platform:android`, `:platform:windows` | add new modules to `settings.gradle.kts` in the same change |
 
 **Known blockers (do not silently inherit, do not silently "fix" unasked):**

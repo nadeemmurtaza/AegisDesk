@@ -74,13 +74,13 @@ All layers live in `shared:database` (Room KMP), so Android and desktop share on
 ```
 AegisAssistant/
 ├── apps/androidApp/        Android application (Compose UI, LiteRT, Vosk, ML Kit, services) — must stay green
-├── apps/desktopApp/        JVM application (Compose Desktop as it lands) — bootstrap shell exists
+├── apps/desktopApp/        JVM application (Compose Desktop as it lands) — landed (Phase 5e): runner bootstraps DesktopCapabilitiesHolder (platform capability registry with WindowsDesktopCapability) + DesktopModelProviderHolder (one ModelProvider per process, fallback swap), surfaces capability/model status in the CLI; landed (Phase 5f): planner wired — SkillRegistry + DesktopGoalPlanner resolve skills through CapabilityResolver against the process registry ("plan" and "skills" commands surface missing capabilities with reasons, mirroring Android's Goals screen); landed (Phase 5g): goal lifecycle — StateMachine/GoalState port of Android's engine/state, TaskStatus/TaskNode/TaskGraph with progress, "goals"/"run"/"abandon" commands drive the state machines; landed (Phase 5h): real execution — DesktopGoalExecutor walks the plan's tasks through the DesktopExecutionRouter ladder (PROCESS_LAUNCH → WIN32_AUTOMATION via WindowsDesktopCapability.activateApp) with a live per-task capability gate and the find_app→launch_app output pipe, replacing the manual task command; landed (Phase 5i): app index — find_app resolves targets against WindowsAppIndex (Start Menu enumeration) and launch_app runs the exact .lnk target via the EXACT_TARGET tier, with an "apps [query]" command; Compose Desktop UI pending
 ├── shared/core/            KMP (jvm + android): actions, planner, authority, capability — platform-free
 ├── shared/database/        Room KMP 2.7.0-alpha13 (android + jvm("desktop")): entities, DAOs, migrations, expect/actual
 ├── shared/platform-api/    Platform capability contracts (files, processes, shell, desktop, secrets, system) — contract layer landed (Phase 3); adapters pending
-├── shared/model-api/       ModelProvider contract — placeholder
-├── platform/android/       Android adapters — landed (Phase 4): files, processes, shell, desktop, secrets, system
-└── platform/windows/       Windows adapters — placeholder
+├── shared/model-api/       ModelProvider contract + deterministic fallback — landed (Phase 5a); platform providers: Android LiteRT (Phase 5b, platform/android), desktop GGUF (Phase 5c, platform/windows)
+├── platform/android/       Android adapters — landed (Phase 4): files, processes, shell, desktop, secrets, system; Phase 5b: LiteRT-LM engine + LiteRtModelProvider behind the ModelProvider contract
+└── platform/windows/       Windows adapters — landed (Phase 5c): GGUF header parser + GgufModelProvider + KherudGgufEngine (de.kherud:java-llama.cpp JNI binding); landed (Phase 5d): WindowsDesktopCapability — Win32 native automation bridge (EnumWindows, control messaging, GDI capture) behind a testable seam; landed (Phase 5i): WindowsAppIndex — Start Menu Programs enumeration (.lnk entries: name, category, exact launch path) with fuzzy search, behind a testable seam; UIA COM patterns + DPAPI secrets pending
 ```
 
 | | Android | Windows | macOS | Linux | iOS |

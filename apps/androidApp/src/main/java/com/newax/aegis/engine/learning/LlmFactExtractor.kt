@@ -1,15 +1,17 @@
 package com.newax.aegis.engine.learning
 
 import android.util.Log
-import com.newax.aegis.assistant.LiteRtOfflineModel
+import com.newax.aegis.model.ModelProvider
+import com.newax.aegis.model.ModelRequest
+import com.newax.aegis.model.ModelState
 import com.newax.aegis.engine.SensitiveInfoDetector
 import org.json.JSONArray
 
 /**
- * LLM-powered fact extraction using the already-loaded Gemma 4 E2B model.
+ * LLM-powered fact extraction using the already-loaded on-device model.
  *
- * Shares the same [LiteRtOfflineModel] instance as the chat UI — no second engine
- * is created. Calls queue behind the model's generationMutex, so chat and extraction
+ * Shares the same [ModelProvider] instance as the chat UI — no second engine is
+ * created. Calls queue behind the engine's generation mutex, so chat and extraction
  * never run simultaneously (safe, no extra RAM).
  *
  * Use as a fallback / supplement to [FactExtractor]:
@@ -24,12 +26,12 @@ object LlmFactExtractor {
     private const val MAX_TEXT_LEN = 1200
     private const val MIN_CONF     = 0.50f
 
-    @Volatile private var model: LiteRtOfflineModel? = null
+    @Volatile private var model: ModelProvider? = null
 
     /** Called from MainViewModel after the offline model finishes loading. */
-    fun bind(m: LiteRtOfflineModel?) { model = m }
+    fun bind(m: ModelProvider?) { model = m }
 
-    fun isReady(): Boolean = model?.isReady == true
+    fun isReady(): Boolean = model?.state?.value == ModelState.READY
 
     /**
      * Extract facts from [text] using the on-device LLM.
@@ -51,7 +53,7 @@ object LlmFactExtractor {
         val safeText = analysis.redactedText.take(MAX_TEXT_LEN)
 
         return try {
-            val response = m.complete(buildPrompt(safeText, sourceContext, subjectName), null)
+            val response = m.complete(ModelRequest(text = buildPrompt(safeText, sourceContext, subjectName))).text
             parseJson(response)
         } catch (e: Exception) {
             Log.w(TAG, "LLM extract error: ${e.message}")

@@ -1,0 +1,256 @@
+package com.newax.aegis.platform.windows
+
+import com.newax.aegis.platform.desktop.AppWindow
+import com.sun.jna.Pointer
+import com.sun.jna.platform.win32.GDI32
+import com.sun.jna.platform.win32.GDI32Util
+import com.sun.jna.platform.win32.User32
+import com.sun.jna.platform.win32.WinDef
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
+import javax.imageio.ImageIO
+
+/**
+ * Production [WindowsUiaBridge] driving the Win32 native API tier of
+ * ARCHITECTURE.md RULE 5 ("native API/CLI → browser DOM → UI Automation →
+ * accessibility nodes → vision → coordinates").
+ *
+ * Why native Win32 instead of UIA COM patterns: the official jna-platform jar
+ * ships NO UI Automation bindings (verified against the upstream repo), and the
+ * only third-party JVM UIA wrapper (mmarquee/ui-automation 0.7.0) has been
+ * dormant since 2020 — a dependency-liability signal per docs/rules/compatibility.md.
+ * The operations below (window enumeration, control-text matching, WM_CHAR input,
+ * WM_VSCROLL, BM_CLICK, GDI capture) are genuine *semantic* automation of
+ * standard Win32 controls and are the cheapest supported tier for them.
+ *
+ * Windows-only: on other OSes the JNA native library cannot load. Construct this
+ * only when [isWindowsOs]; the capability guards construction.
+ *
+ * Every operation returns false/null on failure — no exceptions escape, so the
+ * capability can report a typed failure instead of crashing.
+ */
+class Win32UiaBridge : WindowsUiaBridge {
+
+    private val user32 = User32.INSTANCE
+    private val gdi32 = GDI32.INSTANCE
+
+    // ── Window constants ────────────────────────────────────────────────────
+    private val SW_RESTORE = 9
+    private val WM_CHAR    = 0x0102
+    private val WM_VSCROLL = 0x0115
+    private val BM_CLICK   = 0x00F5
+    private val SB_LINE_UP   = 0
+    private val SB_LINE_DOWN = 1
+    private val SB_PAGE_UP   = 2
+    private val SB_PAGE_DOWN = 3
+    private val MOUSEEVENTF_LEFTDOWN = 0x0002
+    private val MOUSEEVENTF_LEFTUP   = 0x0004
+    private val SRCCOPY = 0x00CC0020
+    private val SM_XVIRTUALSCREEN = 76
+    private val SM_YVIRTUALSCREEN = 77
+    private val SM_CXVIRTUALSCREEN = 78
+    private val SM_CYVIRTUALSCREEN = 79
+
+    private val maxTextLen = 512
+
+    // ── Window enumeration helpers ──────────────────────────────────────────
+
+    private fun windowTitle(hwnd: WinDef.HWND): String {
+        val buf = CharArray(maxTextLen)
+        val n = user32.GetWindowTextW(hwnd, buf, maxTextLen)
+        return if (n > 0) String(buf, 0, n) else ""
+    }
+
+    private fun windowClass(hwnd: WinDef.HWND): String {
+        val buf = CharArray(256)
+        val n = user32.GetClassNameW(hwnd, buf, 256)
+        return if (n > 0) String(buf, 0, n) else ""
+    }
+
+    private fun topLevelWindows(visibleOnly: Boolean): List<WinDef.HWND> {
+        val result = mutableListOf<WinDef.HWND>()
+        user32.EnumWindows(User32.WNDENUMPROC { hwnd, _ ->
+            if (!visibleOnly || user32.IsWindowVisible(hwnd)) result.add(hwnd)
+            true // continue enumeration
+        }, Pointer.NULL)
+        return result
+    }
+
+    private fun childWindows(parent: WinDef.HWND): List<WinDef.HWND> {
+        val result = mutableListOf<WinDef.HWND>()
+        user32.EnumChildWindows(parent, User32.WNDENUMPROC { hwnd, _ ->
+            result.add(hwnd)
+            true
+        }, Pointer.NULL)
+        return result
+    }
+
+    /** First child control (or the window itself) whose text equals [label] (case-insensitive). */
+    private fun findControlByText(root: WinDef.HWND, label: String): WinDef.HWND? {
+        val needle = label.trim()
+        if (needle.isEmpty()) return null
+        if (windowTitle(root).equals(needle, ignoreCase = true)) return root
+        return childWindows(root).firstOrNull { windowTitle(it).equals(needle, ignoreCase = true) }
+    }
+
+    /** First child control inside [app]'s window whose control id or text equals [elementId]. */
+    private fun findControlByAppElement(app: String, elementId: String): WinDef.HWND? {
+        val appWindow = topLevelWindows(visibleOnly = true)
+            .firstOrNull { windowTitle(it).contains(app, ignoreCase = true) } ?: return null
+        val id = elementId.trim().toIntOrNull()
+        return childWindows(appWindow).firstOrNull { child ->
+            (id != null && user32.GetDlgCtrlID(child) == id) ||
+                windowTitle(child).equals(elementId.trim(), ignoreCase = true)
+        }
+    }
+
+    // ── WindowsUiaBridge ────────────────────────────────────────────────────
+
+    override fun listWindows(): List<AppWindow> =
+        topLevelWindows(visibleOnly = true).mapNotNull { hwnd ->
+            val title = windowTitle(hwnd)
+            if (title.isBlank()) null
+            else AppWindow(
+                appName  = windowClass(hwnd).ifBlank { title },
+                title    = title,
+                windowId = hwnd.toString(),
+            )
+        }
+
+    override fun activateApp(appName: String): Boolean {
+        val target = topLevelWindows(visibleOnly = true)
+            .firstOrNull { windowTitle(it).contains(appName, ignoreCase = true) }
+        if (target != null) {
+            return runCatching {
+                user32.ShowWindow(target, SW_RESTORE)
+                user32.SetForegroundWindow(target)
+            }.getOrDefault(false)
+        }
+        // No open window: launch via the shell (Windows `start` resolves the app
+        // name against PATH / App Paths registry).
+        return runCatching {
+            val proc = ProcessBuilder("cmd", "/c", "start", "", appName)
+                .redirectErrorStream(true)
+                .start()
+            proc.inputStream.close()
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun clickSemantic(label: String): Boolean {
+        val control = topLevelWindows(visibleOnly = true)
+            .firstNotNullOfOrNull { findControlByText(it, label) } ?: return false
+        return runCatching {
+            user32.SendMessage(control, BM_CLICK, WinDef.WPARAM(0L), WinDef.LPARAM(0L))
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun clickAppElement(app: String, elementId: String): Boolean {
+        val control = findControlByAppElement(app, elementId) ?: return false
+        return runCatching {
+            user32.SendMessage(control, BM_CLICK, WinDef.WPARAM(0L), WinDef.LPARAM(0L))
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun clickAt(x: Float, y: Float): Boolean {
+        return runCatching {
+            user32.SetCursorPos(x.toInt(), y.toInt())
+            user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, Pointer.NULL)
+            user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, Pointer.NULL)
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun typeText(label: String?, text: String): Boolean {
+        if (text.isEmpty()) return true
+        val focus = when {
+            // No target: the focused field (the common "type what I said" case).
+            label == null -> user32.GetForegroundWindow()
+            // A labeled target that cannot be found is a hard failure — never
+            // silently type into the wrong window.
+            else -> topLevelWindows(visibleOnly = true)
+                .firstNotNullOfOrNull { findControlByText(it, label) } ?: return false
+        }
+        return runCatching {
+            user32.SetFocus(focus)
+            text.forEach { c ->
+                user32.SendMessage(focus, WM_CHAR, WinDef.WPARAM(c.code.toLong()), WinDef.LPARAM(0L))
+            }
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun scroll(label: String, down: Boolean): Boolean {
+        val target: WinDef.HWND? = when {
+            label.isEmpty() -> user32.GetForegroundWindow()
+            else -> topLevelWindows(visibleOnly = true)
+                .firstNotNullOfOrNull { findControlByText(it, label) }
+        }
+        val hwnd = target ?: return false
+        val sbAmount = when {
+            down -> SB_PAGE_DOWN
+            else -> SB_PAGE_UP
+        }
+        return runCatching {
+            user32.SendMessage(hwnd, WM_VSCROLL, WinDef.WPARAM(sbAmount.toLong()), WinDef.LPARAM(0L))
+            true
+        }.getOrDefault(false)
+    }
+
+    override fun waitFor(label: String, timeoutMs: Long): Boolean {
+        val needle = label.trim()
+        if (needle.isEmpty()) return true
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() <= deadline) {
+            val found = topLevelWindows(visibleOnly = true).any { root ->
+                windowTitle(root).contains(needle, ignoreCase = true) ||
+                    findControlByText(root, needle) != null
+            }
+            if (found) return true
+            Thread.sleep(200)
+        }
+        return false
+    }
+
+    override fun screenshot(): ByteArray? {
+        return runCatching {
+            val x = user32.GetSystemMetrics(SM_XVIRTUALSCREEN)
+            val y = user32.GetSystemMetrics(SM_YVIRTUALSCREEN)
+            val w = user32.GetSystemMetrics(SM_CXVIRTUALSCREEN)
+            val h = user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)
+            if (w <= 0 || h <= 0) return@runCatching null
+
+            val hdcScreen = user32.GetDC(null)
+            if (hdcScreen == null) return@runCatching null
+            val hdcMem = gdi32.CreateCompatibleDC(hdcScreen)
+            if (hdcMem == null) {
+                user32.ReleaseDC(null, hdcScreen)
+                return@runCatching null
+            }
+            val hBitmap = gdi32.CreateCompatibleBitmap(hdcScreen, w, h)
+            if (hBitmap == null) {
+                gdi32.DeleteDC(hdcMem)
+                user32.ReleaseDC(null, hdcScreen)
+                return@runCatching null
+            }
+            val old = gdi32.SelectObject(hdcMem, hBitmap)
+            val captured = gdi32.BitBlt(hdcMem, 0, 0, w, h, hdcScreen, x, y, SRCCOPY)
+            gdi32.SelectObject(hdcMem, old)
+
+            val png = if (captured) {
+                val image: BufferedImage = GDI32Util.getBufferedImage(hBitmap, false)
+                ByteArrayOutputStream().use { out ->
+                    ImageIO.write(image, "png", out)
+                    out.toByteArray()
+                }
+            } else null
+
+            gdi32.DeleteObject(hBitmap)
+            gdi32.DeleteDC(hdcMem)
+            user32.ReleaseDC(null, hdcScreen)
+            png
+        }.getOrNull()
+    }
+}

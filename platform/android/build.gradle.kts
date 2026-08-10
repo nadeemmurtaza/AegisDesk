@@ -23,7 +23,15 @@ dependencies {
     // types (CapabilityId, CapabilityStatus, PlatformCapabilities, ...), so the
     // contract must be exported to consumers (the app) via api().
     api(project(":shared:platform-api"))
+    // Same for the model contract: LiteRtModelProvider implements ModelProvider
+    // (Phase 5b), so shared:model-api is public surface too.
+    api(project(":shared:model-api"))
     implementation(project(":shared:core"))
+
+    // LiteRT-LM runtime + coroutines for the on-device model provider
+    // (LiteRtOfflineModel / LiteRtModelProvider — moved here from androidApp).
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.14.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
     // Same proven vault primitive the app already uses for its secure store
     // (apps/androidApp/src/main/java/com/newax/aegis/memory/SecureKeyVault.kt).

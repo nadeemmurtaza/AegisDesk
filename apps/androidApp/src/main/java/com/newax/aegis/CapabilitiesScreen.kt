@@ -20,6 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.newax.aegis.model.ModelFormat
+import com.newax.aegis.model.ModelState
 import com.newax.aegis.platform.CapabilityId
 import com.newax.aegis.platform.CapabilityStatus
 import com.newax.aegis.platform.PlatformCapability
@@ -148,6 +150,9 @@ fun CapabilitiesScreen(padding: PaddingValues) {
             }
         }
 
+        // ── Model provider (shared/model-api contract, Phase 5b) ────────────
+        item { ModelProviderCard() }
+
         // ── States ─────────────────────────────────────────────────────────
         when {
             rows == null -> item {
@@ -220,6 +225,114 @@ private fun CapabilityCard(row: CapabilityRow) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Tag("Privilege · ${row.privilegeLevel.label()}", TextSec)
                 if (row.offline) Tag("Offline", ReadyColor)
+            }
+        }
+    }
+}
+
+// ── Model provider card ────────────────────────────────────────────────────
+
+private fun modelStateColor(state: ModelState): Color = when (state) {
+    ModelState.READY         -> ReadyColor
+    ModelState.LOADING       -> MissingPermCol
+    ModelState.ERROR         -> UnavailableCol
+    ModelState.NOT_INSTALLED -> NotSupportedCol
+    ModelState.CLOSED        -> NotSupportedCol
+}
+
+private fun ModelState.label(): String = when (this) {
+    ModelState.NOT_INSTALLED -> "Not installed"
+    ModelState.LOADING       -> "Loading"
+    ModelState.READY         -> "Ready"
+    ModelState.ERROR         -> "Error"
+    ModelState.CLOSED        -> "Closed"
+}
+
+private fun ModelFormat.label(): String = when (this) {
+    ModelFormat.LITERTLM -> "LiteRT-LM"
+    ModelFormat.GGUF     -> "GGUF"
+    ModelFormat.UNKNOWN  -> "Format unknown"
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_073_741_824 -> "${"%.1f".format(bytes / 1_073_741_824.0)} GB"
+    bytes >= 1_048_576     -> "${"%.0f".format(bytes / 1_048_576.0)} MB"
+    bytes >= 1024          -> "${bytes / 1024} KB"
+    else                   -> "$bytes B"
+}
+
+/**
+ * The UI face of the shared model contract: live provider state (NOT_INSTALLED →
+ * LOADING → READY/ERROR → CLOSED) plus the installed pack's descriptor. State is
+ * reactive via the provider's StateFlow; the descriptor is static per provider.
+ */
+@Composable
+private fun ModelProviderCard() {
+    // Re-read on every recomposition (not remembered) so a swap to the LiteRT
+    // provider is picked up; collectAsState re-collects when the flow changes.
+    val provider = ModelProviderHolder.current()
+    val state by provider.state.collectAsState()
+    val d = provider.descriptor
+
+    Card(
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = Surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(modelStateColor(state))
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Model provider", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPri)
+                    Text("shared/model-api · on-device brain", fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(modelStateColor(state).copy(alpha = 0.12f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(state.label(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = modelStateColor(state))
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            when (state) {
+                ModelState.NOT_INSTALLED -> Text(
+                    "No model pack installed — the deterministic command engine is active. Import a verified .litertlm bundle to enable open-ended reasoning.",
+                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                )
+                ModelState.LOADING -> Text(
+                    "Loading ${d.modelName} into memory…",
+                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                )
+                ModelState.READY -> Text(
+                    "${d.modelName} is loaded and accepting requests on this device.",
+                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                )
+                ModelState.ERROR -> Text(
+                    "Model unavailable — load failed or the pack was removed. Re-import to retry.",
+                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                )
+                ModelState.CLOSED -> Text(
+                    "Model provider closed — no further requests are accepted.",
+                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Tag(d.format.label(), TextSec)
+                if (d.sha256.isNotBlank()) Tag("sha256 ${d.sha256.take(10)}…", TextSec)
+                if (d.sizeBytes > 0) Tag(formatBytes(d.sizeBytes), TextSec)
+                if (d.modelName.isNotBlank() && state != ModelState.NOT_INSTALLED) Tag(d.modelName, TextSec)
             }
         }
     }
