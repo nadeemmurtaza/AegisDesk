@@ -15,7 +15,9 @@ dependencies {
     // kherud/java-llama.cpp — actively maintained JVM binding for llama.cpp
     // (GGUF format). Bundles native .dll/.dylib/.so for Windows/macOS/Linux
     // and provides in-process inference via JNI without an external daemon.
-    implementation("de.kherud:java-llama.cpp:4.0.0")
+    // NOTE: the Maven artifact is de.kherud:llama (the GitHub repo is
+    // java-llama.cpp) — de.kherud:java-llama.cpp does not exist on Central.
+    implementation("de.kherud:llama:4.0.0")
 
     // JNA platform — stable Win32 bindings (User32, GDI32, GDI32Util) for the
     // Windows desktop automation adapter. jna-platform has NO UI Automation

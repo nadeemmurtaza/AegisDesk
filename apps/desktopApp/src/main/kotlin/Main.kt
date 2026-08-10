@@ -1,11 +1,17 @@
 /**
- * Entry point for the Aegis Desktop runner.
+ * Entry point for the Aegis Desktop app.
  *
- * Usage:
- *   ./gradlew :apps:desktopApp:run                                       # scans ~/.aegis/models/
- *   ./gradlew :apps:desktopApp:run --args="/path/to/model.gguf"          # uses the given file
+ * Default mode (Phase B1): opens the Compose Desktop window — Status
+ * (capability + model state), Apps (Start Menu index + search), and the Goals
+ * board (plan / run / abandon). The model is imported and loaded in the
+ * background while the window is up; the Status screen reflects
+ * NOT_INSTALLED → LOADING → READY/ERROR live.
  *
- * On startup the app:
+ * CLI mode (unchanged Phase 5e–5i behavior, kept behind `--cli`):
+ *   ./gradlew :apps:desktopApp:run --args="--cli"                          # scans ~/.aegis/models/
+ *   ./gradlew :apps:desktopApp:run --args="--cli /path/to/model.gguf"      # uses the given file
+ *
+ * In CLI mode on startup the app:
  *   1. Bootstraps the desktop process-wide surfaces:
  *      [DesktopCapabilitiesHolder] — registers the platform capability registry
  *      (WindowsDesktopCapability today); [DesktopModelProviderHolder] — the one
@@ -33,21 +39,97 @@
  */
 package com.newax.aegis.desktop
 
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.newax.aegis.desktop.execution.DesktopGoalExecutor
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.SkillRegistry
 import com.newax.aegis.desktop.planner.TaskStatus
+import com.newax.aegis.desktop.ui.AegisDesktopApp
 import com.newax.aegis.model.ModelRequest
 import com.newax.aegis.platform.windows.GgufHeaderParser
 import com.newax.aegis.platform.windows.GgufModelProvider
 import com.newax.aegis.platform.windows.WindowsAppIndex
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import java.io.File
 
-fun main(args: Array<String>) = runBlocking {
+fun main(args: Array<String>) {
+    if (args.contains("--cli")) {
+        runBlocking { cliMain(args) }
+    } else {
+        windowMain()
+    }
+}
+
+/**
+ * Window mode — the Compose Desktop surface (Phase B1). Bootstraps the process
+ * surfaces, imports and loads the model in the background (the Status screen
+ * reflects the provider's live state), then runs the window until it closes.
+ */
+private fun windowMain() {
+    DesktopCapabilitiesHolder.init()
+    val appIndex = WindowsAppIndex()
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    var modelProvider: GgufModelProvider? = null
+    appScope.launch {
+        val file = firstModelFile() ?: return@launch
+        try {
+            val imported = DesktopModelImporter.importAsync(file)
+            val provider = GgufModelProvider(imported.file, imported.sha256)
+            modelProvider = provider
+            DesktopModelProviderHolder.set(provider)
+            provider.load()
+        } catch (e: Exception) {
+            // The provider reports ERROR in its state; the Status screen shows
+            // the honest reason instead of the app failing to open.
+            println("[model] not loaded: ${e.message ?: e.javaClass.simpleName}")
+        }
+    }
+
+    application {
+        Window(
+            onCloseRequest = ::exitApplication,
+            title = "Aegis Assistant — Desktop",
+            state = rememberWindowState(size = DpSize(1120.dp, 760.dp)),
+        ) {
+            AegisDesktopApp(appScope = appScope, appIndex = appIndex)
+        }
+    }
+
+    appScope.cancel()
+    modelProvider?.close()
+    DesktopModelProviderHolder.clear()
+    println("Done.")
+}
+
+/**
+ * Deterministic model pick for window mode: the single discovered model, or the
+ * largest one when several are present (the CLI asks interactively; the window
+ * must not block on stdin). Null when no valid model is installed — the app
+ * then runs on the deterministic fallback and the Status screen says so.
+ */
+private suspend fun firstModelFile(): File? = withContext(Dispatchers.IO) {
+    val models = DesktopModelImporter.discover()
+    when {
+        models.isEmpty() -> null
+        models.size == 1 -> models.first().file
+        else -> models.maxByOrNull { it.bytes }?.file
+    }
+}
+
+private suspend fun cliMain(args: Array<String>) {
     println()
     println("  █████╗ ███████╗ ██████╗ ██╗███████╗")
     println(" ██╔══██╗██╔════╝██╔════╝ ██║██╔════╝")
@@ -57,7 +139,7 @@ fun main(args: Array<String>) = runBlocking {
     println(" ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝╚══════╝")
     println()
     println("  Desktop — offline GGUF model runner")
-    println("  shared/model-api · platform:windows · Phase 5i")
+    println("  shared/model-api · platform:windows · Phase 5i · window UI (B1) — --cli for this loop")
     println()
 
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
@@ -66,9 +148,10 @@ fun main(args: Array<String>) = runBlocking {
     printStatusBlock()
 
     // ── 1. Find the model file ─────────────────────────────────────────────
+    val modelArg = args.firstOrNull { it != "--cli" }
     val modelFile: File = when {
-        args.isNotEmpty() -> {
-            File(args[0]).also { f ->
+        modelArg != null -> {
+            File(modelArg).also { f ->
                 require(f.isFile) { "Model file not found: ${f.absolutePath}" }
             }
         }
@@ -80,7 +163,7 @@ fun main(args: Array<String>) = runBlocking {
                     println("    Place a model in ~/.aegis/models/ or pass the path as argument:")
                     println("    ./gradlew :apps:desktopApp:run --args=\"/path/to/model.gguf\"")
                     println()
-                    return@runBlocking
+                    return
                 }
                 models.size == 1 -> {
                     val m = models.first()

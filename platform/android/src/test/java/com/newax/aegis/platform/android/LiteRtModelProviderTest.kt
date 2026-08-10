@@ -67,7 +67,7 @@ class LiteRtModelProviderTest {
     fun `failed load leaves ERROR and rethrows`() = runBlocking {
         engine.loadError = IllegalStateException("engine exploded")
         val p = provider()
-        assertThrows(IllegalStateException::class.java) { p.load() }
+        assertThrows(IllegalStateException::class.java) { runBlocking { p.load() } }
         assertEquals(ModelState.ERROR, p.state.value)
     }
 
@@ -97,11 +97,13 @@ class LiteRtModelProviderTest {
     }
 
     @Test
-    fun `blank text is rejected`() = runBlocking {
-        val p = provider()
-        p.load()
-        assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { p.complete(ModelRequest(text = "   ")) }
+    fun `blank text is rejected`() {
+        runBlocking {
+            val p = provider()
+            p.load()
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { p.complete(ModelRequest(text = "   ")) }
+            }
         }
     }
 

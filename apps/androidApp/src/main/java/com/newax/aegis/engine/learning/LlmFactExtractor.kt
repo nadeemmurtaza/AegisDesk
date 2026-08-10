@@ -45,7 +45,7 @@ object LlmFactExtractor {
         subjectName: String?
     ): List<FactExtractor.ExtractedFact> {
         val m = model ?: return emptyList()
-        if (!m.isReady || text.length < MIN_TEXT_LEN) return emptyList()
+        if (!isReady() || text.length < MIN_TEXT_LEN) return emptyList()
 
         // SECURITY: redact before sending; skip extremely sensitive content
         val analysis = SensitiveInfoDetector.analyze(text)

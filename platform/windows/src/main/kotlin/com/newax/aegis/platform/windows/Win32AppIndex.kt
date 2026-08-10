@@ -20,8 +20,8 @@ class WindowsAppIndex(private val bridge: AppIndexBridge?) {
 
     private val cache: List<AppIndexEntry> by lazy { bridge?.enumerate().orEmpty() }
 
-    /** Every indexed app, in name order. */
-    fun all(): List<AppIndexEntry> = cache
+    /** Every indexed app, in name order (case-insensitive). */
+    fun all(): List<AppIndexEntry> = cache.sortedBy { it.name.lowercase() }
 
     /**
      * Best matches for [query]: every entry whose name contains all query tokens

@@ -1,5 +1,6 @@
 package com.newax.aegis.desktop.planner
 
+import com.newax.aegis.platform.CapabilityResolution
 import com.newax.aegis.platform.CapabilityResolver
 import com.newax.aegis.platform.PlatformCapabilityRegistry
 import java.util.UUID
@@ -138,9 +139,19 @@ object DesktopGoalPlanner {
             .mapNotNull { SkillRegistry.get(it) }
             .flatMap { it.requiredCapabilities }
             .distinct()
-        val resolutions = registry
-            ?.let { CapabilityResolver.resolveAll(it, requiredCapabilities) }
-            .orEmpty()
+        val resolutions = if (registry == null) {
+            // No registry at all = no registered capability = every platform-gated
+            // requirement is blocked ("no registered capability"), with the
+            // candidate surfaces named so the warning explains what could back it.
+            requiredCapabilities.flatMap { capability ->
+                CapabilityResolver.candidateIds(capability)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { ids -> listOf(CapabilityResolution(capability, ids, null)) }
+                    ?: emptyList()
+            }
+        } else {
+            CapabilityResolver.resolveAll(registry, requiredCapabilities)
+        }
         val missingCapabilities = resolutions.filter { it.isBlocked }.map { it.requested }
         val warnings = resolutions.filter { it.isBlocked }.map { resolution ->
             "Capability '${resolution.requested}' is not ready " +

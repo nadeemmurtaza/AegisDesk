@@ -105,7 +105,7 @@ class DesktopPlannerTest {
             plan.tasks.forEach { task ->
                 assertTrue(
                     "skill '${task.skillId}' from plan of '$description' is not registered",
-                    SkillRegistry.has(task.skillId),
+                    task.skillId != null && SkillRegistry.has(task.skillId),
                 )
             }
         }
