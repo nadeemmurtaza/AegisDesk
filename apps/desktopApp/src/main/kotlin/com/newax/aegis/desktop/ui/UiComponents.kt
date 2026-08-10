@@ -102,6 +102,12 @@ fun formatBytes(bytes: Long): String = when {
     else -> "$bytes B"
 }
 
+/** Human-readable duration ("512 ms", "1.4 s") — the audit summary and run meta lines. */
+fun formatDurationMs(ms: Long): String = when {
+    ms >= 1_000 -> "${"%.1f".format(ms / 1000.0)} s"
+    else -> "$ms ms"
+}
+
 /** Rounded pill with muted background — the Android Tag component. */
 @Composable
 fun Tag(text: String, color: Color) {

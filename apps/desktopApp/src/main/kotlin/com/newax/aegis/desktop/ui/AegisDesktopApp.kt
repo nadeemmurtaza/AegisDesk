@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationRail
@@ -23,20 +24,22 @@ import androidx.compose.ui.unit.dp
 import com.newax.aegis.desktop.DesktopCapabilitiesHolder
 import com.newax.aegis.desktop.GoalsStore
 import com.newax.aegis.desktop.ui.state.AppsScreenState
+import com.newax.aegis.desktop.ui.state.AuditScreenState
 import com.newax.aegis.desktop.ui.state.GoalsScreenState
 import com.newax.aegis.desktop.ui.state.LiveGoalRunner
 import com.newax.aegis.desktop.ui.state.StatusScreenState
 import com.newax.aegis.platform.windows.WindowsAppIndex
 import kotlinx.coroutines.CoroutineScope
 
-private enum class DesktopScreen { STATUS, APPS, GOALS }
+private enum class DesktopScreen { STATUS, APPS, GOALS, AUDIT }
 
 /**
- * The desktop window content: side navigation (Status / Apps / Goals) over the
- * three screens, each backed by a plain-Kotlin state holder. The Goals board's
- * executor runs on [appScope] (the process scope that outlives the window's
- * recompositions) and resolves against the process-wide capability registry and
- * the Start Menu [appIndex].
+ * The desktop window content: side navigation (Status / Apps / Goals / Audit)
+ * over the four screens, each backed by a plain-Kotlin state holder. The Goals
+ * board's executor runs on [appScope] (the process scope that outlives the
+ * window's recompositions) and resolves against the process-wide capability
+ * registry and the Start Menu [appIndex]. The Audit tab shows the full
+ * execution audit trail with CSV export.
  */
 @Composable
 fun AegisDesktopApp(
@@ -56,7 +59,11 @@ fun AegisDesktopApp(
                 registry = { DesktopCapabilitiesHolder.registry() },
             )
         }
-        LaunchedEffect(Unit) { goalsState.refresh() }
+        val auditState = remember { AuditScreenState() }
+        LaunchedEffect(Unit) {
+            goalsState.refresh()
+            auditState.refresh()
+        }
 
         Scaffold(
             contentColor = SurfaceColor,
@@ -89,11 +96,18 @@ fun AegisDesktopApp(
                         icon = { Icon(Icons.Rounded.Flag, contentDescription = "Goals") },
                         label = { Text("Goals") },
                     )
+                    NavigationRailItem(
+                        selected = screen == DesktopScreen.AUDIT,
+                        onClick = { screen = DesktopScreen.AUDIT },
+                        icon = { Icon(Icons.Rounded.History, contentDescription = "Audit") },
+                        label = { Text("Audit") },
+                    )
                 }
                 when (screen) {
                     DesktopScreen.STATUS -> StatusScreen(statusState)
                     DesktopScreen.APPS -> AppsScreen(appsState)
                     DesktopScreen.GOALS -> GoalsScreen(goalsState)
+                    DesktopScreen.AUDIT -> AuditScreen(auditState)
                 }
             }
         }

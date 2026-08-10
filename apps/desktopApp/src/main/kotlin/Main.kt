@@ -30,7 +30,8 @@
  *      activates the goal and executes its tasks through the real
  *      DesktopGoalExecutor — find_app resolves the target against the app index
  *      and launch_app runs the exact shortcut target, then the process →
- *      Win32-activateApp ladder (Phase 5i)
+ *      Win32-activateApp ladder (Phase 5i). "audit" prints the full execution
+ *      audit trail; "audit export" writes it to CSV under ~/.aegis/
  *   7. On empty input, "exit", or Ctrl+D the model is closed, the holder returns
  *      to the fallback, and the app exits
  *
@@ -235,6 +236,10 @@ private suspend fun cliMain(args: Array<String>) {
             }
             if (prompt.equals("goals", ignoreCase = true)) {
                 printGoals()
+                continue
+            }
+            if (prompt.equals("audit", ignoreCase = true) || prompt.startsWith("audit ", ignoreCase = true)) {
+                printAudit(if (prompt.length > 5) prompt.substring(5) else "")
                 continue
             }
             if (prompt.startsWith("run ", ignoreCase = true)) {
@@ -485,6 +490,52 @@ private fun printAbandon(ref: String) {
     println()
 }
 
+/**
+ * The full execution audit trail — every recorded run, newest first, with the
+ * tiers used, task count, window, and reason; \"audit export\" writes the same
+ * trail to a CSV under ~/.aegis/ (audit-<timestamp>.csv). The CLI twin of the
+ * Audit tab in the window.
+ */
+private fun printAudit(command: String) {
+    println()
+    println("  ── Execution audit ───────────────────────────────────")
+    if (command.trim().equals("export", ignoreCase = true)) {
+        val runs = ExecutionAudit.all()
+        AuditExporter.exportCsv(runs).fold(
+            onSuccess = { file ->
+                println("    ✓ Exported ${runs.size} ${if (runs.size == 1) "run" else "runs"} to ${file.toAbsolutePath()}")
+            },
+            onFailure = { e ->
+                println("    ✗ Export failed: ${e.message ?: e.javaClass.simpleName}")
+            }
+        )
+        println()
+        return
+    }
+    val runs = ExecutionAudit.all().sortedByDescending { it.completedMs }
+    if (runs.isEmpty()) {
+        println("    No runs recorded yet. Run a goal (\"run <goal>\") to build the trail.")
+        println()
+        return
+    }
+    println("    ${runs.size} ${if (runs.size == 1) "run" else "runs"} · \"audit export\" writes CSV to ~/.aegis/")
+    val summary = AuditSummary.of(runs)
+    println(
+        "    Success rate: ${summary.successRatePercent}% (${summary.completedRuns}/${summary.totalRuns})" +
+            "  ·  Average duration: ${formatDuration(summary.avgDurationMs)}"
+    )
+    runs.forEach { run ->
+        val tierText = if (run.tiers.isEmpty()) "no tier" else run.tiers.joinToString(" · ")
+        println(
+            "    ${run.outcome.lowercase().replaceFirstChar { it.uppercase() }}  ${run.goalDescription}" +
+                "  [$tierText]  ${run.taskCount} ${if (run.taskCount == 1) "task" else "tasks"}  ${auditTime(run.completedMs)}" +
+                (if (run.durationMs > 0) "  (${run.durationMs} ms)" else "")
+        )
+        run.reason?.let { println("        ✗ $it") }
+    }
+    println()
+}
+
 /** Goals in board order (priority desc — the order the board numbers them). */
 private fun sortedGoals(): List<Goal> =
     DesktopGoalPlanner.allGoals().sortedByDescending { it.priority }
@@ -522,6 +573,11 @@ private val AUDIT_TIME_FORMATTER: java.time.format.DateTimeFormatter =
 
 private fun auditTime(epochMs: Long): String =
     java.time.Instant.ofEpochMilli(epochMs).atZone(java.time.ZoneId.systemDefault()).format(AUDIT_TIME_FORMATTER)
+
+private fun formatDuration(ms: Long): String = when {
+    ms >= 1_000 -> "${"%.1f".format(ms / 1000.0)} s"
+    else -> "$ms ms"
+}
 
 private fun formatGb(bytes: Long): String = when {
     bytes >= 1_000_000_000 -> "${ "%.2f".format(bytes / 1_000_000_000.0) } GB"
