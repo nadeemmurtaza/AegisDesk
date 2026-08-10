@@ -63,4 +63,17 @@ object PlatformCapabilitiesHolder {
 
     /** The registered registry, or null before [init] has run. */
     fun registry(): PlatformCapabilityRegistry? = registry
+
+    /**
+     * Test seam — installs a fake registry so the planner/executor resolution
+     * paths are unit-testable without an Android [Context] (pure JVM tests
+     * cannot build [AndroidPlatformCapabilities]). Production code never calls
+     * this: [init] remains the only real path, and this seam does not touch the
+     * desktop capability or automation state.
+     */
+    fun setRegistryForTest(registry: PlatformCapabilityRegistry?) {
+        synchronized(lock) {
+            this.registry = registry
+        }
+    }
 }

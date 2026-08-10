@@ -9,6 +9,7 @@ import com.newax.aegis.engine.bus.AegisEvent
 import com.newax.aegis.engine.bus.AegisEventBus
 import com.newax.aegis.engine.state.GoalState
 import com.newax.aegis.engine.state.StateMachines
+import com.newax.aegis.platform.CapabilityResolution
 import com.newax.aegis.platform.CapabilityResolver
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -182,9 +183,22 @@ object GoalPlanner {
             .mapNotNull { SkillRegistry.get(it) }
             .flatMap { it.requiredCapabilities }
             .distinct()
-        val resolutions = PlatformCapabilitiesHolder.registry()
-            ?.let { registry -> CapabilityResolver.resolveAll(registry, requiredCapabilities) }
-            .orEmpty()
+        val registry = PlatformCapabilitiesHolder.registry()
+        val resolutions = if (registry == null) {
+            // No registry at all = no registered capability = every platform-gated
+            // requirement is blocked. The candidates are named so the warning
+            // explains what could back it — desktop-parity: a missing registry is
+            // an honest "blocked", never a silent "feasible" (A3 named failure
+            // mode; unmapped tiers like LLM stay unblocked — not platform-owned).
+            requiredCapabilities.flatMap { capability ->
+                CapabilityResolver.candidateIds(capability)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { ids -> listOf(CapabilityResolution(capability, ids, null)) }
+                    ?: emptyList()
+            }
+        } else {
+            CapabilityResolver.resolveAll(registry, requiredCapabilities)
+        }
         val missingCapabilities = resolutions.filter { it.isBlocked }.map { it.requested }
         val capabilityWarnings = resolutions.filter { it.isBlocked }.map { resolution ->
             "Capability '${resolution.requested}' is not ready " +
