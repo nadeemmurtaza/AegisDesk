@@ -78,6 +78,7 @@ base {
 
 dependencies {
     implementation(project(":shared:core"))
+    implementation(project(":shared:model-api"))
     implementation(project(":platform:android"))
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.10.0")
@@ -93,7 +94,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.14.0")
     
     // Open-Source Security & Vosk
     implementation("androidx.biometric:biometric:1.1.0")

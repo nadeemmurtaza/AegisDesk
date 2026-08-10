@@ -43,11 +43,11 @@ If any is unknown: **ask, or state the assumption in one line and take the conse
 | KSP | **2.1.0-1.0.29** | format is `<kotlin>-<ksp>` — mismatch fails at configuration time |
 | AGP | **8.7.3** | couples to Gradle 8.11.1 + JDK 17 |
 | compileSdk / targetSdk / minSdk | **35 / 35 / 26** | Android app; every API used must exist at 26 or be guarded |
-| Compose | **BOM 2024.12.01** (Android); desktopApp has **no Compose yet** | Compose compiler comes from the Kotlin plugin (Kotlin 2.0+) |
+| Compose | **BOM 2024.12.01** (Android); desktopApp: **Compose Multiplatform 1.7.1** (Phase B1) | Compose compiler comes from the Kotlin plugin (Kotlin 2.0+); CMP 1.7.1 is the lockstep pairing for Kotlin 2.1.0 — keep them coupled |
 | Room | **2.7.0-alpha13 (KMP alpha)** | `shared:database`; alpha line — do not treat as stable; see docs/rules/compatibility.md |
 | sqlite driver | **androidx.sqlite:sqlite-bundled 2.5.0-alpha13** (desktop); SQLCipher 4.5.4 (androidMain) | |
 | coroutines / datetime | **1.9.0 / 0.6.1** | |
-| LiteRT LM | **0.14.0** (androidApp) | offline model runtime |
+| LiteRT LM | **0.14.0** (platform:android — engine + provider; app consumes via shared:model-api) | offline model runtime |
 | Modules | `:apps:androidApp`, `:apps:desktopApp`, `:shared:core`, `:shared:database`, `:shared:platform-api`, `:shared:model-api`, `:platform:android`, `:platform:windows` | add new modules to `settings.gradle.kts` in the same change |
 
 **Known blockers (do not silently inherit, do not silently "fix" unasked):**

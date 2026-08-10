@@ -1,4 +1,4 @@
-package com.newax.aegis.assistant
+package com.newax.aegis.platform.android
 
 import android.content.ComponentCallbacks2
 import android.content.Context
@@ -22,7 +22,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
-class LiteRtOfflineModel(private val context: Context, private val modelFile: File) : OfflineModel, AutoCloseable {
+class LiteRtOfflineModel(private val context: Context, private val modelFile: File) : LiteRtEngine {
 
     enum class ModelState { UNLOADED, WARM, ACTIVE }
 
@@ -39,12 +39,10 @@ class LiteRtOfflineModel(private val context: Context, private val modelFile: Fi
     private var keepaliveJob: Job? = null
     private var state: ModelState = ModelState.UNLOADED
 
-    override val modelName: String = modelFile.name
-
     /** True once the engine is mapped — WARM and ACTIVE can both serve requests. */
-    override val isReady: Boolean get() = state != ModelState.UNLOADED
+    val isReady: Boolean get() = state != ModelState.UNLOADED
 
-    suspend fun initialize() = lifecycleMutex.withLock {
+    override suspend fun load() = lifecycleMutex.withLock {
         when (state) {
             ModelState.ACTIVE   -> return@withLock
             ModelState.WARM     -> warmToActive()
@@ -53,7 +51,7 @@ class LiteRtOfflineModel(private val context: Context, private val modelFile: Fi
     }
 
     override suspend fun complete(prompt: String, image: android.graphics.Bitmap?): String {
-        initialize()
+        load()
         return generationMutex.withLock {
             withContext(Dispatchers.IO) {
                 val finalPrompt = if (image != null)
@@ -74,7 +72,7 @@ class LiteRtOfflineModel(private val context: Context, private val modelFile: Fi
      * RUNNING_LOW (10) → release KV cache (conversation), keep engine mapped (WARM).
      * COMPLETE (80)    → fully unmap engine (UNLOADED).
      */
-    fun onMemoryPressure(level: Int) {
+    override fun onMemoryPressure(level: Int) {
         scope.launch {
             lifecycleMutex.withLock {
                 when {

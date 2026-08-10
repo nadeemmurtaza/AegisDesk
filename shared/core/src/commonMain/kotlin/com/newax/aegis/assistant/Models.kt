@@ -96,19 +96,23 @@ val ProposedAction.riskLevel: RiskLevel get() = riskOf(this)
  * notification bodies, gallery/contact scan output, OCR'd screen content — which is
  * untrusted input that happens to be phrased as a request. A filename or message body
  * can say "delete file /x"; that must never carry the authority of the user saying it.
+ * AGENT is an autonomous executor running a goal/plan (ARCHITECTURE.md: agent-origin
+ * actions are stricter than user-origin). BACKGROUND and AGENT are both machine
+ * origin: neither inherits user-level trust.
  */
-enum class ActionOrigin { USER, BACKGROUND }
+enum class ActionOrigin { USER, BACKGROUND, AGENT }
 
 /**
- * Actions at or above this risk level never auto-execute when they originated from
- * background text, regardless of how the automation toggles are set. The toggles record
- * what the user is willing to have done on *their* instruction, not on a scanner's.
+ * Actions at or above this risk level never auto-execute when they originated from a
+ * machine (background text or an autonomous agent), regardless of how the automation
+ * toggles are set. The toggles record what the user is willing to have done on *their*
+ * instruction, not on a scanner's or an agent's.
  */
-private val BACKGROUND_AUTO_EXECUTE_CEILING = RiskLevel.HIGH
+private val MACHINE_AUTO_EXECUTE_CEILING = RiskLevel.HIGH
 
 fun mayAutoExecute(action: ProposedAction, origin: ActionOrigin, toggleEnabled: Boolean): Boolean {
     if (!toggleEnabled) return false
-    if (origin == ActionOrigin.BACKGROUND && riskOf(action) >= BACKGROUND_AUTO_EXECUTE_CEILING) return false
+    if (origin != ActionOrigin.USER && riskOf(action) >= MACHINE_AUTO_EXECUTE_CEILING) return false
     return true
 }
 

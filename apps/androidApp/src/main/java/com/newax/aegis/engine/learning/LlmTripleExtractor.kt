@@ -1,7 +1,9 @@
 package com.newax.aegis.engine.learning
 
 import android.util.Log
-import com.newax.aegis.assistant.LiteRtOfflineModel
+import com.newax.aegis.model.ModelProvider
+import com.newax.aegis.model.ModelRequest
+import com.newax.aegis.model.ModelState
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.TripleEntity
 import com.newax.aegis.engine.SensitiveInfoDetector
@@ -16,10 +18,10 @@ object LlmTripleExtractor {
     private const val MAX_TEXT_LEN = 1200
     private const val MIN_CONF     = 0.55f
 
-    @Volatile private var model: LiteRtOfflineModel? = null
+    @Volatile private var model: ModelProvider? = null
 
-    fun bind(m: LiteRtOfflineModel?) { model = m }
-    fun isReady(): Boolean = model?.isReady == true
+    fun bind(m: ModelProvider?) { model = m }
+    fun isReady(): Boolean = model?.state?.value == ModelState.READY
 
     suspend fun extract(
         text: String,
@@ -27,7 +29,7 @@ object LlmTripleExtractor {
         subjectHint: String?
     ): List<TripleEntity> {
         val m = model ?: return emptyList()
-        if (!m.isReady || text.length < MIN_TEXT_LEN) return emptyList()
+        if (!isReady() || text.length < MIN_TEXT_LEN) return emptyList()
 
         // SECURITY: redact before sending; skip high-sensitivity content
         val analysis = SensitiveInfoDetector.analyze(text)
@@ -35,7 +37,7 @@ object LlmTripleExtractor {
         val safeText = analysis.redactedText.take(MAX_TEXT_LEN)
 
         return try {
-            val response = m.complete(buildPrompt(safeText, sourceContext, subjectHint), null)
+            val response = m.complete(ModelRequest(text = buildPrompt(safeText, sourceContext, subjectHint))).text
             parseJson(response, sourceContext)
         } catch (e: Exception) {
             Log.w(TAG, "Triple extract error: ${e.message}")

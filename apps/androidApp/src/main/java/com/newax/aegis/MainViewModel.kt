@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import android.app.Application
+import android.graphics.Bitmap
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.net.Uri
@@ -17,6 +18,9 @@ import android.speech.tts.TextToSpeech
 import java.util.Locale
 import com.newax.aegis.accessibility.AegisAccessibilityService
 import com.newax.aegis.assistant.*
+import com.newax.aegis.model.ModelRequest
+import com.newax.aegis.model.ModelState
+import com.newax.aegis.platform.android.LiteRtModelProvider
 import com.newax.aegis.engine.AutomationSettings
 import com.newax.aegis.engine.ContactsManager
 import com.newax.aegis.engine.TotpManager
@@ -59,6 +63,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.util.Calendar
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -66,15 +71,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val memory = EncryptedMemory(application)
     val db = AegisDatabase.get
     private val modelImporter = ModelImporter(application)
-    private var offlineModel: LiteRtOfflineModel? = null
+    private var modelProvider: LiteRtModelProvider? = null
 
     private val memoryCallback = object : ComponentCallbacks2 {
         override fun onTrimMemory(level: Int) {
-            offlineModel?.onMemoryPressure(level)
+            modelProvider?.onMemoryPressure(level)
             ResourceGovernor.onMemoryPressure(pressureFromTrim(level))
         }
         override fun onLowMemory() {
-            offlineModel?.onMemoryPressure(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
+            modelProvider?.onMemoryPressure(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
             ResourceGovernor.onMemoryPressure(5)
         }
         override fun onConfigurationChanged(newConfig: Configuration) {}
@@ -149,9 +154,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-        modelImporter.current()?.let { file ->
-            modelStatus = "Loading ${file.name}…"
-            loadModel(file)
+        modelImporter.current()?.let { imported ->
+            modelStatus = "Loading ${imported.file.name}…"
+            loadModel(imported)
         }
         memory.getRaw("knowledge_graph")?.let { com.newax.aegis.engine.KnowledgeGraph.load(it) }
         memory.getRaw("comm_log")?.let { com.newax.aegis.engine.CommunicationLog.load(it) }
@@ -189,7 +194,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun bumpAutomationVersion() { automationVersion++ }
 
     /**
-     * Route an action through the shared AuthorityManager.
+     * Route an action through the authority spine (ARCHITECTURE.md rule 3).
+     *
+     * The PolicyEngine resolves the user's policy mode for the action class
+     * (override or risk default), applies the decision table (AUTO_EXECUTE /
+     * REQUIRE_APPROVAL / REQUIRE_STRONG / DENY), and audits the evaluation;
+     * [AuthorityManager.apply] maps the decision onto the same approval UI flow
+     * (Approved / RequestApproval / RequestBiometric / Rejected). The PersonPolicy
+     * gate stays: send actions always require approval, enforced before the engine.
      */
     private fun processAction(action: ProposedAction, origin: ActionOrigin = ActionOrigin.USER) {
         // PersonPolicy gate: send actions always require approval (policy-enforced)
@@ -197,9 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             enqueueForApproval(action)
             return
         }
-        val toggle = AutomationSettings.toggleForAction(action)
-        val enabled = toggle != null && AutomationSettings.isEnabled(toggle)
-        authorityManager.evaluate(action, origin, enabled)
+        authorityManager.apply(PolicyHolder.engine().evaluate(action, origin))
     }
 
     private fun enqueueForApproval(action: ProposedAction) {
@@ -215,7 +225,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val imported = modelImporter.import(uri)
                 modelStatus = "Verified ${imported.sha256.take(12)}…; initializing…"
-                loadModel(imported.file)
+                loadModel(imported)
             } catch (error: Throwable) {
                 modelStatus = "Import failed: ${error.message ?: error.javaClass.simpleName}"
                 modelBusy = false
@@ -223,21 +233,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadModel(file: java.io.File) {
+    private fun loadModel(imported: ImportedModel) {
         viewModelScope.launch {
             modelBusy = true
+            val previous = modelProvider
+            modelProvider = null
+            ModelProviderHolder.clear()
+            LlmFactExtractor.bind(null)
+            LlmTripleExtractor.bind(null)
+            var provider: LiteRtModelProvider? = null
             try {
-                offlineModel?.close()
-                val model = LiteRtOfflineModel(getApplication(), file)
-                model.initialize()
-                offlineModel = model
-                LlmFactExtractor.bind(model)
-                LlmTripleExtractor.bind(model)
-                modelStatus = "Offline AI ready • ${file.name}"
+                previous?.close()
+                provider = LiteRtModelProvider(getApplication(), imported.file, imported.sha256)
+                provider.load()
+                modelProvider = provider
+                ModelProviderHolder.set(provider)
+                LlmFactExtractor.bind(provider)
+                LlmTripleExtractor.bind(provider)
+                modelStatus = "Offline AI ready • ${imported.file.name}"
             } catch (error: Throwable) {
-                offlineModel?.close(); offlineModel = null
-                LlmFactExtractor.bind(null)
-                LlmTripleExtractor.bind(null)
+                provider?.close()
                 modelStatus = "Model unavailable: ${error.message ?: error.javaClass.simpleName}"
             } finally { modelBusy = false }
         }
@@ -428,8 +443,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         // ─────────────────────────────────────────────────────────────────────
         if (!engine.canHandle(text) && !text.contains(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE))) {
-            val model = offlineModel
-            if (model == null || !model.isReady) {
+            val provider = modelProvider
+            if (provider == null || provider.state.value != ModelState.READY) {
                 messages += ChatMessage("No verified offline model is ready. Use Import model, or use a deterministic device command.", false)
                 return
             }
@@ -480,7 +495,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             append("User: ${text.trim().take(3000)}")
                         }.take(7000)
                         val frame = com.newax.aegis.vision.ScreenCaptureService.latestFrame.value
-                        resultDeferred.complete(model.complete(prompt, frame))
+                        val imageBytes = frame?.let { bmp ->
+                            ByteArrayOutputStream().use { out ->
+                                bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                out.toByteArray()
+                            }
+                        }
+                        val reply = provider.complete(
+                            ModelRequest(
+                                text          = prompt,
+                                imageBytes    = imageBytes,
+                                imageMimeType = if (imageBytes != null) "image/png" else null
+                            )
+                        )
+                        resultDeferred.complete(reply.text)
                     }
                     ResourceGovernor.preemptForUser(llmJob)
                     val replyText = resultDeferred.await()
@@ -1039,7 +1067,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         getApplication<Application>().unregisterComponentCallbacks(memoryCallback)
-        offlineModel?.close()
+        modelProvider?.close()
+        ModelProviderHolder.clear()
         tts?.shutdown()
         super.onCleared()
     }

@@ -26,6 +26,16 @@ class StateMachine<S : Enum<S>>(
     fun canTransition(to: S): Boolean = to in (transitions[_state.value] ?: emptySet())
 
     fun allowedTransitions(): Set<S> = transitions[_state.value] ?: emptySet()
+
+    /**
+     * Restore-only: force the machine to a previously saved state without firing
+     * transition callbacks or validating edges. The saved state was legal when it
+     * was captured; this is hydration, not a transition. Never used for live moves.
+     */
+    @Synchronized
+    fun seed(to: S) {
+        _state.value = to
+    }
 }
 
 enum class IndexerState { IDLE, SCANNING, EXTRACTING_TEXT, EXTRACTING_ENTITIES, VISUAL_INDEXING, PAUSED, FAILED, COMPLETED }

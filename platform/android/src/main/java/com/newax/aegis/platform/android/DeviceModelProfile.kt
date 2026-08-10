@@ -1,4 +1,4 @@
-package com.newax.aegis.assistant
+package com.newax.aegis.platform.android
 
 /** Defaults selected for Galaxy S21-class devices with 8 GB physical RAM. */
 data object DeviceModelProfile {

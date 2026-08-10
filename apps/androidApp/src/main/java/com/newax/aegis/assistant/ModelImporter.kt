@@ -14,7 +14,10 @@ class ModelImporter(private val context: Context) {
     private val modelDir = File(context.filesDir, "models")
     private val prefs = context.getSharedPreferences("aegis_model", Context.MODE_PRIVATE)
 
-    fun current(): File? = prefs.getString("path", null)?.let(::File)?.takeIf { it.isFile }
+    fun current(): ImportedModel? =
+        prefs.getString("path", null)?.let(::File)?.takeIf { it.isFile }?.let { file ->
+            ImportedModel(file, prefs.getString("sha256", "") ?: "", file.length())
+        }
 
     suspend fun import(uri: Uri): ImportedModel = withContext(Dispatchers.IO) {
         modelDir.mkdirs()

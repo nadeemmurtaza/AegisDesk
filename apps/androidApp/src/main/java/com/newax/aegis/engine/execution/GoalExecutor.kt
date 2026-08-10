@@ -2,17 +2,25 @@ package com.newax.aegis.engine.execution
 
 import android.content.Context
 import com.newax.aegis.PlatformCapabilitiesHolder
+import com.newax.aegis.PolicyHolder
+import com.newax.aegis.assistant.ActionOrigin
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.engine.apps.AppCapability
+import com.newax.aegis.engine.audit.ExecutionAuditEntry
+import com.newax.aegis.engine.audit.ExecutionAuditHolder
+import com.newax.aegis.engine.audit.RunOutcome
+import com.newax.aegis.engine.audit.TaskRunRecord
 import com.newax.aegis.engine.bus.AegisEvent
 import com.newax.aegis.engine.bus.AegisEventBus
 import com.newax.aegis.engine.intelligence.GoalPlanner
 import com.newax.aegis.engine.intelligence.SkillRegistry
+import com.newax.aegis.engine.intelligence.TaskFailureKind
 import com.newax.aegis.engine.intelligence.TaskNode
 import com.newax.aegis.engine.intelligence.TaskStatus
 import com.newax.aegis.platform.CapabilityResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 /**
  * Runs a goal's plan through the app's execution machinery, one task at a time in
@@ -28,6 +36,10 @@ import kotlinx.coroutines.withContext
  *
  * Each task's outputs are piped into the inputs of later tasks (find_app's resolved
  * package → launch_app's ExecutionRouter launch), completing the capability ladder.
+ *
+ * Every run is recorded in the execution audit trail (Track A8): goal, outcome,
+ * per-task tiers, statuses and timestamps — the "Recent runs" section on the Goals
+ * screen, persisted to kv_store (rule 6: consequential modifications are auditable).
  */
 object GoalExecutor {
 
@@ -51,25 +63,63 @@ object GoalExecutor {
         // ExecutionRouter launch — the capability ladder, end to end).
         val carry = mutableMapOf<String, Any>("goalId" to goalId)
 
+        val runStartedMs = System.currentTimeMillis()
+        val taskRecords = mutableListOf<TaskRunRecord>()
+
         for (task in tasks) {
             val outcome = runTask(goalId, task, carry, context, db)
+            taskRecords += TaskRunRecord(
+                taskId = task.id,
+                description = task.description,
+                skillId = task.skillId,
+                tier = outcome.getOrNull()?.name,
+                status = task.status,
+                result = task.result,
+                startedMs = task.startedMs ?: runStartedMs,
+                finishedMs = task.completedMs
+            )
             if (outcome.isFailure) {
                 val reason = outcome.exceptionOrNull()?.message ?: "Task '${task.description}' failed"
                 blockGoal(goalId, reason)
+                recordRun(goalId, RunOutcome.FAILED, runStartedMs, taskRecords)
                 return@withContext Result.failure(outcome.exceptionOrNull() ?: IllegalStateException(reason))
             }
         }
 
+        recordRun(goalId, RunOutcome.COMPLETED, runStartedMs, taskRecords)
         Result.success(Unit)
     }
 
+    private fun recordRun(
+        goalId: String,
+        outcome: RunOutcome,
+        startedMs: Long,
+        tasks: List<TaskRunRecord>
+    ) {
+        ExecutionAuditHolder.record(
+            ExecutionAuditEntry(
+                id = UUID.randomUUID().toString(),
+                goalId = goalId,
+                goalDescription = GoalPlanner.getGoal(goalId)?.description ?: goalId,
+                outcome = outcome,
+                startedMs = startedMs,
+                finishedMs = System.currentTimeMillis(),
+                tasks = tasks
+            )
+        )
+    }
+
+    /**
+     * Runs one task. Returns the tier used on success (null when the skill ran
+     * without an ExecutionRouter tier) — the caller captures it into the audit.
+     */
     private suspend fun runTask(
         goalId: String,
         task: TaskNode,
         carry: MutableMap<String, Any>,
         context: Context,
         db: AegisDatabase?
-    ): Result<Unit> {
+    ): Result<ExecutionTier?> {
         val skillId = task.skillId
         if (skillId == null) {
             val reason = "Task '${task.description}' has no skill assigned"
@@ -89,8 +139,29 @@ object GoalExecutor {
             val cap = blocked.first().requested
             return finishFailed(
                 goalId, task,
-                "Capability '$cap' is not ready — enable it on the Capabilities screen"
+                "Capability '$cap' is not ready — enable it on the Capabilities screen",
+                kind = TaskFailureKind.CAPABILITY
             )
+        }
+
+        // Policy gate — rule 10 (PLAN is never EXECUTE): the goal/plan grants zero
+        // execution authority. Every privileged task is evaluated through the policy
+        // spine as AGENT origin (stricter than user). Only AUTO_EXECUTE runs
+        // autonomously; approval/strong/deny fail the task with the policy reason —
+        // the user then adjusts the mode (Capabilities → Policy modes) or runs the
+        // action from chat, where the approval flow exists.
+        val policyAction = SkillRegistry.policyActionFor(skillId)
+        if (policyAction != null) {
+            val evaluation = PolicyHolder.engine().evaluate(policyAction, ActionOrigin.AGENT)
+            if (!evaluation.decision.allowsAutonomousExecution) {
+                return finishFailed(
+                    goalId, task,
+                    "Skill '$skillId' cannot run autonomously — policy ${evaluation.decision.name} " +
+                        "(${evaluation.reason}). Change its mode in Capabilities → Policy modes, " +
+                        "or run it from chat where approval is possible.",
+                    kind = TaskFailureKind.POLICY
+                )
+            }
         }
 
         markRunning(goalId, task)
@@ -155,7 +226,7 @@ object GoalExecutor {
             result["summary"]?.let { append(" · ").append(it) }
         }
         finishCompleted(goalId, task, message)
-        return Result.success(Unit)
+        return Result.success(tier)
     }
 
     private fun markRunning(goalId: String, task: TaskNode) {
@@ -168,8 +239,13 @@ object GoalExecutor {
         AegisEventBus.emit(AegisEvent.TaskUpdated(goalId, task.id, TaskStatus.COMPLETED.name, message))
     }
 
-    private fun finishFailed(goalId: String, task: TaskNode, reason: String): Result<Unit> {
-        GoalPlanner.updateTask(goalId, task.id, TaskStatus.FAILED, reason)
+    private fun finishFailed(
+        goalId: String,
+        task: TaskNode,
+        reason: String,
+        kind: TaskFailureKind? = null
+    ): Result<Nothing> {
+        GoalPlanner.updateTask(goalId, task.id, TaskStatus.FAILED, reason, kind)
         AegisEventBus.emit(AegisEvent.TaskUpdated(goalId, task.id, TaskStatus.FAILED.name, reason))
         return Result.failure(IllegalStateException(reason))
     }
