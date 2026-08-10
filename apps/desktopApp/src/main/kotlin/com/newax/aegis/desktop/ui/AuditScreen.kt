@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.desktop.AuditSummary
 import com.newax.aegis.desktop.ExecutionAuditEntry
+import com.newax.aegis.desktop.TierBreakdown
 import com.newax.aegis.desktop.ui.state.AuditScreenState
 import com.newax.aegis.desktop.ui.state.AuditUiModel
 import com.newax.aegis.desktop.ui.state.ExportState
@@ -149,6 +150,19 @@ private fun AuditSummaryCard(
                 SummaryStat("Avg duration", formatDurationMs(summary.avgDurationMs))
                 SummaryStat("Blocked", summary.blockedRuns.toString())
             }
+            if (summary.tierBreakdown.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "By launch tier",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextTertiaryColor
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    summary.tierBreakdown.forEach { tier -> TierStat(tier) }
+                }
+            }
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(
@@ -185,6 +199,31 @@ private fun SummaryStat(label: String, value: String, color: Color = TextPrimary
         )
         Spacer(Modifier.height(2.dp))
         Text(label, fontSize = 11.sp, color = TextTertiaryColor)
+    }
+}
+
+/** One launch tier's slice: name, runs, and color-coded success rate. */
+@Composable
+private fun TierStat(breakdown: TierBreakdown) {
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceMutedColor)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            breakdown.tier,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextSecondaryColor,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            "${breakdown.runs} ${if (breakdown.runs == 1) "run" else "runs"} · ${breakdown.successRatePercent}% complete",
+            fontSize = 12.sp,
+            color = successRateColor(breakdown.successRatePercent)
+        )
     }
 }
 

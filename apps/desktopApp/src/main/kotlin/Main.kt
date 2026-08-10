@@ -524,6 +524,11 @@ private fun printAudit(command: String) {
         "    Success rate: ${summary.successRatePercent}% (${summary.completedRuns}/${summary.totalRuns})" +
             "  ·  Average duration: ${formatDuration(summary.avgDurationMs)}"
     )
+    summary.tierBreakdown.forEach { tier ->
+        println(
+            "    ${tier.tier}  — ${tier.runs} ${if (tier.runs == 1) "run" else "runs"} (${tier.successRatePercent}% complete)"
+        )
+    }
     runs.forEach { run ->
         val tierText = if (run.tiers.isEmpty()) "no tier" else run.tiers.joinToString(" · ")
         println(
