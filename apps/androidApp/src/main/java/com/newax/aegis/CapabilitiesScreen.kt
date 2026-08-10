@@ -27,6 +27,7 @@ import com.newax.aegis.platform.CapabilityId
 import com.newax.aegis.platform.CapabilityStatus
 import com.newax.aegis.platform.PlatformCapability
 import com.newax.aegis.platform.PrivilegeLevel
+import kotlinx.coroutines.delay
 
 // ── Design tokens (REFINED_THEME.md) ────────────────────────────────────────
 private val Surface      = Color(0xFFFFFFFF)
@@ -105,16 +106,43 @@ fun CapabilitiesScreen(
      * resets itself via [onScrollHandled] so a later manual visit doesn't re-scroll.
      */
     policyScrollSignal: Int = 0,
-    onScrollHandled: () -> Unit = {}
+    onScrollHandled: () -> Unit = {},
+    /** Opens the full policy-decision history screen (See all on the audit card). */
+    onOpenPolicyHistory: () -> Unit = {},
+    /**
+     * Action class to jump to (policy-history "jump to row"): the list scrolls
+     * to that class's PolicyRowCard and highlights it, then [onTargetHandled]
+     * consumes the signal (a small delay keeps the highlight visible).
+     */
+    policyScrollTarget: String? = null,
+    onTargetHandled: () -> Unit = {}
 ) {
     var refreshKey by remember { mutableStateOf(0) }
+    var policyVersion by remember { mutableIntStateOf(0) }
     val rows = remember(refreshKey) { readSnapshot() }
     val listState = rememberLazyListState()
 
+    // Items before the policy section: header card (0), model card (1), then one
+    // item per capability row (or the single un-initialized/empty state box).
+    val policySectionStart = 2 + (rows?.size ?: 1)
+
     LaunchedEffect(policyScrollSignal) {
         if (policyScrollSignal > 0 && listState.layoutInfo.totalItemsCount > 0) {
-            listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+            listState.animateScrollToItem(
+                policySectionStart.coerceAtMost(listState.layoutInfo.totalItemsCount - 1)
+            )
             onScrollHandled()
+        }
+    }
+
+    LaunchedEffect(policyScrollTarget) {
+        if (policyScrollTarget != null && listState.layoutInfo.totalItemsCount > 0) {
+            val pos = policyClassPosition(policyScrollTarget!!)
+            val index = if (pos != null) policySectionStart + 1 + pos else policySectionStart
+            listState.animateScrollToItem(index.coerceAtMost(listState.layoutInfo.totalItemsCount - 1))
+            // Keep the amber highlight visible briefly, then consume the signal.
+            delay(2500)
+            onTargetHandled()
         }
     }
 
@@ -204,7 +232,12 @@ fun CapabilitiesScreen(
         }
 
         // ── Policy settings — authority spine (Track A2) ────────────────────
-        item { PolicySettingsSection() }
+        policySectionItems(
+            policyVersion = policyVersion,
+            onPolicyChanged = { policyVersion++ },
+            highlightedClass = policyScrollTarget,
+            onOpenPolicyHistory = onOpenPolicyHistory
+        )
     }
 }
 

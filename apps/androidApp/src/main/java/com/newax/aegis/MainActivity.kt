@@ -98,6 +98,7 @@ sealed class Screen(val label: String) {
     object AppPermissions : Screen("App Permissions")
     object Capabilities : Screen("Capabilities")
     object Goals : Screen("Goals")
+    object PolicyHistory : Screen("Policy History")
 }
 
 class MainActivity : FragmentActivity() {
@@ -138,6 +139,10 @@ fun AegisApp(
     // Bumped when a policy-blocked goal task jumps to the Capabilities screen,
     // which scrolls itself to the Policy modes section.
     var policyScrollSignal by remember { mutableIntStateOf(0) }
+    // Set when the policy history screen jumps to one action class's row: the
+    // Capabilities screen scrolls to that row and highlights it, then resets via
+    // onTargetHandled so a later manual visit doesn't re-scroll.
+    var policyScrollTarget by remember { mutableStateOf<String?>(null) }
     val pendingDrafts by vm.pendingDrafts.collectAsStateWithLifecycle()
     val draftCount = pendingDrafts.size
 
@@ -246,6 +251,7 @@ fun AegisApp(
                                         Screen.AppPermissions -> "App Permissions"
                                         Screen.Capabilities -> "Capabilities"
                                         Screen.Goals -> "Goals"
+                                        Screen.PolicyHistory -> "Policy History"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize   = 18.sp,
@@ -277,7 +283,17 @@ fun AegisApp(
                     Screen.Capabilities -> CapabilitiesScreen(
                         padding,
                         policyScrollSignal = policyScrollSignal,
-                        onScrollHandled = { policyScrollSignal = 0 }
+                        onScrollHandled = { policyScrollSignal = 0 },
+                        onOpenPolicyHistory = { screen = Screen.PolicyHistory },
+                        policyScrollTarget = policyScrollTarget,
+                        onTargetHandled = { policyScrollTarget = null }
+                    )
+                    Screen.PolicyHistory -> PolicyHistoryScreen(
+                        padding,
+                        onOpenActionClass = { actionClass ->
+                            policyScrollTarget = actionClass
+                            screen = Screen.Capabilities
+                        }
                     )
                     Screen.Goals -> GoalsScreen(
                         padding,
