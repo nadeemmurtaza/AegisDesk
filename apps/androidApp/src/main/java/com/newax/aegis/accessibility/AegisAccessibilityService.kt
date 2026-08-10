@@ -4,9 +4,12 @@ import android.accessibilityservice.AccessibilityService
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.newax.aegis.PlatformCapabilitiesHolder
 import com.newax.aegis.assistant.ProposedAction
+import com.newax.aegis.platform.android.SemanticAutomation
+import com.newax.aegis.platform.desktop.AppWindow
 
-class AegisAccessibilityService : AccessibilityService() {
+class AegisAccessibilityService : AccessibilityService(), SemanticAutomation {
     companion object {
         @Volatile var instance: AegisAccessibilityService? = null
             private set
@@ -18,7 +21,13 @@ class AegisAccessibilityService : AccessibilityService() {
 
     val chatHistory = java.util.Collections.synchronizedList(mutableListOf<String>())
 
-    override fun onServiceConnected() { instance = this }
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+        // Attach the semantic-automation bridge so the Desktop capability reports
+        // READY on the Capabilities screen for as long as the service is connected.
+        PlatformCapabilitiesHolder.attachAutomation(this)
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -31,7 +40,11 @@ class AegisAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() = Unit
-    override fun onDestroy() { instance = null; super.onDestroy() }
+    override fun onDestroy() {
+        PlatformCapabilitiesHolder.detachAutomation()
+        instance = null
+        super.onDestroy()
+    }
 
     /**
      * Returns a structured, AI-ready screen summary with:
@@ -173,6 +186,55 @@ class AegisAccessibilityService : AccessibilityService() {
         ProposedAction.Back -> performGlobalAction(GLOBAL_ACTION_BACK)
         else -> false // Handle all the background-only actions like AuditSecurity, PostSocialMedia etc.
         }
+    }
+
+    // ── SemanticAutomation (platform contract seam) ──────────────────────────
+    // Implemented so AndroidDesktopCapability can drive the UI semantically
+    // (labels, never coordinates — ARCHITECTURE.md RULE 5). Reuses the same
+    // node finders as execute().
+
+    override fun listWindows(): List<AppWindow> = windows.mapNotNull { win ->
+        val root = win.root ?: return@mapNotNull null
+        AppWindow(
+            appName = win.packageName?.toString() ?: currentPackage,
+            title = root.text?.toString()?.ifBlank { null } ?: root.contentDescription?.toString(),
+            windowId = win.id.toString(),
+        )
+    }
+
+    override fun click(label: String): Boolean =
+        (findByText(label) ?: findByDescription(label))?.clickUpTree() == true
+
+    override fun typeText(label: String?, text: String): Boolean {
+        val target = when {
+            label != null -> (findByText(label) ?: findByDescription(label))?.takeIf { it.isEditable }
+            else -> focusedEditable() ?: firstEditable()
+        } ?: return false
+        return target.setNodeText(text)
+    }
+
+    override fun scroll(label: String, down: Boolean): Boolean {
+        var node: AccessibilityNodeInfo? = findByText(label) ?: findByDescription(label) ?: return false
+        repeat(5) {
+            if (node?.isScrollable == true) {
+                return node!!.performAction(
+                    if (down) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                    else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+                )
+            }
+            node = node?.parent
+        }
+        return false
+    }
+
+    /** Polls the active window for [label] until [timeoutMs] elapses. Blocks the caller. */
+    override fun waitFor(label: String, timeoutMs: Long): Boolean {
+        val deadline = android.os.SystemClock.uptimeMillis() + timeoutMs
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            if (findByText(label) != null || findByDescription(label) != null) return true
+            android.os.SystemClock.sleep(100)
+        }
+        return false
     }
 
     // ── Public direct-execution API (used by ProcedureExecutor) ──────────────

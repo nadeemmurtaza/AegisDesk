@@ -1,9 +1,11 @@
 package com.newax.aegis.engine.intelligence
 
+import com.newax.aegis.PlatformCapabilitiesHolder
 import com.newax.aegis.engine.bus.AegisEvent
 import com.newax.aegis.engine.bus.AegisEventBus
 import com.newax.aegis.engine.state.GoalState
 import com.newax.aegis.engine.state.StateMachines
+import com.newax.aegis.platform.CapabilityResolver
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -66,6 +68,8 @@ data class PlanResult(
     val graph: TaskGraph,
     val feasible: Boolean,
     val missingSkills: List<String>,
+    /** Skill capability names that are platform-gated but no registered capability is ready for. */
+    val missingCapabilities: List<String> = emptyList(),
     val warnings: List<String>
 )
 
@@ -74,6 +78,7 @@ object GoalPlanner {
     private val goals = ConcurrentHashMap<String, Goal>()
     private val graphs = ConcurrentHashMap<String, TaskGraph>()
     private val stateMachines = ConcurrentHashMap<String, com.newax.aegis.engine.state.StateMachine<GoalState>>()
+    private val plans = ConcurrentHashMap<String, PlanResult>()
 
     private val DECOMPOSITION_RULES: Map<String, List<String>> = mapOf(
         "send" to listOf("find_recipient", "compose_content", "select_app", "send_message"),
@@ -112,20 +117,45 @@ object GoalPlanner {
             .filter { !SkillRegistry.has(it) }
         val graph = TaskGraph(goalId = goal.id, tasks = tasks)
 
+        // Capability pre-flight: every task skill declares what it needs (e.g.
+        // "OPEN_APP"), and the platform registry is the single source of truth for
+        // whether any registered capability can back it right now (CapabilityResolver
+        // in the contract module — skills resolve through CapabilityIds, never ad-hoc
+        // string matching). A skill that exists but cannot run is still infeasible.
+        val requiredCapabilities = tasks.mapNotNull { it.skillId }
+            .mapNotNull { SkillRegistry.get(it) }
+            .flatMap { it.requiredCapabilities }
+            .distinct()
+        val resolutions = PlatformCapabilitiesHolder.registry()
+            ?.let { registry -> CapabilityResolver.resolveAll(registry, requiredCapabilities) }
+            .orEmpty()
+        val missingCapabilities = resolutions.filter { it.isBlocked }.map { it.requested }
+        val capabilityWarnings = resolutions.filter { it.isBlocked }.map { resolution ->
+            "Capability '${resolution.requested}' is not ready " +
+                "(${resolution.status?.name ?: "no registered capability"}; " +
+                "candidates: ${resolution.candidates.joinToString { it.name }})"
+        }
+
         goals[goal.id] = goal
         graphs[goal.id] = graph
         stateMachines[goal.id] = StateMachines.goal()
 
         AegisEventBus.emit(AegisEvent.GoalCreated(goal.id, description))
 
-        return PlanResult(
+        val result = PlanResult(
             goal = goal,
             graph = graph,
-            feasible = missingSkills.isEmpty(),
+            feasible = missingSkills.isEmpty() && missingCapabilities.isEmpty(),
             missingSkills = missingSkills,
-            warnings = if (deadlineMs != null && tasks.size > 5)
-                listOf("Goal has ${tasks.size} tasks, deadline may be tight") else emptyList()
+            missingCapabilities = missingCapabilities,
+            warnings = buildList {
+                if (deadlineMs != null && tasks.size > 5)
+                    add("Goal has ${tasks.size} tasks, deadline may be tight")
+                addAll(capabilityWarnings)
+            }
         )
+        plans[goal.id] = result
+        return result
     }
 
     private fun decompose(goal: Goal): List<TaskNode> {
@@ -177,6 +207,9 @@ object GoalPlanner {
     fun getGoal(id: String): Goal? = goals[id]
     fun getGraph(id: String): TaskGraph? = graphs[id]
     fun getState(id: String): GoalState? = stateMachines[id]?.current
+
+    /** The plan pre-flight for a goal: feasibility, missing skills, missing capabilities, warnings. */
+    fun planOf(id: String): PlanResult? = plans[id]
 
     fun activeGoals(): List<Goal> = goals.values
         .filter { stateMachines[it.id]?.current == GoalState.ACTIVE }

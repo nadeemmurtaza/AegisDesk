@@ -117,7 +117,9 @@ object SkillRegistry {
     private fun registerBuiltins() {
         register(
             SkillDefinition("find_app", "Find App", "Locate an installed app by name", category = SkillCategory.SYSTEM),
-            handler = { inputs -> mapOf("packageName" to (inputs["query"] ?: "")) }
+            // Prefer a package resolved by the executor (the app index, ANDROID_API tier);
+            // fall back to echoing the query so package-name targets still flow downstream.
+            handler = { inputs -> mapOf("packageName" to ((inputs["packageName"] ?: inputs["query"]) ?: "")) }
         )
         register(
             SkillDefinition("launch_app", "Launch App", "Open an installed app", requiredCapabilities = listOf("OPEN_APP"), category = SkillCategory.SYSTEM),

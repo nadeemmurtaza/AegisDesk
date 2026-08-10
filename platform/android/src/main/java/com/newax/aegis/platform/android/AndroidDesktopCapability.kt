@@ -37,15 +37,29 @@ fun interface ScreenCapturer {
 
 /**
  * Desktop capability on Android = UI automation through the accessibility service.
- * Without an attached [SemanticAutomation] the capability reports [CapabilityStatus.UNAVAILABLE]
- * and every interaction fails with a typed reason — this is the real platform state
- * (the user has not enabled the service), not a stub.
+ * The [SemanticAutomation] bridge is attached at runtime by the app's
+ * AegisAccessibilityService ([attach] on service connect, [detach] on destroy), so
+ * the capability reports [CapabilityStatus.READY] while the service is connected and
+ * [CapabilityStatus.UNAVAILABLE] otherwise — the real platform state, not a stub.
  */
 class AndroidDesktopCapability(
     private val androidContext: Context,
-    private val automation: SemanticAutomation?,
+    automation: SemanticAutomation?,
     private val screenCapturer: ScreenCapturer?,
 ) : DesktopCapability {
+
+    @Volatile
+    private var automation: SemanticAutomation? = automation
+
+    /** Called by the app's accessibility service when it connects. */
+    fun attach(automation: SemanticAutomation) {
+        this.automation = automation
+    }
+
+    /** Called by the app's accessibility service when it is destroyed. */
+    fun detach() {
+        this.automation = null
+    }
 
     override val id: CapabilityId get() = CapabilityId.DESKTOP
 

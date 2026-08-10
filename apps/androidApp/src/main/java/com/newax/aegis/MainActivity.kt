@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -96,6 +97,7 @@ sealed class Screen(val label: String) {
     object People   : Screen("People")
     object AppPermissions : Screen("App Permissions")
     object Capabilities : Screen("Capabilities")
+    object Goals : Screen("Goals")
 }
 
 class MainActivity : FragmentActivity() {
@@ -177,6 +179,7 @@ fun AegisApp(
                         NavEntry(Screen.People,   Icons.Outlined.Person,            "People"),
                         NavEntry(Screen.Backup,   Icons.Outlined.CloudSync,         "Backup"),
                         NavEntry(Screen.Settings, Icons.Outlined.Settings,          "Settings"),
+                        NavEntry(Screen.Goals, Icons.Rounded.CheckCircle,            "Goals"),
                         NavEntry(Screen.Capabilities, Icons.Rounded.Shield,         "Capabilities")
                     ).forEach { entry ->
                         NavigationDrawerItem(
@@ -239,6 +242,7 @@ fun AegisApp(
                                         Screen.Settings -> "Settings"
                                         Screen.AppPermissions -> "App Permissions"
                                         Screen.Capabilities -> "Capabilities"
+                                        Screen.Goals -> "Goals"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize   = 18.sp,
@@ -268,6 +272,7 @@ fun AegisApp(
                     Screen.People   -> PeopleScreen(vm, padding)
                     Screen.AppPermissions -> AppPermissionScreen(padding)
                     Screen.Capabilities -> CapabilitiesScreen(padding)
+                    Screen.Goals -> GoalsScreen(padding)
                     Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions })
                 }
             }

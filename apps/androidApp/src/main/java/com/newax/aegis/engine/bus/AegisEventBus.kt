@@ -25,6 +25,10 @@ sealed class AegisEvent {
     data class SkillInvoked(val skillId: String, val success: Boolean, val durationMs: Long) : AegisEvent()
     data class GoalCreated(val goalId: String, val description: String) : AegisEvent()
     data class GoalCompleted(val goalId: String) : AegisEvent()
+    /** Emitted by GoalExecutor as each plan task flips state (status = TaskStatus.name). */
+    data class TaskUpdated(val goalId: String, val taskId: String, val status: String, val message: String?) : AegisEvent()
+    /** Emitted when a goal run stops on a blocker (unready capability, missing skill, task failure). */
+    data class GoalBlocked(val goalId: String, val reason: String) : AegisEvent()
     data class ErrorOccurred(val module: String, val message: String, val throwable: Throwable? = null) : AegisEvent()
     data class PermissionGranted(val permission: String) : AegisEvent()
     data class PermissionDenied(val permission: String) : AegisEvent()
