@@ -35,6 +35,12 @@ jobs:
       - name: Build platform:android adapter + run its unit tests
         run: ./gradlew :platform:android:assembleDebug :platform:android:testDebugUnitTest --stacktrace
 
+      # The Windows capability adapter (platform/windows) implements the same contract
+      # on the JVM. Its unit tests run on any OS: Windows-only paths are guarded with
+      # JUnit Assume or typed CapabilityResult failures.
+      - name: Build platform:windows adapter + run its unit tests
+        run: ./gradlew :platform:windows:test --stacktrace
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

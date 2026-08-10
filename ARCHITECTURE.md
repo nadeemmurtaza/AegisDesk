@@ -80,7 +80,7 @@ AegisAssistant/
 ├── shared/platform-api/    Platform capability contracts (files, processes, shell, desktop, secrets, system) — contract layer landed (Phase 3); adapters pending
 ├── shared/model-api/       ModelProvider contract — placeholder
 ├── platform/android/       Android adapters — landed (Phase 4): files, processes, shell, desktop, secrets, system
-└── platform/windows/       Windows adapters — placeholder
+└── platform/windows/       Windows adapters — landed (Track A): files, processes, shell, desktop (User32/SendInput/GDI), secrets (DPAPI), system
 ```
 
 | | Android | Windows | macOS | Linux | iOS |
