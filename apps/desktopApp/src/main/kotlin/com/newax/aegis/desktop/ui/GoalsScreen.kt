@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.newax.aegis.desktop.ExecutionAuditEntry
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.TaskStatus
 import com.newax.aegis.desktop.ui.state.GoalTaskUi
@@ -55,6 +56,9 @@ import com.newax.aegis.desktop.ui.state.GoalUiRow
 import com.newax.aegis.desktop.ui.state.GoalsScreenState
 import com.newax.aegis.desktop.ui.state.GoalsUiModel
 import com.newax.aegis.desktop.ui.state.RunProgressLine
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * Goals board — the desktop face of the goal lifecycle (the `printGoals` /
@@ -69,6 +73,7 @@ fun GoalsScreen(state: GoalsScreenState) {
     val model by state.model.collectAsState()
     val runningGoalId by state.runningGoalId.collectAsState()
     val runProgress by state.runProgress.collectAsState()
+    val recentRuns by state.recentRuns.collectAsState()
     var draft by remember { mutableStateOf("") }
 
     LazyColumn(
@@ -129,6 +134,11 @@ fun GoalsScreen(state: GoalsScreenState) {
         // ── Live run log (surfaced while a goal executes) ──────────────────
         if (runProgress.isNotEmpty()) {
             item { RunLogCard(runningGoalId, runProgress) }
+        }
+
+        // ── Execution audit (Phase B3): every run, newest first ─────────────
+        if (recentRuns.isNotEmpty()) {
+            item { RecentRunsCard(recentRuns) }
         }
     }
 }
@@ -426,6 +436,80 @@ private fun BlockBanner(iconColor: Color, title: String, body: String?) {
 }
 
 @Composable
+private fun RecentRunsCard(runs: List<ExecutionAuditEntry>) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+        border = BorderStroke(1.dp, BorderColor),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "Recent runs",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = TextPrimaryColor
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Every goal execution, audited with its outcome and launch tier — persisted under ~/.aegis/goals.json.",
+                fontSize = 12.sp,
+                color = TextTertiaryColor,
+                lineHeight = 17.sp
+            )
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                runs.forEach { run ->
+                    val ok = run.outcome == "COMPLETED"
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(if (ok) ReadyColor else ErrorColor))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                run.goalDescription,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextPrimaryColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                buildString {
+                                    if (run.tiers.isNotEmpty()) append(run.tiers.joinToString(" · ")).append("  ·  ")
+                                    append("${run.taskCount} tasks").append("  ·  ")
+                                    append(formatRunTime(run.completedMs))
+                                    if (run.durationMs > 0) append("  ·  ${run.durationMs} ms")
+                                },
+                                fontSize = 11.5.sp,
+                                color = TextTertiaryColor,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 16.sp
+                            )
+                            run.reason?.let { reason ->
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    reason,
+                                    fontSize = 11.5.sp,
+                                    color = ErrorColor,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        StatusChip(run.outcome, if (ok) ReadyColor else ErrorColor)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val RUN_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+
+private fun formatRunTime(epochMs: Long): String =
+    Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).format(RUN_TIME_FORMATTER)
+
 private fun RunLogCard(runningGoalId: String?, lines: List<RunProgressLine>) {
     Card(
         shape = RoundedCornerShape(16.dp),

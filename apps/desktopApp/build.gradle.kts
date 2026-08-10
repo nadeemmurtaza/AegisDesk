@@ -30,6 +30,11 @@ dependencies {
     // holders (the window's app scope).
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
+    // JSON persistence for goals + execution audit (Phase B3) — the desktop twin of
+    // Android's org.json snapshots. Tiny, no transitive deps; FileGoalsStore writes
+    // ~/.aegis/goals.json best-effort (corrupt/missing file → honest empty start).
+    implementation("org.json:json:20240303")
+
     // Compose Multiplatform desktop UI (Phase B1): full window surface + the
     // Material 3 layer and the extended icon set the Android screens already use
     // (Refresh, Shield, Add, CheckCircle — REFINED_THEME.md design tokens).

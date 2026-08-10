@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.newax.aegis.desktop.DesktopCapabilitiesHolder
+import com.newax.aegis.desktop.GoalsStore
 import com.newax.aegis.desktop.ui.state.AppsScreenState
 import com.newax.aegis.desktop.ui.state.GoalsScreenState
 import com.newax.aegis.desktop.ui.state.LiveGoalRunner
@@ -41,6 +42,7 @@ private enum class DesktopScreen { STATUS, APPS, GOALS }
 fun AegisDesktopApp(
     appScope: CoroutineScope,
     appIndex: WindowsAppIndex?,
+    store: GoalsStore? = null,
 ) {
     AegisTheme {
         var screen by remember { mutableStateOf(DesktopScreen.STATUS) }
@@ -50,6 +52,7 @@ fun AegisDesktopApp(
             GoalsScreenState(
                 scope = appScope,
                 runner = LiveGoalRunner(appIndex = { appIndex }),
+                store = store,
                 registry = { DesktopCapabilitiesHolder.registry() },
             )
         }

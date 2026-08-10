@@ -32,6 +32,15 @@ class StateMachine<S : Enum<S>>(
     fun canTransition(to: S): Boolean = to in (transitions[_state.value] ?: emptySet())
 
     fun allowedTransitions(): Set<S> = transitions[_state.value] ?: emptySet()
+
+    /**
+     * Restores a persisted state directly, bypassing the transition table.
+     * Snapshot rehydration on bootstrap is the only legitimate caller — live
+     * transitions must go through [transition] so illegal moves stay loud.
+     */
+    fun restore(to: S) {
+        _state.value = to
+    }
 }
 
 /**

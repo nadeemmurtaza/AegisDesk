@@ -80,6 +80,8 @@ fun main(args: Array<String>) {
  */
 private fun windowMain() {
     DesktopCapabilitiesHolder.init()
+    val goalsStore = FileGoalsStore()
+    restorePersistedState(goalsStore)
     val appIndex = WindowsAppIndex()
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     var modelProvider: GgufModelProvider? = null
@@ -104,7 +106,7 @@ private fun windowMain() {
             title = "Aegis Assistant — Desktop",
             state = rememberWindowState(size = DpSize(1120.dp, 760.dp)),
         ) {
-            AegisDesktopApp(appScope = appScope, appIndex = appIndex)
+            AegisDesktopApp(appScope = appScope, appIndex = appIndex, store = goalsStore)
         }
     }
 
@@ -144,6 +146,8 @@ private suspend fun cliMain(args: Array<String>) {
 
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
     DesktopCapabilitiesHolder.init()
+    val goalsStore = FileGoalsStore()
+    restorePersistedState(goalsStore)
     val appIndex = WindowsAppIndex()
     printStatusBlock()
 
@@ -222,6 +226,7 @@ private suspend fun cliMain(args: Array<String>) {
             }
             if (prompt.startsWith("plan ", ignoreCase = true)) {
                 printPlan(prompt.substring(5).trim())
+                goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
             if (prompt.startsWith("apps", ignoreCase = true)) {
@@ -234,10 +239,12 @@ private suspend fun cliMain(args: Array<String>) {
             }
             if (prompt.startsWith("run ", ignoreCase = true)) {
                 printRunGoal(prompt.substring(4).trim(), appIndex)
+                goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
             if (prompt.startsWith("abandon ", ignoreCase = true)) {
                 printAbandon(prompt.substring(8).trim())
+                goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
 
@@ -382,6 +389,16 @@ private fun printGoals() {
             println("        feasible — \"run ${index + 1}\" to execute")
         }
     }
+    val runs = ExecutionAudit.recent()
+    if (runs.isNotEmpty()) {
+        println("  ── Recent runs (execution audit) ────────────────────────")
+        runs.take(5).forEach { run ->
+            val tierText = if (run.tiers.isEmpty()) "no tier" else run.tiers.joinToString(" · ")
+            println("    ${run.outcome.lowercase().replaceFirstChar { it.uppercase() }}  ${run.goalDescription}  [$tierText]  ${auditTime(run.completedMs)}")
+            run.reason?.let { println("        ✗ $it") }
+        }
+        println()
+    }
     println()
 }
 
@@ -491,6 +508,20 @@ private fun progressBar(progress: Float, width: Int = 10): String {
     val filled = (progress.coerceIn(0f, 1f) * width).roundToInt()
     return "[" + "█".repeat(filled) + "░".repeat(width - filled) + "]"
 }
+
+/** Restores the persisted goals + audit snapshot on bootstrap (Phase B3). A missing or corrupt store is an honest empty start. */
+private fun restorePersistedState(store: GoalsStore) {
+    val snapshot = store.load() ?: return
+    DesktopGoalPlanner.restore(snapshot)
+    ExecutionAudit.replaceAll(snapshot.runs)
+    println("[goals] restored ${snapshot.goals.size} goal(s), ${snapshot.runs.size} audit run(s) from ${FileGoalsStore.defaultFile()}")
+}
+
+private val AUDIT_TIME_FORMATTER: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+
+private fun auditTime(epochMs: Long): String =
+    java.time.Instant.ofEpochMilli(epochMs).atZone(java.time.ZoneId.systemDefault()).format(AUDIT_TIME_FORMATTER)
 
 private fun formatGb(bytes: Long): String = when {
     bytes >= 1_000_000_000 -> "${ "%.2f".format(bytes / 1_000_000_000.0) } GB"

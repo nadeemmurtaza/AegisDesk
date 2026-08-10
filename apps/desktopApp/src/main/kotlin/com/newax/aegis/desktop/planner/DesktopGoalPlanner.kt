@@ -1,5 +1,8 @@
 package com.newax.aegis.desktop.planner
 
+import com.newax.aegis.desktop.ExecutionAudit
+import com.newax.aegis.desktop.GoalsSnapshot
+import com.newax.aegis.desktop.PlanVerdict
 import com.newax.aegis.platform.CapabilityResolution
 import com.newax.aegis.platform.CapabilityResolver
 import com.newax.aegis.platform.PlatformCapabilityRegistry
@@ -237,6 +240,52 @@ object DesktopGoalPlanner {
         .sortedByDescending { it.priority }
 
     fun allGoals(): List<Goal> = goals.values.toList()
+
+    /**
+     * Captures the full planner state (Phase B3 persistence) — goals, task
+     * graphs, state machines, plan verdicts — plus the execution audit trail,
+     * for [com.newax.aegis.desktop.FileGoalsStore] to write on every mutation.
+     */
+    fun snapshot(): GoalsSnapshot = GoalsSnapshot(
+        // Deterministic ordering so snapshot equality is stable across saves.
+        goals = goals.values.sortedWith(compareBy({ it.createdMs }, { it.id })),
+        graphs = graphs.values.sortedWith(compareBy({ it.createdMs }, { it.goalId })),
+        states = stateMachines.mapValues { (_, machine) -> machine.current },
+        plans = plans.mapValues { (_, plan) ->
+            PlanVerdict(plan.feasible, plan.missingSkills, plan.missingCapabilities, plan.warnings)
+        },
+        runs = ExecutionAudit.all(),
+    )
+
+    /**
+     * Replaces the in-memory state with a persisted snapshot (bootstrap only —
+     * never mid-session). State machines are rehydrated directly ([StateMachine.restore])
+     * because persisted states like BLOCKED/COMPLETED are unreachable through the
+     * live transition table; plan verdicts are rebuilt from goal + graph + verdict.
+     */
+    fun restore(snapshot: GoalsSnapshot) {
+        goals.clear()
+        graphs.clear()
+        stateMachines.clear()
+        plans.clear()
+        snapshot.goals.forEach { goals[it.id] = it }
+        snapshot.graphs.forEach { graphs[it.id] = it }
+        snapshot.states.forEach { (id, state) ->
+            stateMachines[id] = StateMachines.goal().apply { restore(state) }
+        }
+        snapshot.plans.forEach { (id, verdict) ->
+            val goal = goals[id] ?: return@forEach
+            val graph = graphs[id] ?: return@forEach
+            plans[id] = DesktopPlan(
+                goal = goal,
+                tasks = graph.tasks,
+                feasible = verdict.feasible,
+                missingSkills = verdict.missingSkills,
+                missingCapabilities = verdict.missingCapabilities,
+                warnings = verdict.warnings,
+            )
+        }
+    }
 
     private fun inferIntent(description: String): String {
         val lower = description.lowercase()

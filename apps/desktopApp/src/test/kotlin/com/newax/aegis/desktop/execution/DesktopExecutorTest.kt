@@ -1,6 +1,7 @@
 package com.newax.aegis.desktop.execution
 
 import com.newax.aegis.assistant.ActionOrigin
+import com.newax.aegis.desktop.ExecutionAudit
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.TaskStatus
@@ -185,6 +186,43 @@ class DesktopExecutorTest {
         val launchTask = DesktopGoalPlanner.getGraph(plan.goal.id)!!.tasks
             .first { it.skillId == "launch_app" }
         assertTrue("reports the exact tier", launchTask.result!!.contains("EXACT_TARGET"))
+    }
+
+    @Test
+    fun `run records an audit entry with the tier used`() {
+        ExecutionAudit.replaceAll(emptyList()) // isolate from other tests' runs
+        val registry = registryWith(FakeDesktopCapability(CapabilityStatus.READY))
+        val plan = DesktopGoalPlanner.plan("open spotify", registry)
+        val index = WindowsAppIndex(
+            FakeAppIndexBridge(
+                listOf(AppIndexEntry("Spotify", "Music", "C:\\Start Menu\\Programs\\Music\\Spotify.lnk"))
+            )
+        )
+        val router = DesktopExecutionRouter(launchProcess = { false }, launchShortcut = { true })
+
+        val result = runBlocking { DesktopGoalExecutor.run(plan.goal.id, registry, router, index) }
+
+        assertTrue("expected success", result.isSuccess)
+        val entry = ExecutionAudit.recent().first { it.goalId == plan.goal.id }
+        assertEquals("COMPLETED", entry.outcome)
+        assertNull(entry.reason)
+        assertTrue("reports the exact tier", entry.tiers.contains("EXACT_TARGET"))
+        assertEquals(2, entry.taskCount)
+        assertTrue("records the window", entry.completedMs >= entry.startedMs)
+    }
+
+    @Test
+    fun `failed run records a BLOCKED audit entry with the reason`() {
+        ExecutionAudit.replaceAll(emptyList()) // isolate from other tests' runs
+        val registry = registryWith(FakeDesktopCapability(CapabilityStatus.NOT_SUPPORTED))
+        val plan = DesktopGoalPlanner.plan("open spotify", registry)
+
+        val result = runBlocking { DesktopGoalExecutor.run(plan.goal.id, registry) }
+
+        assertFalse("expected failure", result.isSuccess)
+        val entry = ExecutionAudit.recent().first { it.goalId == plan.goal.id }
+        assertEquals("BLOCKED", entry.outcome)
+        assertTrue("carries the blocker", entry.reason!!.contains("OPEN_APP"))
     }
 
     @Test

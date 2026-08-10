@@ -1,5 +1,9 @@
 package com.newax.aegis.desktop.ui.state
 
+import com.newax.aegis.desktop.DesktopGoalPlanner
+import com.newax.aegis.desktop.ExecutionAudit
+import com.newax.aegis.desktop.ExecutionAuditEntry
+import com.newax.aegis.desktop.GoalsStore
 import com.newax.aegis.desktop.planner.DesktopPlan
 import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState
@@ -63,6 +67,9 @@ class GoalsScreenState(
     private val scope: CoroutineScope,
     private val planner: DesktopPlannerSurface = LivePlannerSurface,
     private val runner: GoalRunner,
+    private val store: GoalsStore? = null,
+    private val auditSource: () -> List<ExecutionAuditEntry> =
+        { ExecutionAudit.recent(ExecutionAudit.RECENT_LIMIT) },
     private val registry: () -> PlatformCapabilityRegistry?,
 ) {
 
@@ -75,15 +82,19 @@ class GoalsScreenState(
     private val _runProgress = MutableStateFlow<List<RunProgressLine>>(emptyList())
     val runProgress: StateFlow<List<RunProgressLine>> = _runProgress.asStateFlow()
 
+    private val _recentRuns = MutableStateFlow<List<ExecutionAuditEntry>>(emptyList())
+    val recentRuns: StateFlow<List<ExecutionAuditEntry>> = _recentRuns.asStateFlow()
+
     private val MAX_PROGRESS_LINES = 200
 
-    /** Re-snapshots the planner into the board model (Loading → Content/Error). */
+    /** Re-snapshots the planner into the board model (Loading → Content/Error) and refreshes the recent-runs list. */
     fun refresh() {
         try {
             val rows = planner.allGoals()
                 .sortedByDescending { it.priority }
                 .map { goal -> rowOf(goal) }
             _model.value = GoalsUiModel.Content(rows)
+            _recentRuns.value = auditSource()
         } catch (e: Exception) {
             _model.value = GoalsUiModel.Error(e.message ?: e.javaClass.simpleName)
         }
@@ -94,12 +105,14 @@ class GoalsScreenState(
         val trimmed = description.trim()
         if (trimmed.isEmpty()) return
         planner.plan(trimmed, registry())
+        persist()
         refresh()
     }
 
     /** Gives up on a goal — OPEN/ACTIVE/BLOCKED → ABANDONED (mirrors the board button). */
     fun abandon(goalId: String) {
         planner.abandon(goalId)
+        persist()
         refresh()
     }
 
@@ -116,11 +129,19 @@ class GoalsScreenState(
         scope.launch {
             val result = runner.run(goalId) { line -> appendProgress(goalId, line) }
             _runningGoalId.value = null
+            // The executor records its audit entry before returning, so the
+            // snapshot persisted here already includes this run.
+            persist()
             refresh()
             if (result.isFailure) {
                 appendProgress(goalId, result.exceptionOrNull()?.message ?: "execution failed")
             }
         }
+    }
+
+    /** Persists the live planner snapshot (Phase B3) after every mutation. */
+    private fun persist() {
+        store?.save(DesktopGoalPlanner.snapshot())
     }
 
     private fun appendProgress(goalId: String, line: String) {
