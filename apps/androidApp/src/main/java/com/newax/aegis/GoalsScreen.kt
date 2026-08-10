@@ -242,7 +242,7 @@ fun GoalsScreen(
                 }
             }
         } else {
-            items(rows, key = { it.goal.id }) { row -> GoalCard(row) { refreshKey++ } }
+            items(rows, key = { it.goal.id }) { row -> GoalCard(row, onOpenPolicyModes) { refreshKey++ } }
         }
 
         // ── Recent runs (execution audit trail, Track A8) ────────────────
@@ -258,7 +258,7 @@ private fun addGoal(text: String, onAdded: () -> Unit) {
 }
 
 @Composable
-private fun GoalCard(row: GoalRow, onChanged: () -> Unit) {
+private fun GoalCard(row: GoalRow, onOpenPolicyModes: () -> Unit, onChanged: () -> Unit) {
     val plan  = row.plan
     val graph = row.graph
     val tasks = graph?.tasks.orEmpty()

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.assistant.ProposedAction
+import com.newax.aegis.assistant.riskLevel
 import com.newax.aegis.authority.PolicyAuditRecord
 import com.newax.aegis.authority.PolicyDecision
 import com.newax.aegis.authority.PolicyEngine

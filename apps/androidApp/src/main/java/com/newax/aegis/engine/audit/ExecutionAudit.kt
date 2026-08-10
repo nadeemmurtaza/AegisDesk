@@ -67,13 +67,16 @@ object ExecutionAuditCodec {
             .toString()
 
     /** Returns null when the stored JSON is corrupt or from an unknown format. */
-    fun decode(json: String): List<ExecutionAuditEntry>? = try {
-        val root = JSONObject(json)
-        if (root.optInt(KEY_VERSION, 0) != VERSION) return null
-        val arr = root.optJSONArray(KEY_RUNS) ?: return null
-        (0 until arr.length()).map { idx -> decodeEntry(arr.getJSONObject(idx)) }
-    } catch (_: JSONException) {
-        null
+    fun decode(json: String): List<ExecutionAuditEntry>? {
+        return try {
+            val root = JSONObject(json)
+            if (root.optInt(KEY_VERSION, 0) != VERSION) null else {
+                val arr = root.optJSONArray(KEY_RUNS) ?: return null
+                (0 until arr.length()).map { idx -> decodeEntry(arr.getJSONObject(idx)) }
+            }
+        } catch (_: JSONException) {
+            null
+        }
     }
 
     private fun encodeEntry(e: ExecutionAuditEntry): JSONObject =

@@ -344,7 +344,7 @@ object GoalPlanner {
             }
             goals[goal.id] = goal
             graphs[goal.id] = graph
-            plans[goal.id] = s.plan
+            s.plan?.let { plans[goal.id] = it }
             val machine = StateMachines.goal()
             machine.seed(s.state)
             stateMachines[goal.id] = machine
