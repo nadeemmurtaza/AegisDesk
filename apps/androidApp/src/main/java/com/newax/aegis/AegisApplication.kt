@@ -14,6 +14,9 @@ import com.newax.aegis.db.DbKeyManager
 import com.newax.aegis.db.migration.LegacyMigrationWorker
 import com.newax.aegis.memory.SecureKeyVault
 import com.newax.aegis.engine.trigger.TriggerEngine as CoreTriggerEngine
+import com.newax.aegis.engine.intelligence.GoalPlanner
+import com.newax.aegis.engine.audit.ExecutionAuditHolder
+import com.newax.aegis.engine.registry.DbGoalSnapshotStore
 import com.newax.aegis.engine.ContactScannerWorker
 import com.newax.aegis.engine.background.IntelligenceWorker
 import com.newax.aegis.engine.embedding.EmbeddingEngine
@@ -54,8 +57,21 @@ class AegisApplication : Application() {
         // Register the platform capability surface (files, processes, shell, desktop,
         // secrets, system) so the UI and future executor can query their state.
         PlatformCapabilitiesHolder.init(this)
+        // The one policy engine per process (authority spine, Track A2): user
+        // overrides persist encrypted; toggle reads degrade to "off" (approval)
+        // until MainViewModel initializes AutomationSettings — the safe default.
+        PolicyHolder.init(this)
         DbKeyManager.migrateFromMemoryIfNeeded(memory)
         AegisDatabase.init(com.newax.aegis.db.getAegisDatabase(this, DbKeyManager.getOrCreate()))
+        // Goals survive restarts (Track A5): every planner mutation persists a JSON
+        // snapshot to the existing kv_store table (no schema change), and restore
+        // rehydrates the planner before any screen or executor reads it.
+        val goalStore = DbGoalSnapshotStore(AegisDatabase.get.kvStoreDao())
+        GoalPlanner.onChange = goalStore::save
+        goalStore.restore()
+        // Execution audit trail (Track A8): every goal run is recorded for the
+        // Goals screen's "Recent runs" section; persisted to kv_store like goals.
+        ExecutionAuditHolder.init(AegisDatabase.get.kvStoreDao())
         CoreTriggerEngine.start(this, AegisDatabase.get) { _, _ -> }
         // One-shot migration from legacy EncryptedSharedPreferences storage
         if (runBlocking { AegisDatabase.get.kvStoreDao().get("migration_v1_done") } != "1") {

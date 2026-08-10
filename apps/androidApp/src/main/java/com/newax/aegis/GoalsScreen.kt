@@ -1,6 +1,7 @@
 package com.newax.aegis
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,17 +26,24 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.newax.aegis.engine.audit.ExecutionAuditEntry
+import com.newax.aegis.engine.audit.ExecutionAuditHolder
+import com.newax.aegis.engine.audit.RunOutcome
 import com.newax.aegis.engine.bus.AegisEvent
 import com.newax.aegis.engine.bus.AegisEventBus
 import com.newax.aegis.engine.execution.GoalExecutor
 import com.newax.aegis.engine.intelligence.Goal
 import com.newax.aegis.engine.intelligence.GoalPlanner
 import com.newax.aegis.engine.intelligence.PlanResult
+import com.newax.aegis.engine.intelligence.TaskFailureKind
 import com.newax.aegis.engine.intelligence.TaskGraph
 import com.newax.aegis.engine.intelligence.TaskStatus
 import com.newax.aegis.engine.state.GoalState
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ── Design tokens (REFINED_THEME.md) ────────────────────────────────────────
 private val Surface      = Color(0xFFFFFFFF)
@@ -93,10 +101,15 @@ private fun readGoalSnapshot(): List<GoalRow> =
  * the Capabilities screen). States: empty (no goals yet), content.
  */
 @Composable
-fun GoalsScreen(padding: PaddingValues) {
+fun GoalsScreen(
+    padding: PaddingValues,
+    /** Fired from a policy-blocked task — jumps the user to the Policy modes section. */
+    onOpenPolicyModes: () -> Unit = {}
+) {
     var refreshKey by remember { mutableStateOf(0) }
     var draft by remember { mutableStateOf("") }
     val rows = remember(refreshKey) { readGoalSnapshot() }
+    val runs = remember(refreshKey) { ExecutionAuditHolder.recent(6) }
 
     // Live updates: task transitions, blocked goals, and completions re-read the snapshot.
     LaunchedEffect(Unit) {
@@ -231,6 +244,9 @@ fun GoalsScreen(padding: PaddingValues) {
         } else {
             items(rows, key = { it.goal.id }) { row -> GoalCard(row) { refreshKey++ } }
         }
+
+        // ── Recent runs (execution audit trail, Track A8) ────────────────
+        item { RecentRunsSection(runs) }
     }
 }
 
@@ -385,7 +401,39 @@ private fun GoalCard(row: GoalRow, onChanged: () -> Unit) {
                     Text("Running: ${runningTask.description}", fontSize = 12.sp, color = TextSec)
                 }
             }
-            tasks.filter { it.status == TaskStatus.FAILED }.forEach { failed ->
+            // Policy-blocked tasks first, with distinct amber treatment: the refusal
+            // is actionable (change the mode or run from chat), so the task gets its
+            // own label and a direct path into the Policy modes section.
+            tasks.filter {
+                it.status == TaskStatus.FAILED && it.failureKind == TaskFailureKind.POLICY
+            }.forEach { failed ->
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(WarnCol)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(failed.description, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                            Spacer(Modifier.width(8.dp))
+                            PolicyTag()
+                        }
+                        failed.result?.let { result ->
+                            Spacer(Modifier.height(2.dp))
+                            Text(result, fontSize = 12.sp, color = TextTer, lineHeight = 16.sp)
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        ActionButton("Policy modes", WarnCol, onOpenPolicyModes)
+                    }
+                }
+            }
+            tasks.filter {
+                it.status == TaskStatus.FAILED && it.failureKind != TaskFailureKind.POLICY
+            }.forEach { failed ->
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -483,6 +531,106 @@ private fun BlockBanner(iconColor: Color, title: String, body: String?) {
                 Text(body, fontSize = 12.sp, color = TextSec, lineHeight = 17.sp)
             }
         }
+    }
+}
+
+@Composable
+private fun RecentRunsSection(runs: List<ExecutionAuditEntry>) {
+    if (runs.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Recent runs", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+        runs.forEach { run -> RunCard(run) }
+    }
+}
+
+@Composable
+private fun RunCard(run: ExecutionAuditEntry) {
+    var expanded by remember { mutableStateOf(false) }
+    val outcomeColor = if (run.outcome == RunOutcome.COMPLETED) ReadyCol else ErrorCol
+    Card(
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = Surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(outcomeColor))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    run.goalDescription,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextPri,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(runTime(run.startedMs), fontSize = 11.sp, color = TextTer)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                buildString {
+                    append(run.outcome.name.lowercase().replaceFirstChar { it.uppercase() })
+                    append(" · ")
+                    append(run.tasks.size)
+                    append(" task")
+                    if (run.tasks.size != 1) append("s")
+                    run.durationMs?.let { append(" · ").append(it).append(" ms") }
+                },
+                fontSize = 11.sp,
+                color = TextTer
+            )
+            if (expanded) {
+                Spacer(Modifier.height(8.dp))
+                run.tasks.forEach { task ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            when (task.status) {
+                                com.newax.aegis.engine.intelligence.TaskStatus.COMPLETED -> "✓"
+                                com.newax.aegis.engine.intelligence.TaskStatus.FAILED -> "✗"
+                                else -> "·"
+                            },
+                            fontSize = 11.sp,
+                            color = if (task.status == com.newax.aegis.engine.intelligence.TaskStatus.FAILED) ErrorCol else TextSec,
+                            modifier = Modifier.width(14.dp)
+                        )
+                        Text(task.description, fontSize = 12.sp, color = TextSec, modifier = Modifier.weight(1f))
+                        Text(task.tier ?: "skill", fontSize = 10.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                    }
+                    task.result?.let { result ->
+                        Spacer(Modifier.height(2.dp))
+                        Text(result, fontSize = 11.sp, color = TextTer, lineHeight = 15.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun runTime(ms: Long): String =
+    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms))
+
+@Composable
+private fun PolicyTag() {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(WarnCol.copy(alpha = 0.14f))
+            .padding(horizontal = 7.dp, vertical = 2.dp)
+    ) {
+        Text(
+            "policy",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = WarnCol,
+            letterSpacing = 0.4.sp
+        )
     }
 }
 

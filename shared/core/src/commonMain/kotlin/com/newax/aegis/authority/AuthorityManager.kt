@@ -46,4 +46,23 @@ class AuthorityManager {
     fun reject(action: ProposedAction, reason: String = "User rejected action") {
         _events.tryEmit(AuthorityEvent.Rejected(action, reason))
     }
+
+    /**
+     * Applies a [PolicyEngine] evaluation as an authority event — the richer policy
+     * path (ARCHITECTURE.md rule 3: "a richer PolicyEngine as it evolves"). The
+     * legacy [evaluate] remains for direct callers; this is how PolicyEngine
+     * decisions reach the same approval UI flow.
+     */
+    fun apply(evaluation: PolicyEvaluation) {
+        val event = when (evaluation.decision) {
+            PolicyDecision.AUTO_EXECUTE -> AuthorityEvent.Approved(evaluation.action)
+            PolicyDecision.REQUIRE_APPROVAL -> AuthorityEvent.RequestApproval(
+                evaluation.action,
+                evaluation.action.confirmationWarning,
+            )
+            PolicyDecision.REQUIRE_STRONG -> AuthorityEvent.RequestBiometric(evaluation.action)
+            PolicyDecision.DENY -> AuthorityEvent.Rejected(evaluation.action, evaluation.reason)
+        }
+        _events.tryEmit(event)
+    }
 }

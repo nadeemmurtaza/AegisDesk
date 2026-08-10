@@ -1,5 +1,6 @@
 package com.newax.aegis.engine.intelligence
 
+import com.newax.aegis.assistant.ProposedAction
 import com.newax.aegis.engine.bus.AegisEvent
 import com.newax.aegis.engine.bus.AegisEventBus
 import java.util.concurrent.ConcurrentHashMap
@@ -73,6 +74,24 @@ object SkillRegistry {
             AegisEventBus.emit(AegisEvent.SkillInvoked(id, false, durationMs))
             Result.failure(e)
         }
+    }
+
+    /**
+     * The representative action the policy spine evaluates before the executor
+     * may run a skill (rule 10: a plan grants zero execution authority). Skills
+     * mapped here are the privileged ones — the GoalExecutor refuses to run them
+     * unless the PolicyEngine's machine-origin decision allows autonomous
+     * execution. Read-only/analysis skills return null (no policy gate; the
+     * capability gate still applies). The representative's risk class drives the
+     * default policy mode, so the mapping follows riskOf: communication → Send
+     * (HIGH), calendar writes → CreateEvent (HIGH), app/media launch → OpenApp
+     * (LOW), deletion → DeleteFile (CRITICAL).
+     */
+    fun policyActionFor(skillId: String): ProposedAction? = when (skillId) {
+        "send_message" -> ProposedAction.Send("")
+        "set_reminder" -> ProposedAction.CreateEvent("", "")
+        "launch_app", "play_media" -> ProposedAction.OpenApp("")
+        else -> null
     }
 
     fun findByCapability(capability: String): List<SkillDefinition> =

@@ -135,6 +135,9 @@ fun AegisApp(
     val drawerState   = rememberDrawerState(DrawerValue.Closed)
     val scope         = rememberCoroutineScope()
     var screen by remember { mutableStateOf<Screen>(Screen.Chat) }
+    // Bumped when a policy-blocked goal task jumps to the Capabilities screen,
+    // which scrolls itself to the Policy modes section.
+    var policyScrollSignal by remember { mutableIntStateOf(0) }
     val pendingDrafts by vm.pendingDrafts.collectAsStateWithLifecycle()
     val draftCount = pendingDrafts.size
 
@@ -271,8 +274,18 @@ fun AegisApp(
                     Screen.Backup   -> BackupRestoreScreen(vm, padding)
                     Screen.People   -> PeopleScreen(vm, padding)
                     Screen.AppPermissions -> AppPermissionScreen(padding)
-                    Screen.Capabilities -> CapabilitiesScreen(padding)
-                    Screen.Goals -> GoalsScreen(padding)
+                    Screen.Capabilities -> CapabilitiesScreen(
+                        padding,
+                        policyScrollSignal = policyScrollSignal,
+                        onScrollHandled = { policyScrollSignal = 0 }
+                    )
+                    Screen.Goals -> GoalsScreen(
+                        padding,
+                        onOpenPolicyModes = {
+                            policyScrollSignal++
+                            screen = Screen.Capabilities
+                        }
+                    )
                     Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions })
                 }
             }

@@ -194,7 +194,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun bumpAutomationVersion() { automationVersion++ }
 
     /**
-     * Route an action through the shared AuthorityManager.
+     * Route an action through the authority spine (ARCHITECTURE.md rule 3).
+     *
+     * The PolicyEngine resolves the user's policy mode for the action class
+     * (override or risk default), applies the decision table (AUTO_EXECUTE /
+     * REQUIRE_APPROVAL / REQUIRE_STRONG / DENY), and audits the evaluation;
+     * [AuthorityManager.apply] maps the decision onto the same approval UI flow
+     * (Approved / RequestApproval / RequestBiometric / Rejected). The PersonPolicy
+     * gate stays: send actions always require approval, enforced before the engine.
      */
     private fun processAction(action: ProposedAction, origin: ActionOrigin = ActionOrigin.USER) {
         // PersonPolicy gate: send actions always require approval (policy-enforced)
@@ -202,9 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             enqueueForApproval(action)
             return
         }
-        val toggle = AutomationSettings.toggleForAction(action)
-        val enabled = toggle != null && AutomationSettings.isEnabled(toggle)
-        authorityManager.evaluate(action, origin, enabled)
+        authorityManager.apply(PolicyHolder.engine().evaluate(action, origin))
     }
 
     private fun enqueueForApproval(action: ProposedAction) {

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -96,15 +97,33 @@ private fun readSnapshot(): List<CapabilityRow>? =
  * States: error (registry not initialized), empty (nothing registered), content.
  */
 @Composable
-fun CapabilitiesScreen(padding: PaddingValues) {
+fun CapabilitiesScreen(
+    padding: PaddingValues,
+    /**
+     * One-shot jump to the Policy modes section (the last list item). The Goals
+     * screen bumps this when a policy-blocked task asks for the fix; the signal
+     * resets itself via [onScrollHandled] so a later manual visit doesn't re-scroll.
+     */
+    policyScrollSignal: Int = 0,
+    onScrollHandled: () -> Unit = {}
+) {
     var refreshKey by remember { mutableStateOf(0) }
     val rows = remember(refreshKey) { readSnapshot() }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(policyScrollSignal) {
+        if (policyScrollSignal > 0 && listState.layoutInfo.totalItemsCount > 0) {
+            listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+            onScrollHandled()
+        }
+    }
 
     LazyColumn(
         Modifier
             .fillMaxSize()
             .padding(padding)
             .padding(horizontal = 16.dp),
+        state               = listState,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding      = PaddingValues(vertical = 12.dp)
     ) {
@@ -183,6 +202,9 @@ fun CapabilitiesScreen(padding: PaddingValues) {
             }
             else -> items(rows, key = { it.id.name }) { CapabilityCard(it) }
         }
+
+        // ── Policy settings — authority spine (Track A2) ────────────────────
+        item { PolicySettingsSection() }
     }
 }
 
