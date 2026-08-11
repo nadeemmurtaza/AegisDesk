@@ -442,6 +442,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         // ─────────────────────────────────────────────────────────────────────
+        // Multi-agent orchestration (docs/AGENTS_DESIGN.md): route the request
+        // (per step), chain handoffs between the dominant agents (they
+        // communicate through the L3 shared-write layer), and record the
+        // orchestration as episodes. The active-agent block is injected into
+        // the model prompt below; disabled agents never route.
+        val agentPlan = com.newax.aegis.agents.AgentOrchestrator.planFor(text)
+        runCatching { com.newax.aegis.agents.AgentOrchestrator.assemble(agentPlan) }
         if (!engine.canHandle(text) && !text.contains(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE))) {
             val provider = modelProvider
             if (provider == null || provider.state.value != ModelState.READY) {
@@ -482,6 +489,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             .filter { !it.text.startsWith("[System") && !it.text.startsWith("Processing background") }
                             .joinToString("\n") { if (it.fromUser) "User: ${it.text}" else "Assistant: ${it.text}" }
                         val prompt = buildString {
+                            val agentContext = com.newax.aegis.agents.AgentOrchestrator.contextFor(agentPlan)
+                            if (agentContext.isNotBlank()) append("$agentContext\n")
                             val profile = memory.getAllCategories().entries
                                 .filter { it.value.isNotEmpty() }
                                 .joinToString("\n") { "${it.key.uppercase()}:\n- " + it.value.joinToString("\n- ") }
@@ -534,10 +543,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty()
         val parts = text.split(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE)).map { it.trim() }.filter { it.isNotEmpty() }
-        val replies = parts.map { part ->
+        val replies = parts.mapIndexed { index, part ->
+            // Per-step agent dominance (docs/AGENTS_DESIGN.md): each step's
+            // dominant agent context rides into the engine as a memory line.
+            val stepAgent = agentPlan.steps.getOrNull(index)?.dominant?.let {
+                listOf("[Agent: ${it.name} (${it.category})] ${it.description}")
+            } ?: emptyList()
             engine.generateReply(
                 part, screen,
-                if (lower in setOf("what do you remember", "show memory", "recall")) memory.getAllCategories().values.flatten() else VectorMemorySearch.search(db, memory, part)
+                if (lower in setOf("what do you remember", "show memory", "recall")) memory.getAllCategories().values.flatten() else VectorMemorySearch.search(db, memory, part) + stepAgent
             )
         }
         messages += ChatMessage(replies.joinToString("\n") { it.text }, false)

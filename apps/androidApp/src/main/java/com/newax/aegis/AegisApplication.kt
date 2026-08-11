@@ -71,6 +71,10 @@ class AegisApplication : Application() {
         PolicyHolder.init(this)
         DbKeyManager.migrateFromMemoryIfNeeded(memory)
         AegisDatabase.init(com.newax.aegis.db.getAegisDatabase(this, DbKeyManager.getOrCreate()))
+        // Multi-agent registry (docs/AGENTS_DESIGN.md): seeds the built-in
+        // agents (coding/planning/research/organizer) so routing works out of
+        // the box before any package import.
+        com.newax.aegis.agents.AgentRegistry.init(this)
         // Goals survive restarts (Track A5): every planner mutation persists a JSON
         // snapshot to the existing kv_store table (no schema change), and restore
         // rehydrates the planner before any screen or executor reads it.

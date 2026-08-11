@@ -31,7 +31,8 @@ fun getAegisDatabase(file: File): AegisDatabase {
             AegisDatabase.MIGRATION_10_11,
             AegisDatabase.MIGRATION_11_12,
             AegisDatabase.MIGRATION_12_13,
-            AegisDatabase.MIGRATION_13_14
+            AegisDatabase.MIGRATION_13_14,
+            AegisDatabase.MIGRATION_14_15
         )
         .build()
 }

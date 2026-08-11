@@ -46,9 +46,10 @@ import androidx.sqlite.execSQL
         Episode::class,
         HandoffEntry::class,
         WorkLogEntry::class,
-        LibraryEntry::class
+        LibraryEntry::class,
+        AgentEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = true
 )
 @ConstructedBy(AegisDatabaseConstructor::class)
@@ -70,6 +71,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun syncJournalDao(): SyncJournalDao
     abstract fun syncVectorDao(): SyncVectorDao
     abstract fun agentMemoryDao(): AgentMemoryDao
+    abstract fun agentRegistryDao(): AgentRegistryDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -333,6 +335,36 @@ abstract class AegisDatabase : RoomDatabase() {
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_library_entries_category ON library_entries(category)")
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_library_entries_status ON library_entries(status)")
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_library_entries_title ON library_entries(title)")
+            }
+        }
+
+        /**
+         * v15 — the multi-agent registry (docs/AGENTS_DESIGN.md): one `agents`
+         * table (manifest, version, enabled, package dir). Device-local by
+         * design — no sync columns, not in SyncPolicy (the mesh syncs the
+         * memory agents produce, never the binaries).
+         */
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(connection: SQLiteConnection) {
+                // Room keeps @ColumnInfo(defaultValue) only — fields with plain
+                // Kotlin defaults (source, packageDir, keywords, skills) get NO
+                // DEFAULT clause; the migration must match the generated schema.
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS agents (
+                        agentId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        version TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        keywords TEXT NOT NULL,
+                        skills TEXT NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        source TEXT NOT NULL,
+                        installedAtMs INTEGER NOT NULL DEFAULT 0,
+                        packageDir TEXT NOT NULL,
+                        PRIMARY KEY (agentId)
+                    )
+                """)
             }
         }
 
