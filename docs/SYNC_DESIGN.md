@@ -1,6 +1,6 @@
 # SYNC DESIGN — the 4-device encrypted mesh (I / A / M / W)
 
-Date: 2026-08-11. Status: design + slice plan (S0–S7 + P1–P2). **Landed: S0 (DB substrate), S1 (engine core), S2 (identity/pairing/session crypto), S3 (LAN transport), S4 (relay), P1 (encrypted Quick Share protocol + discovery seam), P2 (Android BLE/WiFi-Direct proximity actual + Nearby Share UI + desktop CLI listener), W1 (Room-backed JournalStore + automatic loops on Android/Windows/macOS), capture slice 1 (graph + people record tables sync end-to-end).** Remaining: S5 wiring/surfaces, S6 commands, S7 files, P2-iOS (Multipeer Connectivity actual), and the rest of the syncable-table capture coverage. **S4 (relay) now covers Android too**: the relay transport moved to jvmAndroidMain behind a `WsClient` seam (java.net.http on JVM, OkHttp on Android) and is wired into the Android `SyncWorker` relay phase + the SyncScreen relay URL field — WAN sync works wherever a relay is reachable. **Deploying the relay:** `relay/` is a bare Node service, already deploy-shaped (binds 0.0.0.0, reads `PORT`; install `npm --prefix relay install`, start `node relay/server.js` — see its header). The platform deploy CLIs are not available in the Linux sandbox, so the actual hosting deploy is a platform-side action; decide hosting per §14.2. **Track I (iOS) status:** audit + driver research done — `shared/sync` + `shared/database` commonMain verified platform-free (zero java./android./platform imports); Room 2.7.0-alpha13 KMP officially supports iOS (bundled sqlite driver); the remaining work — declaring the iOS targets, the 4 iosMain `actual`s (Keychain/CommonCrypto/CryptoKit-shim + Network.framework/POSIX transport + CoreBluetooth proximity), the `shared/database` iOS builder, and the `apps/iosApp` shell — **requires a Mac + Xcode and cannot be compiled or verified in the Linux sandbox**; exact steps in §15.
+Date: 2026-08-11. Status: design + slice plan (S0–S7 + P1–P2). **Landed: S0 (DB substrate), S1 (engine core), S2 (identity/pairing/session crypto), S3 (LAN transport), S4 (relay), P1 (encrypted Quick Share protocol + discovery seam), P2 (Android BLE/WiFi-Direct proximity actual + Nearby Share UI + desktop CLI listener), W1 (Room-backed JournalStore + automatic loops on Android/Windows/macOS), capture slice 1 (graph + people record tables sync end-to-end).** Remaining: S5 wiring/surfaces, S6 commands, S7 files, P2-iOS (Multipeer Connectivity actual), and the rest of the syncable-table capture coverage. **S5 (unpair revocation) landed**: `peer_trust` journal records on pair/unpair (Android + desktops), re-applied via materialize; the relay's REG is now authoritative (resets the grant allowlist — the relay-side revocation mechanism, test-verified). **S4 (relay) now covers Android too**: the relay transport moved to jvmAndroidMain behind a `WsClient` seam (java.net.http on JVM, OkHttp on Android) and is wired into the Android `SyncWorker` relay phase + the SyncScreen relay URL field — WAN sync works wherever a relay is reachable. **Deploying the relay:** `relay/` is a bare Node service, already deploy-shaped (binds 0.0.0.0, reads `PORT`; install `npm --prefix relay install`, start `node relay/server.js` — see its header). The platform deploy CLIs are not available in the Linux sandbox, so the actual hosting deploy is a platform-side action; decide hosting per §14.2. **Track I (iOS) status:** audit + driver research done — `shared/sync` + `shared/database` commonMain verified platform-free (zero java./android./platform imports); Room 2.7.0-alpha13 KMP officially supports iOS (bundled sqlite driver); the remaining work — declaring the iOS targets, the 4 iosMain `actual`s (Keychain/CommonCrypto/CryptoKit-shim + Network.framework/POSIX transport + CoreBluetooth proximity), the `shared/database` iOS builder, and the `apps/iosApp` shell — **requires a Mac + Xcode and cannot be compiled or verified in the Linux sandbox**; exact steps in §15.
 This document specifies how the four Aegis devices — **I** (iOS), **A**
 (Android), **M** (macOS), **W** (Windows) — keep one shared reality across
 four private, encrypted databases.
@@ -120,14 +120,23 @@ pair once, then trust each other forever (until revoked):
    the existing keys/settings UI: list of paired devices, name, fingerprint,
    last-seen, and **Unpair** (see revocation below).
 
-**Revocation.** Unpairing writes a **revocation record** into the sync
-journal (LWW, tombstone). Every device that receives it drops the peer's
-identity and refuses its data. Because the journal propagates through the
-mesh, one unpair reaches all devices even when the revoked device is
-offline. A wiped device re-pairs from scratch (new identity key) — old data
-it previously synced remains; it can never decrypt new outboxes without a
-fresh pair, and each remaining device keeps a tombstone so a stolen key
-cannot rejoin silently.
+**Revocation — LANDED (S5).** Unpairing writes a **revocation record** into
+the sync journal (LWW, tombstone, `peer_trust` table keyed
+`$myDeviceId\u0001$peerDeviceId` — namespaced so different revokers' rows
+never collide). Because the journal propagates through the mesh, one unpair
+reaches all devices even when the revoked device is offline; each device
+re-applies only **its own** trust rows (`materializeTrust` on Android +
+DesktopSync): a tombstone re-removes the peer (durable across a reinstall),
+a live pairing record restores it, and the LWW guard keeps the newest local
+decision. Enforcement of the A-revokes-B relationship is namespaced to A:
+A drops B from its keystore (rejects B's handshakes) and stops granting B at
+the relay — the relay's REG is authoritative and resets the allowlist, so a
+revoked peer loses relay access on the revoker's next registration. A third
+device C does **not** sever its own independent relationship with B based on
+A's decision. A wiped device re-pairs from scratch (new identity key) — old
+data it previously synced remains; it can never decrypt new outboxes without
+a fresh pair, and the tombstone persists so a stolen key cannot rejoin
+silently.
 
 ---
 

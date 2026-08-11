@@ -9,7 +9,10 @@ import com.newax.aegis.db.entity.PersonFactEntity
 import com.newax.aegis.db.getAegisDatabase
 import com.newax.aegis.db.sync.RoomJournalStore
 import com.newax.aegis.db.sync.SyncPayload
+import com.newax.aegis.db.sync.toEntity
+import com.newax.aegis.sync.Hlc
 import com.newax.aegis.sync.AntiEntropyRunner
+import com.newax.aegis.sync.Hex
 import com.newax.aegis.sync.Identity
 import com.newax.aegis.sync.JvmLanTransport
 import com.newax.aegis.sync.PairedPeer
@@ -51,6 +54,14 @@ object DesktopSync {
     /** Journal table name for the memory profile — mirrors Android's SyncRuntime. */
     private const val TABLE_MEMORY_PROFILE = "memory_profile"
 
+    /**
+     * Pairing/revocation records — mirrors Android's SyncRuntime (same table
+     * name and key shape `$myDeviceId\u0001$peerDeviceId`, so both platforms'
+     * trust rows live in one journal namespace).
+     */
+    private const val TABLE_PEER_TRUST = "peer_trust"
+    private const val TRUST_SEP = "\u0001"
+
     private const val LOOP_INTERVAL_MS = 15_000L
 
     private val home: File
@@ -78,6 +89,9 @@ object DesktopSync {
     private var identityHolder: StoredIdentity? = null
 
     private val identityLock = Any()
+
+    private val hlcLock = Any()
+    private var clock = Hlc(System.currentTimeMillis(), 0)
 
     // ── lifecycle ────────────────────────────────────────────────────────────
 
@@ -165,6 +179,12 @@ object DesktopSync {
 
     fun displayName(): String = identity().identity.displayName
 
+    /** Monotonic per-process HLC for locally-captured entries. */
+    private fun nextHlc(): Hlc = synchronized(hlcLock) {
+        clock = Hlc.tick(clock, System.currentTimeMillis())
+        clock
+    }
+
     // ── status / surface ─────────────────────────────────────────────────────
 
     /** One-line loop status for the CLI and window cards. */
@@ -228,6 +248,7 @@ object DesktopSync {
                 nowMs = System.currentTimeMillis()
             )
             platformKeyStore().savePeer(peer)
+            captureTrust(peer.deviceId, peer, tombstone = false)
             peer
         } catch (_: Exception) {
             null
@@ -237,6 +258,38 @@ object DesktopSync {
     fun unpair(deviceId: String) {
         platformKeyStore().removePeer(deviceId)
         peerAddressFile(deviceId).delete()
+        captureTrust(deviceId, null, tombstone = true)
+    }
+
+    /** Journal this device's pairing decision (live record or revocation tombstone). */
+    private fun captureTrust(peerDeviceId: String, peer: PairedPeer?, tombstone: Boolean) {
+        val db = database ?: return
+        val me = identity().identity.deviceId
+        val fields = if (peer != null) {
+            listOf(
+                "deviceId" to peer.deviceId,
+                "displayName" to peer.displayName,
+                "signPublicKey" to Hex.encode(peer.signPublicKey),
+                "ecdhPublicKey" to Hex.encode(peer.ecdhPublicKey),
+                "pairedAtMs" to peer.pairedAtMs.toString()
+            )
+        } else {
+            listOf("deviceId" to peerDeviceId)
+        }
+        val entry = SyncEntry.of(
+            opId = java.util.UUID.randomUUID().toString(),
+            deviceId = me,
+            hlc = nextHlc(),
+            kind = SyncEntry.Kind.RECORD,
+            table = TABLE_PEER_TRUST,
+            key = me + TRUST_SEP + peerDeviceId,
+            payload = SyncPayload.encode(fields),
+            tombstone = tombstone,
+            createdAt = System.currentTimeMillis()
+        )
+        kotlinx.coroutines.runBlocking {
+            runCatching { db.syncJournalDao().insert(entry.toEntity()) }
+        }
     }
 
     /** Manually-entered `host:port` for a paired peer (mDNS-free bootstrap). */
@@ -290,6 +343,7 @@ object DesktopSync {
                 "entity_aliases" -> materializeAlias(entry)
                 "persons" -> materializePerson(entry)
                 "person_facts" -> materializePersonFact(entry)
+                TABLE_PEER_TRUST -> materializeTrust(entry)
                 else -> Unit
             }
         }
@@ -419,6 +473,35 @@ object DesktopSync {
                 )
             )
         }
+    }
+
+    /**
+     * Re-apply this device's own trust records — mirror of
+     * SyncRuntime.materializeTrust (tombstone re-removes, live record
+     * restores; the LWW guard keeps the newest local decision).
+     */
+    private fun materializeTrust(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val parts = entry.key.split(TRUST_SEP)
+        if (parts.size != 2 || parts[0] != identity().identity.deviceId) return
+        val peerId = parts[1]
+        if (entry.tombstone) {
+            platformKeyStore().removePeer(peerId)
+            peerAddressFile(peerId).delete()
+            return
+        }
+        val fields = SyncPayload.decode(entry.payload)
+        val sign = fields["signPublicKey"]?.let { Hex.decode(it) } ?: return
+        val ecdh = fields["ecdhPublicKey"]?.let { Hex.decode(it) } ?: return
+        platformKeyStore().savePeer(
+            PairedPeer(
+                deviceId = peerId,
+                displayName = fields["displayName"] ?: peerId,
+                signPublicKey = sign,
+                ecdhPublicKey = ecdh,
+                pairedAtMs = fields["pairedAtMs"]?.toLongOrNull() ?: entry.createdAt
+            )
+        )
     }
 
     private fun applyMemoryProfile(category: String, facts: List<String>) {

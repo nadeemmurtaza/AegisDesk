@@ -78,6 +78,12 @@ function onMessage(ws, msg) {
       if (prev && prev !== ws) prev.close(4001, 'replaced');
       sockets.set(env.deviceId, ws);
       ws.deviceId = env.deviceId;
+      // REG is authoritative: rebuild the grant allowlist from the client's
+      // fresh GRANTs (it re-grants its current peers right after). This is
+      // the relay-side revocation mechanism — a device that unpaired a peer
+      // simply stops granting it, and the next REG drops the old grant
+      // instead of keeping it forever.
+      grants.set(env.deviceId, new Set());
       announce(env.deviceId);
       flushQueue(env.deviceId);
       break;

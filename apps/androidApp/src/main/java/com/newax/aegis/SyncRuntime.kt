@@ -55,6 +55,16 @@ object SyncRuntime {
     /** Journal table name for the encrypted memory profile (per-category RECORD). */
     const val TABLE_MEMORY_PROFILE = "memory_profile"
 
+    /**
+     * Journal table for pairing/revocation records (docs/SYNC_DESIGN.md §3):
+     * each device owns its own rows, keyed `$myDeviceId\u0001$peerDeviceId`
+     * (namespaced so different revokers' rows never LWW-collide). Pairing
+     * journals a live RECORD; unpair journals a tombstone — the revocation
+     * propagates through the mesh journal and is re-applied after a reinstall.
+     */
+    const val TABLE_PEER_TRUST = "peer_trust"
+    private const val TRUST_SEP = "\u0001"
+
     /** Local-only kv_store keys (NOT under `syncable:` — they never sync). */
     private const val KEY_ENABLED = "sync:enabled"
     private const val KEY_STATUS = "sync:status"
@@ -112,7 +122,15 @@ object SyncRuntime {
     fun unpair(deviceId: String) {
         keyStoreHolder.removePeer(deviceId)
         kvDelete(ADDR_PREFIX + deviceId)
+        // Revocation record — propagates through the mesh journal; other
+        // devices re-apply it (and the relay's REG-reset drops the grant).
+        captureRecord(
+            TABLE_PEER_TRUST, trustKey(deviceId),
+            listOf("deviceId" to deviceId), tombstone = true
+        )
     }
+
+    private fun trustKey(peerDeviceId: String): String = deviceId() + TRUST_SEP + peerDeviceId
 
     /**
      * The relay server URL (`ws://host:port` or `wss://...`) for WAN sync
@@ -187,6 +205,19 @@ object SyncRuntime {
                 nowMs = System.currentTimeMillis()
             )
             keyStoreHolder.savePeer(peer)
+            // Pairing record — the durable counterpart of the revocation
+            // tombstone (restores the peer after a reinstall, cancels older
+            // tombstones via LWW).
+            captureRecord(
+                TABLE_PEER_TRUST, trustKey(peer.deviceId),
+                listOf(
+                    "deviceId" to peer.deviceId,
+                    "displayName" to peer.displayName,
+                    "signPublicKey" to Hex.encode(peer.signPublicKey),
+                    "ecdhPublicKey" to Hex.encode(peer.ecdhPublicKey),
+                    "pairedAtMs" to peer.pairedAtMs.toString()
+                )
+            )
             peer
         } catch (_: Exception) {
             null
@@ -260,6 +291,8 @@ object SyncRuntime {
                     "entity_aliases" -> materializeAlias(entry)
                     "persons" -> materializePerson(entry)
                     "person_facts" -> materializePersonFact(entry)
+                    // Pairing/revocation records (Slice 5).
+                    TABLE_PEER_TRUST -> materializeTrust(entry)
                     else -> Unit // tables not yet captured/materialized
                 }
             } catch (_: Exception) {
@@ -379,6 +412,36 @@ object SyncRuntime {
                 )
             )
         }
+    }
+
+    /**
+     * Re-apply MY OWN pairing/revocation records (key namespaced with my
+     * device id — other devices' trust rows are someone else's business): a
+     * tombstone re-removes a peer (durable revocation after reinstall), a live
+     * record restores it. The LWW guard keeps a newer local decision winning.
+     */
+    private fun materializeTrust(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val parts = entry.key.split(TRUST_SEP)
+        if (parts.size != 2 || parts[0] != deviceId()) return
+        val peerId = parts[1]
+        if (entry.tombstone) {
+            keyStoreHolder.removePeer(peerId)
+            kvDelete(ADDR_PREFIX + peerId)
+            return
+        }
+        val fields = SyncPayload.decode(entry.payload)
+        val sign = fields["signPublicKey"]?.let { Hex.decode(it) } ?: return
+        val ecdh = fields["ecdhPublicKey"]?.let { Hex.decode(it) } ?: return
+        keyStoreHolder.savePeer(
+            PairedPeer(
+                deviceId = peerId,
+                displayName = fields["displayName"] ?: peerId,
+                signPublicKey = sign,
+                ecdhPublicKey = ecdh,
+                pairedAtMs = fields["pairedAtMs"]?.toLongOrNull() ?: entry.createdAt
+            )
+        )
     }
 
     private fun materializeMemoryProfile(entry: SyncEntry) {

@@ -118,6 +118,10 @@ test('routes frames byte-identically between granted peers (E2E-blind)', async (
     grant(a, 'dev-aaaaaaaaaa', 'dev-bbbbbbbbbb');
     grant(b, 'dev-bbbbbbbbbb', 'dev-aaaaaaaaaa');
 
+    // Grants apply asynchronously server-side — a SEND sent in the same tick can
+    // arrive before b's GRANT is processed. Give the loopback a settle tick.
+    await new Promise((r) => setTimeout(r, 50));
+
     // Opaque payload containing the full byte range — the relay must never touch it.
     const payload = Buffer.from([0x00, 0x01, 0x7f, 0x80, 0xff, 0x49, 0x53, 0x00, 0x42]);
     const forwarded = collect(b, T.FORWARD, 1);
@@ -133,6 +137,13 @@ test('routes frames byte-identically between granted peers (E2E-blind)', async (
 
 test('queues for offline peers and flushes on registration', async () => {
   const a = await connect();
+  // B registers and grants A, then goes offline — self-contained (no reliance
+  // on other tests' leftover grants).
+  const b0 = await connect();
+  reg(b0, 'dev-bbbbbbbbbb');
+  grant(b0, 'dev-bbbbbbbbbb', 'dev-aaaaaaaaaa');
+  b0.close();
+  await new Promise((r) => setTimeout(r, 50));
   try {
     reg(a, 'dev-aaaaaaaaaa');
     grant(a, 'dev-aaaaaaaaaa', 'dev-bbbbbbbbbb'); // A allows B (offline) to send to it
@@ -176,6 +187,39 @@ test('drops un-granted traffic (pair-aware routing)', async () => {
   } finally {
     a.close();
     c.close();
+  }
+});
+
+test('re-registration revokes grants (unpair propagates via the REG reset)', async () => {
+  const a = await connect();
+  const b = await connect();
+  try {
+    reg(a, 'dev-aaaaaaaaaa');
+    grant(a, 'dev-aaaaaaaaaa', 'dev-bbbbbbbbbb'); // A allows B to send to it
+    reg(b, 'dev-bbbbbbbbbb');
+
+    // B -> A flows while granted.
+    const okForward = collect(a, T.FORWARD, 1);
+    sendFrame(b, 'dev-aaaaaaaaaa', Buffer.from('while-granted'));
+    const [fwd] = await okForward;
+    assert.strictEqual(fwd.payload.toString('utf8'), 'while-granted');
+
+    // A un-pairs B and re-registers (the client re-grants only current peers).
+    reg(a, 'dev-aaaaaaaaaa');
+
+    // B -> A must now be rejected and A must see nothing.
+    const error = collect(b, T.ERROR, 1);
+    const nothingArrives = collect(a, T.FORWARD, 1, 800).then(
+      () => 'unexpected-forward',
+      () => 'no-forward'
+    );
+    sendFrame(b, 'dev-aaaaaaaaaa', Buffer.from('after-revoke'));
+    const [err] = await error;
+    assert.strictEqual(err.payload.toString('utf8'), 'not-granted');
+    assert.strictEqual(await nothingArrives, 'no-forward');
+  } finally {
+    a.close();
+    b.close();
   }
 });
 
