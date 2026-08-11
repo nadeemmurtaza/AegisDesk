@@ -35,6 +35,38 @@ jobs:
       - name: Build platform:android adapter + run its unit tests
         run: ./gradlew :platform:android:assembleDebug :platform:android:testDebugUnitTest --stacktrace
 
+      # The Windows capability adapter (platform/windows) implements the same contract
+      # on the JVM. Its unit tests run on any OS: Windows-only paths are guarded with
+      # JUnit Assume or typed CapabilityResult failures (the Windows-only paths — DPAPI
+      # secrets round-trip, Toolhelp32 process listing, Win32 app index — actually run on
+      # the windows-adapter-tests job below).
+      - name: Build platform:windows adapter + run its unit tests
+        run: ./gradlew :platform:windows:test --stacktrace
+
+  # The Windows-only adapter tests are Assume-gated on IS_WINDOWS, so the ubuntu
+  # job above compiles them but skips the OS-bound paths. This Windows runner is
+  # where those paths actually execute: DPAPI CryptProtectData/CryptUnprotectData
+  # secrets round-trip and the Toolhelp32 process listing (Track A).
+  windows-adapter-tests:
+    name: Windows adapter tests (Windows-only paths)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # bash shell (Git Bash ships on windows-latest) so the POSIX gradlew wrapper
+      # runs; Gradle on Windows resolves the JDK from setup-java.
+      - name: Run platform:windows adapter tests on Windows
+        shell: bash
+        run: ./gradlew :platform:windows:test --stacktrace
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

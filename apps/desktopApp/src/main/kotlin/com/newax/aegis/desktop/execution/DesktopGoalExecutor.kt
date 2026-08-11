@@ -1,5 +1,7 @@
 package com.newax.aegis.desktop.execution
 
+import com.newax.aegis.desktop.ExecutionAudit
+import com.newax.aegis.desktop.ExecutionAuditEntry
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.SkillRegistry
@@ -72,11 +74,17 @@ object DesktopGoalExecutor {
         // inputs for the tasks that follow (find_app's exact target → launch_app).
         val carry = mutableMapOf<String, Any>("goalId" to goalId)
 
+        // Execution audit (Phase B3 / invariant 8): one entry per run — outcome,
+        // tiers used, task count, timestamps — recorded before this function
+        // returns so the caller's snapshot save persists it.
+        val startedMs = System.currentTimeMillis()
+
         for (task in tasks) {
             val outcome = runTask(goalId, task, carry, registry, router, appIndex, onProgress)
             if (outcome.isFailure) {
                 val reason = outcome.exceptionOrNull()?.message ?: "Task '${task.description}' failed"
                 DesktopGoalPlanner.block(goalId)
+                recordAudit(goalId, label, "BLOCKED", reason, startedMs, System.currentTimeMillis())
                 onProgress("task \"${task.description}\" FAILED — goal BLOCKED: $reason")
                 return@withContext Result.failure(
                     outcome.exceptionOrNull() ?: IllegalStateException(reason)
@@ -84,8 +92,44 @@ object DesktopGoalExecutor {
             }
         }
 
+        recordAudit(goalId, label, "COMPLETED", null, startedMs, System.currentTimeMillis())
         onProgress("all ${tasks.size} task(s) finished — \"$label\" ${DesktopGoalPlanner.getState(goalId)}")
         Result.success(Unit)
+    }
+
+    /**
+     * One audit entry per run. Tiers are read back from the task results the
+     * router reported ("via EXACT_TARGET …"), so the audit names exactly which
+     * ladder rung fired without the executor needing to thread them out.
+     */
+    private fun recordAudit(
+        goalId: String,
+        label: String,
+        outcome: String,
+        reason: String?,
+        startedMs: Long,
+        completedMs: Long,
+    ) {
+        val tiers = DesktopGoalPlanner.getGraph(goalId)?.tasks.orEmpty()
+            .mapNotNull { it.result }
+            .flatMap { result ->
+                DesktopExecutionTier.values().mapNotNull { tier ->
+                    tier.name.takeIf { result.contains(it) }
+                }
+            }
+            .distinct()
+        ExecutionAudit.record(
+            ExecutionAuditEntry(
+                goalId = goalId,
+                goalDescription = label,
+                outcome = outcome,
+                reason = reason,
+                tiers = tiers,
+                taskCount = DesktopGoalPlanner.getGraph(goalId)?.tasks?.size ?: 0,
+                startedMs = startedMs,
+                completedMs = completedMs,
+            )
+        )
     }
 
     private suspend fun runTask(

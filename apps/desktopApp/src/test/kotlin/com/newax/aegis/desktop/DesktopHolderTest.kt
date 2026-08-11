@@ -21,29 +21,31 @@ import org.junit.Test
 
 /**
  * Phase 5e — desktop process-wide surfaces:
- *  - [DesktopCapabilitiesHolder] registers the Windows desktop capability once.
+ *  - [DesktopCapabilitiesHolder] registers the full Windows capability surface
+ *    (files, processes, shell, desktop, secrets, system) exactly once.
  *  - [DesktopModelProviderHolder] starts at the deterministic fallback and swaps
  *    to a real provider only when the runner installs one.
  *
- * All tests are pure JVM and OS-independent: the Windows desktop capability
- * reports NOT_SUPPORTED on non-Windows CI runners, which the holder surfaces
+ * All tests are pure JVM and OS-independent: the Win32-backed capabilities
+ * report NOT_SUPPORTED on non-Windows CI runners, which the holder surfaces
  * honestly rather than stubbing.
  */
 class DesktopHolderTest {
 
     @Test
-    fun `capabilities holder registers desktop capability once`() {
+    fun `capabilities holder registers the full surface once`() {
         DesktopCapabilitiesHolder.init()
         DesktopCapabilitiesHolder.init() // idempotent — same registry, no duplicates
 
         val registry = DesktopCapabilitiesHolder.registry()
         assertNotNull(registry)
         val all = registry!!.all()
-        assertEquals(1, all.size)
-        assertEquals(CapabilityId.DESKTOP, all[0].id)
-        // OS-independent assertion: the capability is registered; its operational
-        // status is READY on Windows and NOT_SUPPORTED elsewhere — either is valid.
-        assertTrue(all[0].descriptor().id == CapabilityId.DESKTOP)
+        // Full Windows capability surface (Track A): files, processes, shell,
+        // desktop, secrets, system — registered exactly once each. Operational
+        // status is READY on Windows and NOT_SUPPORTED elsewhere; either is valid.
+        assertEquals(6, all.size)
+        val ids = all.map { it.id }.toSet()
+        CapabilityId.entries.take(6).forEach { assertTrue("expected $it registered", it in ids) }
     }
 
     @Test

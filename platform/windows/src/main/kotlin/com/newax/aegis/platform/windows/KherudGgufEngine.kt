@@ -53,7 +53,7 @@ class KherudGgufEngine(
         return withContext(Dispatchers.IO) {
             val params = InferenceParameters(prompt)
                 .setNPredict(512)
-                .setTemperature(0.7)
+                .setTemperature(0.7f)
             val sb = StringBuilder()
             for (output: LlamaOutput in m.generate(params)) {
                 sb.append(output.toString())
@@ -67,7 +67,7 @@ class KherudGgufEngine(
         return flow {
             val params = InferenceParameters(prompt)
                 .setNPredict(maxTokens)
-                .setTemperature(temperature.toDouble())
+                .setTemperature(temperature)
             for (output: LlamaOutput in m.generate(params)) {
                 emit(output.toString())
             }

@@ -31,6 +31,17 @@ A native Kotlin/Jetpack Compose MVP that can read the current accessibility tree
 
 Accessibility services are powerful. Install only builds you control. Banking, password managers, permission dialogs, CAPTCHAs, biometric prompts, and apps with protected content should remain blocked.
 
+## Windows desktop (Track A)
+
+A JVM bootstrap (`apps/desktopApp`) implements the shared platform capability contract on Windows via `platform/windows`: real file access, process listing/launch/terminate, a bounded shell runner, User32/GDI desktop automation (window activation, SendInput click/type/scroll, screenshots), a DPAPI-protected secrets vault, and system info/connectivity/battery.
+
+```bash
+sh ./gradlew :apps:desktopApp:run   # prints the capability surface + operational statuses
+sh ./gradlew :platform:windows:test # adapter unit tests — run on any OS; Win32 paths are OS-guarded
+```
+
+On non-Windows hosts the Win32-backed capabilities report `NOT_SUPPORTED` instead of crashing; the pure-JVM ones (files, shell, system) stay operational. The Compose Desktop UI (Track B) will consume this same process-wide registry.
+
 ## Honest capability boundary
 
 “Offline AI chat” requires separately licensed model weights that are too large to bundle in the APK. Aegis now includes the LiteRT-LM runtime and importer; the user selects the downloaded `.litertlm` bundle once, it is verified and copied into private storage, and subsequent natural-language chat runs through the on-device model. Deterministic commands remain available if initialization fails.

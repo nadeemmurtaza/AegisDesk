@@ -29,7 +29,7 @@ object LlmTripleExtractor {
         subjectHint: String?
     ): List<TripleEntity> {
         val m = model ?: return emptyList()
-        if (!m.isReady || text.length < MIN_TEXT_LEN) return emptyList()
+        if (!isReady() || text.length < MIN_TEXT_LEN) return emptyList()
 
         // SECURITY: redact before sending; skip high-sensitivity content
         val analysis = SensitiveInfoDetector.analyze(text)

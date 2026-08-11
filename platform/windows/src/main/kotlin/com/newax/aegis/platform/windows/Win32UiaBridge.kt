@@ -1,11 +1,14 @@
 package com.newax.aegis.platform.windows
 
 import com.newax.aegis.platform.desktop.AppWindow
+import com.sun.jna.Native
 import com.sun.jna.Pointer
-import com.sun.jna.platform.win32.GDI32
-import com.sun.jna.platform.win32.GDI32Util
 import com.sun.jna.platform.win32.User32
 import com.sun.jna.platform.win32.WinDef
+import com.sun.jna.platform.win32.WinUser
+import com.sun.jna.win32.StdCallLibrary
+import java.awt.Rectangle
+import java.awt.Robot
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
@@ -20,8 +23,13 @@ import javax.imageio.ImageIO
  * only third-party JVM UIA wrapper (mmarquee/ui-automation 0.7.0) has been
  * dormant since 2020 — a dependency-liability signal per docs/rules/compatibility.md.
  * The operations below (window enumeration, control-text matching, WM_CHAR input,
- * WM_VSCROLL, BM_CLICK, GDI capture) are genuine *semantic* automation of
+ * WM_VSCROLL, BM_CLICK, capture) are genuine *semantic* automation of
  * standard Win32 controls and are the cheapest supported tier for them.
+ *
+ * Two functions jna-platform 5.13.0 does NOT map are declared locally:
+ * [User32Ext.GetDlgCtrlID] and [User32Ext.mouse_event]. Screenshots use the
+ * JDK's Robot instead of a GDI copy — same virtual-screen pixels, no HBITMAP
+ * conversion plumbing (GDI32Util has no getBufferedImage in 5.13.0).
  *
  * Windows-only: on other OSes the JNA native library cannot load. Construct this
  * only when [isWindowsOs]; the capability guards construction.
@@ -32,7 +40,14 @@ import javax.imageio.ImageIO
 class Win32UiaBridge : WindowsUiaBridge {
 
     private val user32 = User32.INSTANCE
-    private val gdi32 = GDI32.INSTANCE
+    private val user32Ext = Native.load("user32", User32Ext::class.java)
+
+    /** USER32 entry points absent from jna-platform 5.13.0, declared locally. */
+    interface User32Ext : StdCallLibrary {
+        fun GetDlgCtrlID(hWnd: WinDef.HWND): Int
+
+        fun mouse_event(dwFlags: Int, dx: Int, dy: Int, dwData: Int, dwExtraInfo: Pointer?)
+    }
 
     // ── Window constants ────────────────────────────────────────────────────
     private val SW_RESTORE = 9
@@ -45,7 +60,6 @@ class Win32UiaBridge : WindowsUiaBridge {
     private val SB_PAGE_DOWN = 3
     private val MOUSEEVENTF_LEFTDOWN = 0x0002
     private val MOUSEEVENTF_LEFTUP   = 0x0004
-    private val SRCCOPY = 0x00CC0020
     private val SM_XVIRTUALSCREEN = 76
     private val SM_YVIRTUALSCREEN = 77
     private val SM_CXVIRTUALSCREEN = 78
@@ -57,19 +71,19 @@ class Win32UiaBridge : WindowsUiaBridge {
 
     private fun windowTitle(hwnd: WinDef.HWND): String {
         val buf = CharArray(maxTextLen)
-        val n = user32.GetWindowTextW(hwnd, buf, maxTextLen)
+        val n = user32.GetWindowText(hwnd, buf, maxTextLen)
         return if (n > 0) String(buf, 0, n) else ""
     }
 
     private fun windowClass(hwnd: WinDef.HWND): String {
         val buf = CharArray(256)
-        val n = user32.GetClassNameW(hwnd, buf, 256)
+        val n = user32.GetClassName(hwnd, buf, 256)
         return if (n > 0) String(buf, 0, n) else ""
     }
 
     private fun topLevelWindows(visibleOnly: Boolean): List<WinDef.HWND> {
         val result = mutableListOf<WinDef.HWND>()
-        user32.EnumWindows(User32.WNDENUMPROC { hwnd, _ ->
+        user32.EnumWindows(WinUser.WNDENUMPROC { hwnd, _ ->
             if (!visibleOnly || user32.IsWindowVisible(hwnd)) result.add(hwnd)
             true // continue enumeration
         }, Pointer.NULL)
@@ -78,10 +92,15 @@ class Win32UiaBridge : WindowsUiaBridge {
 
     private fun childWindows(parent: WinDef.HWND): List<WinDef.HWND> {
         val result = mutableListOf<WinDef.HWND>()
-        user32.EnumChildWindows(parent, User32.WNDENUMPROC { hwnd, _ ->
-            result.add(hwnd)
-            true
-        }, Pointer.NULL)
+        // Explicit WinUser.WNDENUMPROC: Kotlin cannot reliably resolve the
+        // inherited nested type via User32 (the inherited-SAM inference quirk).
+        val proc = object : WinUser.WNDENUMPROC {
+            override fun callback(hwnd: WinDef.HWND, lParam: Pointer): Boolean {
+                result.add(hwnd)
+                return true
+            }
+        }
+        user32.EnumChildWindows(parent, proc, Pointer.NULL)
         return result
     }
 
@@ -99,7 +118,7 @@ class Win32UiaBridge : WindowsUiaBridge {
             .firstOrNull { windowTitle(it).contains(app, ignoreCase = true) } ?: return null
         val id = elementId.trim().toIntOrNull()
         return childWindows(appWindow).firstOrNull { child ->
-            (id != null && user32.GetDlgCtrlID(child) == id) ||
+            (id != null && user32Ext.GetDlgCtrlID(child) == id) ||
                 windowTitle(child).equals(elementId.trim(), ignoreCase = true)
         }
     }
@@ -156,9 +175,9 @@ class Win32UiaBridge : WindowsUiaBridge {
 
     override fun clickAt(x: Float, y: Float): Boolean {
         return runCatching {
-            user32.SetCursorPos(x.toInt(), y.toInt())
-            user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, Pointer.NULL)
-            user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, Pointer.NULL)
+            user32.SetCursorPos(x.toLong(), y.toLong())
+            user32Ext.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, Pointer.NULL)
+            user32Ext.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, Pointer.NULL)
             true
         }.getOrDefault(false)
     }
@@ -216,41 +235,19 @@ class Win32UiaBridge : WindowsUiaBridge {
 
     override fun screenshot(): ByteArray? {
         return runCatching {
-            val x = user32.GetSystemMetrics(SM_XVIRTUALSCREEN)
-            val y = user32.GetSystemMetrics(SM_YVIRTUALSCREEN)
-            val w = user32.GetSystemMetrics(SM_CXVIRTUALSCREEN)
-            val h = user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)
-            if (w <= 0 || h <= 0) return@runCatching null
+            val bounds = Rectangle(
+                user32.GetSystemMetrics(SM_XVIRTUALSCREEN),
+                user32.GetSystemMetrics(SM_YVIRTUALSCREEN),
+                user32.GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                user32.GetSystemMetrics(SM_CYVIRTUALSCREEN),
+            )
+            if (bounds.width <= 0 || bounds.height <= 0) return@runCatching null
 
-            val hdcScreen = user32.GetDC(null)
-            if (hdcScreen == null) return@runCatching null
-            val hdcMem = gdi32.CreateCompatibleDC(hdcScreen)
-            if (hdcMem == null) {
-                user32.ReleaseDC(null, hdcScreen)
-                return@runCatching null
+            val image: BufferedImage = Robot().createScreenCapture(bounds)
+            ByteArrayOutputStream().use { out ->
+                ImageIO.write(image, "png", out)
+                out.toByteArray()
             }
-            val hBitmap = gdi32.CreateCompatibleBitmap(hdcScreen, w, h)
-            if (hBitmap == null) {
-                gdi32.DeleteDC(hdcMem)
-                user32.ReleaseDC(null, hdcScreen)
-                return@runCatching null
-            }
-            val old = gdi32.SelectObject(hdcMem, hBitmap)
-            val captured = gdi32.BitBlt(hdcMem, 0, 0, w, h, hdcScreen, x, y, SRCCOPY)
-            gdi32.SelectObject(hdcMem, old)
-
-            val png = if (captured) {
-                val image: BufferedImage = GDI32Util.getBufferedImage(hBitmap, false)
-                ByteArrayOutputStream().use { out ->
-                    ImageIO.write(image, "png", out)
-                    out.toByteArray()
-                }
-            } else null
-
-            gdi32.DeleteObject(hBitmap)
-            gdi32.DeleteDC(hdcMem)
-            user32.ReleaseDC(null, hdcScreen)
-            png
         }.getOrNull()
     }
 }

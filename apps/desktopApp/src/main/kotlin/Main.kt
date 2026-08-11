@@ -1,11 +1,17 @@
 /**
- * Entry point for the Aegis Desktop runner.
+ * Entry point for the Aegis Desktop app.
  *
- * Usage:
- *   ./gradlew :apps:desktopApp:run                                       # scans ~/.aegis/models/
- *   ./gradlew :apps:desktopApp:run --args="/path/to/model.gguf"          # uses the given file
+ * Default mode (Phase B1): opens the Compose Desktop window — Status
+ * (capability + model state), Apps (Start Menu index + search), and the Goals
+ * board (plan / run / abandon). The model is imported and loaded in the
+ * background while the window is up; the Status screen reflects
+ * NOT_INSTALLED → LOADING → READY/ERROR live.
  *
- * On startup the app:
+ * CLI mode (unchanged Phase 5e–5i behavior, kept behind `--cli`):
+ *   ./gradlew :apps:desktopApp:run --args="--cli"                          # scans ~/.aegis/models/
+ *   ./gradlew :apps:desktopApp:run --args="--cli /path/to/model.gguf"      # uses the given file
+ *
+ * In CLI mode on startup the app:
  *   1. Bootstraps the desktop process-wide surfaces:
  *      [DesktopCapabilitiesHolder] — registers the platform capability registry
  *      (WindowsDesktopCapability today); [DesktopModelProviderHolder] — the one
@@ -24,11 +30,12 @@
  *      activates the goal and executes its tasks through the real
  *      DesktopGoalExecutor — find_app resolves the target against the app index
  *      and launch_app runs the exact shortcut target, then the process →
- *      Win32-activateApp ladder (Phase 5i)
- *      "proximity listen" / "proximity send <file> <deviceId>" / "proximity
- *      nearby" drive the encrypted Quick Share (P2): mDNS discovery, direct
- *      TCP, ECDH key exchange + ProximityTransfer sealing (receive confirms
- *      per transfer; files land in ~/.aegis/shared/)
+ *      Win32-activateApp ladder (Phase 5i). "audit" prints the full execution
+ *      audit trail; "audit export" writes it to CSV under ~/.aegis/. "proximity
+ *      listen" / "proximity send <file> <deviceId>" / "proximity nearby" drive
+ *      the encrypted Quick Share (P2): mDNS discovery, direct TCP, ECDH key
+ *      exchange + ProximityTransfer sealing (receive confirms per transfer;
+ *      files land in ~/.aegis/shared/)
  *   7. On empty input, "exit", or Ctrl+D the model is closed, the holder returns
  *      to the fallback, and the app exits
  *
@@ -37,21 +44,99 @@
  */
 package com.newax.aegis.desktop
 
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.newax.aegis.desktop.execution.DesktopGoalExecutor
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.SkillRegistry
 import com.newax.aegis.desktop.planner.TaskStatus
+import com.newax.aegis.desktop.ui.AegisDesktopApp
 import com.newax.aegis.model.ModelRequest
 import com.newax.aegis.platform.windows.GgufHeaderParser
 import com.newax.aegis.platform.windows.GgufModelProvider
 import com.newax.aegis.platform.windows.WindowsAppIndex
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import java.io.File
 
-fun main(args: Array<String>) = runBlocking {
+fun main(args: Array<String>) {
+    if (args.contains("--cli")) {
+        runBlocking { cliMain(args) }
+    } else {
+        windowMain()
+    }
+}
+
+/**
+ * Window mode — the Compose Desktop surface (Phase B1). Bootstraps the process
+ * surfaces, imports and loads the model in the background (the Status screen
+ * reflects the provider's live state), then runs the window until it closes.
+ */
+private fun windowMain() {
+    DesktopCapabilitiesHolder.init()
+    val goalsStore = FileGoalsStore()
+    restorePersistedState(goalsStore)
+    val appIndex = WindowsAppIndex()
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    var modelProvider: GgufModelProvider? = null
+    appScope.launch {
+        val file = firstModelFile() ?: return@launch
+        try {
+            val imported = DesktopModelImporter.importAsync(file)
+            val provider = GgufModelProvider(imported.file, imported.sha256)
+            modelProvider = provider
+            DesktopModelProviderHolder.set(provider)
+            provider.load()
+        } catch (e: Exception) {
+            // The provider reports ERROR in its state; the Status screen shows
+            // the honest reason instead of the app failing to open.
+            println("[model] not loaded: ${e.message ?: e.javaClass.simpleName}")
+        }
+    }
+
+    application {
+        Window(
+            onCloseRequest = ::exitApplication,
+            title = "Aegis Assistant — Desktop",
+            state = rememberWindowState(size = DpSize(1120.dp, 760.dp)),
+        ) {
+            AegisDesktopApp(appScope = appScope, appIndex = appIndex, store = goalsStore)
+        }
+    }
+
+    appScope.cancel()
+    modelProvider?.close()
+    DesktopModelProviderHolder.clear()
+    println("Done.")
+}
+
+/**
+ * Deterministic model pick for window mode: the single discovered model, or the
+ * largest one when several are present (the CLI asks interactively; the window
+ * must not block on stdin). Null when no valid model is installed — the app
+ * then runs on the deterministic fallback and the Status screen says so.
+ */
+private suspend fun firstModelFile(): File? = withContext(Dispatchers.IO) {
+    val models = DesktopModelImporter.discover()
+    when {
+        models.isEmpty() -> null
+        models.size == 1 -> models.first().file
+        else -> models.maxByOrNull { it.bytes }?.file
+    }
+}
+
+private suspend fun cliMain(args: Array<String>) {
     println()
     println("  █████╗ ███████╗ ██████╗ ██╗███████╗")
     println(" ██╔══██╗██╔════╝██╔════╝ ██║██╔════╝")
@@ -61,18 +146,21 @@ fun main(args: Array<String>) = runBlocking {
     println(" ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝╚══════╝")
     println()
     println("  Desktop — offline GGUF model runner")
-    println("  shared/model-api · platform:windows · Phase 5i")
+    println("  shared/model-api · platform:windows · Phase 5i · window UI (B1) — --cli for this loop")
     println()
 
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
     DesktopCapabilitiesHolder.init()
+    val goalsStore = FileGoalsStore()
+    restorePersistedState(goalsStore)
     val appIndex = WindowsAppIndex()
     printStatusBlock()
 
     // ── 1. Find the model file ─────────────────────────────────────────────
+    val modelArg = args.firstOrNull { it != "--cli" }
     val modelFile: File = when {
-        args.isNotEmpty() -> {
-            File(args[0]).also { f ->
+        modelArg != null -> {
+            File(modelArg).also { f ->
                 require(f.isFile) { "Model file not found: ${f.absolutePath}" }
             }
         }
@@ -84,7 +172,7 @@ fun main(args: Array<String>) = runBlocking {
                     println("    Place a model in ~/.aegis/models/ or pass the path as argument:")
                     println("    ./gradlew :apps:desktopApp:run --args=\"/path/to/model.gguf\"")
                     println()
-                    return@runBlocking
+                    return
                 }
                 models.size == 1 -> {
                     val m = models.first()
@@ -143,6 +231,7 @@ fun main(args: Array<String>) = runBlocking {
             }
             if (prompt.startsWith("plan ", ignoreCase = true)) {
                 printPlan(prompt.substring(5).trim())
+                goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
             if (prompt.startsWith("apps", ignoreCase = true)) {
@@ -153,12 +242,18 @@ fun main(args: Array<String>) = runBlocking {
                 printGoals()
                 continue
             }
+            if (prompt.equals("audit", ignoreCase = true) || prompt.startsWith("audit ", ignoreCase = true)) {
+                printAudit(if (prompt.length > 5) prompt.substring(5) else "")
+                continue
+            }
             if (prompt.startsWith("run ", ignoreCase = true)) {
                 printRunGoal(prompt.substring(4).trim(), appIndex)
+                goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
             if (prompt.startsWith("abandon ", ignoreCase = true)) {
                 printAbandon(prompt.substring(8).trim())
+                goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
             if (prompt.equals("proximity", ignoreCase = true) || prompt.startsWith("proximity ", ignoreCase = true)) {
@@ -307,6 +402,16 @@ private fun printGoals() {
             println("        feasible — \"run ${index + 1}\" to execute")
         }
     }
+    val runs = ExecutionAudit.recent()
+    if (runs.isNotEmpty()) {
+        println("  ── Recent runs (execution audit) ────────────────────────")
+        runs.take(5).forEach { run ->
+            val tierText = if (run.tiers.isEmpty()) "no tier" else run.tiers.joinToString(" · ")
+            println("    ${run.outcome.lowercase().replaceFirstChar { it.uppercase() }}  ${run.goalDescription}  [$tierText]  ${auditTime(run.completedMs)}")
+            run.reason?.let { println("        ✗ $it") }
+        }
+        println()
+    }
     println()
 }
 
@@ -421,6 +526,57 @@ private fun printAbandon(ref: String) {
     println()
 }
 
+/**
+ * The full execution audit trail — every recorded run, newest first, with the
+ * tiers used, task count, window, and reason; \"audit export\" writes the same
+ * trail to a CSV under ~/.aegis/ (audit-<timestamp>.csv). The CLI twin of the
+ * Audit tab in the window.
+ */
+private fun printAudit(command: String) {
+    println()
+    println("  ── Execution audit ───────────────────────────────────")
+    if (command.trim().equals("export", ignoreCase = true)) {
+        val runs = ExecutionAudit.all()
+        AuditExporter.exportCsv(runs).fold(
+            onSuccess = { file ->
+                println("    ✓ Exported ${runs.size} ${if (runs.size == 1) "run" else "runs"} to ${file.toAbsolutePath()}")
+            },
+            onFailure = { e ->
+                println("    ✗ Export failed: ${e.message ?: e.javaClass.simpleName}")
+            }
+        )
+        println()
+        return
+    }
+    val runs = ExecutionAudit.all().sortedByDescending { it.completedMs }
+    if (runs.isEmpty()) {
+        println("    No runs recorded yet. Run a goal (\"run <goal>\") to build the trail.")
+        println()
+        return
+    }
+    println("    ${runs.size} ${if (runs.size == 1) "run" else "runs"} · \"audit export\" writes CSV to ~/.aegis/")
+    val summary = AuditSummary.of(runs)
+    println(
+        "    Success rate: ${summary.successRatePercent}% (${summary.completedRuns}/${summary.totalRuns})" +
+            "  ·  Average duration: ${formatDuration(summary.avgDurationMs)}"
+    )
+    summary.tierBreakdown.forEach { tier ->
+        println(
+            "    ${tier.tier}  — ${tier.runs} ${if (tier.runs == 1) "run" else "runs"} (${tier.successRatePercent}% complete)"
+        )
+    }
+    runs.forEach { run ->
+        val tierText = if (run.tiers.isEmpty()) "no tier" else run.tiers.joinToString(" · ")
+        println(
+            "    ${run.outcome.lowercase().replaceFirstChar { it.uppercase() }}  ${run.goalDescription}" +
+                "  [$tierText]  ${run.taskCount} ${if (run.taskCount == 1) "task" else "tasks"}  ${auditTime(run.completedMs)}" +
+                (if (run.durationMs > 0) "  (${run.durationMs} ms)" else "")
+        )
+        run.reason?.let { println("        ✗ $it") }
+    }
+    println()
+}
+
 /** Goals in board order (priority desc — the order the board numbers them). */
 private fun sortedGoals(): List<Goal> =
     DesktopGoalPlanner.allGoals().sortedByDescending { it.priority }
@@ -443,6 +599,25 @@ private fun stateLabel(state: GoalState): String = when (state) {
 private fun progressBar(progress: Float, width: Int = 10): String {
     val filled = (progress.coerceIn(0f, 1f) * width).roundToInt()
     return "[" + "█".repeat(filled) + "░".repeat(width - filled) + "]"
+}
+
+/** Restores the persisted goals + audit snapshot on bootstrap (Phase B3). A missing or corrupt store is an honest empty start. */
+private fun restorePersistedState(store: GoalsStore) {
+    val snapshot = store.load() ?: return
+    DesktopGoalPlanner.restore(snapshot)
+    ExecutionAudit.replaceAll(snapshot.runs)
+    println("[goals] restored ${snapshot.goals.size} goal(s), ${snapshot.runs.size} audit run(s) from ${FileGoalsStore.defaultFile()}")
+}
+
+private val AUDIT_TIME_FORMATTER: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+
+private fun auditTime(epochMs: Long): String =
+    java.time.Instant.ofEpochMilli(epochMs).atZone(java.time.ZoneId.systemDefault()).format(AUDIT_TIME_FORMATTER)
+
+private fun formatDuration(ms: Long): String = when {
+    ms >= 1_000 -> "${"%.1f".format(ms / 1000.0)} s"
+    else -> "$ms ms"
 }
 
 private fun formatGb(bytes: Long): String = when {

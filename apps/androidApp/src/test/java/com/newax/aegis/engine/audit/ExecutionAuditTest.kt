@@ -42,7 +42,7 @@ class ExecutionAuditTest {
     fun `append keeps the newest entries within the cap`() {
         val capped = (1..30)
             .map { entry("run-$it", startedMs = it.toLong()) }
-            .fold(emptyList()) { acc, e -> appendAudit(acc, e, maxSize = 10) }
+            .fold(emptyList<ExecutionAuditEntry>()) { acc, e -> appendAudit(acc, e, maxSize = 10) }
 
         assertEquals(10, capped.size)
         assertEquals("run-21", capped.first().id)

@@ -83,7 +83,7 @@ class PolicyEngineTest {
         val engine = PolicyEngine().apply { setModeOverride("Send", PolicyMode.AUTO) }
         val evaluation = engine.evaluate(ProposedAction.Send("hi"), ActionOrigin.BACKGROUND)
         assertEquals(PolicyDecision.REQUIRE_APPROVAL, evaluation.decision)
-        assertTrue(evaluation.reason.contains("background"))
+        assertTrue(evaluation.reason.contains("machine origin"))
     }
 
     @Test

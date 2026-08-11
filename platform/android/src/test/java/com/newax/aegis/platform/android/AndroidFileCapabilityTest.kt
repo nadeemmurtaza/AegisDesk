@@ -45,7 +45,8 @@ class AndroidFileCapabilityTest {
         val metadata = (stat as CapabilityResult.Success).value
         assertEquals(11L, metadata.sizeBytes)
         assertTrue(!metadata.isDirectory)
-        assertTrue(metadata.path.endsWith(path))
+        // Path separators differ per OS (Windows: backslashes) — compare normalized.
+        assertTrue(metadata.path.replace('\\', '/').endsWith(path))
 
         val listing = capability.list("notes")
         assertTrue(listing.isSuccess())

@@ -77,6 +77,10 @@ class AegisApplication : Application() {
         // Execution audit trail (Track A8): every goal run is recorded for the
         // Goals screen's "Recent runs" section; persisted to kv_store like goals.
         ExecutionAuditHolder.init(AegisDatabase.get.kvStoreDao())
+        // Policy-decision history (Track A2 follow-up): every evaluation across
+        // sessions, persisted to kv_store like the execution audit. Records made
+        // before the DB was ready are merged in by initAuditPersistence.
+        PolicyHolder.initAuditPersistence(AegisDatabase.get.kvStoreDao())
         CoreTriggerEngine.start(this, AegisDatabase.get) { _, _ -> }
         // One-shot migration from legacy EncryptedSharedPreferences storage
         if (runBlocking { AegisDatabase.get.kvStoreDao().get("migration_v1_done") } != "1") {

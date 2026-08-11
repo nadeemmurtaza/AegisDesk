@@ -16,6 +16,8 @@ Read this when a toolchain is available. Run cheapest-first, **stop at the first
 ./gradlew :apps:androidApp:lintDebug
 ./gradlew :apps:androidApp:testDebugUnitTest                 # JVM unit tests
 ./gradlew :apps:androidApp:connectedDebugAndroidTest         # needs a device/emulator — Room MigrationTest
+./gradlew :platform:windows:test                             # Windows adapter tests (any OS; Win32 paths OS-guarded)
+./gradlew :apps:desktopApp:run                               # desktop bootstrap smoke — prints capability statuses
 ./gradlew :apps:androidApp:assembleRelease                   # only this exercises R8/minify/signing
 ```
 
@@ -23,7 +25,7 @@ Read this when a toolchain is available. Run cheapest-first, **stop at the first
 
 **Environment notes for this repo:**
 - On Windows: `$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; ./gradlew <task>`.
-- This Freebuff sandbox has **no JDK** — Gradle cannot run here. That is an `UNVERIFIED` handoff line, never a skipped step.
+- The sandbox has **no JDK on PATH by default** — Gradle cannot run until one is provided. A Temurin 17 tarball under `/tmp` (`export JAVA_HOME=/tmp/jdk-17.0.20+8`) was used to verify Track A. A build you could not run is an `UNVERIFIED` handoff line, never a skipped step.
 - `gradle.properties` must not contain `org.gradle.java.home=...` for CI/sandbox builds to work.
 - CI (`.github/workflows/android.yml`) is the machine gate once its path/branch issues are fixed.
 

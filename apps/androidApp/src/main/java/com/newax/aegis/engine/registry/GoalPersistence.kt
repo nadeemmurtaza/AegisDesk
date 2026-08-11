@@ -40,13 +40,16 @@ object GoalSnapshotCodec {
             .toString()
 
     /** Returns null when the stored JSON is corrupt or from an unknown format. */
-    fun decode(json: String): List<GoalSnapshot>? = try {
-        val root = JSONObject(json)
-        if (root.optInt(KEY_VERSION, 0) != VERSION) return null
-        val arr = root.optJSONArray(KEY_GOALS) ?: return null
-        (0 until arr.length()).map { idx -> decodeSnapshot(arr.getJSONObject(idx)) }
-    } catch (_: JSONException) {
-        null
+    fun decode(json: String): List<GoalSnapshot>? {
+        return try {
+            val root = JSONObject(json)
+            if (root.optInt(KEY_VERSION, 0) != VERSION) null else {
+                val arr = root.optJSONArray(KEY_GOALS) ?: return null
+                (0 until arr.length()).map { idx -> decodeSnapshot(arr.getJSONObject(idx)) }
+            }
+        } catch (_: JSONException) {
+            null
+        }
     }
 
     private fun encodeSnapshot(s: GoalSnapshot): JSONObject =

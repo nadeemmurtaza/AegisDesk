@@ -15,6 +15,11 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        // LiteRT-LM 0.14.0 ships Kotlin 2.3.0 metadata while this repo pins
+        // Kotlin 2.1.0 (the baseline table). Same palliative as androidApp:
+        // remove it when the repo's Kotlin version aligns with LiteRT's, not
+        // before (AGENTS.md known blockers).
+        freeCompilerArgs += listOf("-Xskip-metadata-version-check")
     }
 }
 

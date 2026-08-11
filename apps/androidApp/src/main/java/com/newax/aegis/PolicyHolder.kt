@@ -4,9 +4,12 @@ import android.content.Context
 import com.newax.aegis.authority.PolicyAuditRecord
 import com.newax.aegis.authority.PolicyEngine
 import com.newax.aegis.authority.SecureSettingsPolicyStore
+import com.newax.aegis.db.dao.KvStoreDao
 import com.newax.aegis.engine.AndroidSecureSettings
 import com.newax.aegis.engine.AutomationSettings
 import com.newax.aegis.engine.AutomationToggle
+import com.newax.aegis.engine.audit.MAX_POLICY_AUDIT_RECORDS
+import com.newax.aegis.engine.audit.PolicyAuditStore
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -19,8 +22,14 @@ import java.util.concurrent.CopyOnWriteArrayList
  * the Policy settings screen reads/writes the same instance's overrides and
  * denies. User overrides persist in the encrypted settings store
  * ([SecureSettingsPolicyStore]); the toggle gate reads the existing automation
- * toggles; every evaluation is appended to an in-memory audit trail surfaced by
- * [recentAudits] (RULE 8: consequential modifications are auditable).
+ * toggles; every evaluation is appended to an audit trail surfaced by
+ * [recentAudits]/[auditHistory] (RULE 8: consequential modifications are
+ * auditable).
+ *
+ * The audit trail persists across sessions: [initAuditPersistence] (wired after
+ * the database initializes) loads the previous decisions from kv_store, and the
+ * engine's audit sink writes through to the store on every evaluation. Records
+ * evaluated before the database is ready are merged in on wire-up, never lost.
  */
 object PolicyHolder {
 
@@ -28,6 +37,9 @@ object PolicyHolder {
 
     @Volatile
     private var engine: PolicyEngine? = null
+
+    @Volatile
+    private var auditStore: PolicyAuditStore? = null
 
     private val audits = CopyOnWriteArrayList<PolicyAuditRecord>()
 
@@ -42,8 +54,28 @@ object PolicyHolder {
                     AutomationToggle.entries.firstOrNull { it.key == key }
                         ?.let { AutomationSettings.isEnabled(it) } == true
                 },
-                auditSink = { record -> audits.add(record) },
+                auditSink = { record -> recordAudit(record) },
             )
+        }
+    }
+
+    /**
+     * Wires the persistent audit trail. Called after the database initializes
+     * (AegisApplication bootstrap); safe to call repeatedly. Loads decisions
+     * from previous sessions and merges any records evaluated before this call
+     * (early bootstrap) so nothing is lost.
+     */
+    fun initAuditPersistence(dao: KvStoreDao) {
+        synchronized(lock) {
+            if (auditStore != null) return
+            auditStore = PolicyAuditStore(dao)
+            val persisted = auditStore!!.load()
+            if (audits.isNotEmpty()) {
+                val merged = (persisted + audits).takeLast(MAX_POLICY_AUDIT_RECORDS)
+                audits.clear()
+                audits.addAll(merged)
+                auditStore!!.save(merged)
+            }
         }
     }
 
@@ -59,4 +91,35 @@ object PolicyHolder {
 
     /** The most recent [limit] audit records, oldest first. */
     fun recentAudits(limit: Int): List<PolicyAuditRecord> = audits.takeLast(limit)
+
+    /**
+     * The full policy-decision history, oldest first — every recorded evaluation
+     * across sessions (persisted via kv_store; empty before [initAuditPersistence]).
+     */
+    fun auditHistory(): List<PolicyAuditRecord> = synchronized(lock) { audits.toList() }
+
+    /** Clears the recorded policy-decision history (memory and persisted ring). */
+    fun clearAuditHistory() {
+        synchronized(lock) {
+            audits.clear()
+            auditStore?.save(emptyList())
+        }
+    }
+
+    /** Engine audit sink: always record in memory; write through once persisted. */
+    private fun recordAudit(record: PolicyAuditRecord) {
+        synchronized(lock) {
+            audits.add(record)
+            val store = auditStore
+            if (store != null) {
+                store.save(audits.takeLast(MAX_POLICY_AUDIT_RECORDS))
+            } else {
+                // Pre-DB-init evaluations: keep the memory ring bounded until
+                // initAuditPersistence wires the store and merges these in.
+                while (audits.size > MAX_POLICY_AUDIT_RECORDS) {
+                    audits.removeAt(0)
+                }
+            }
+        }
+    }
 }

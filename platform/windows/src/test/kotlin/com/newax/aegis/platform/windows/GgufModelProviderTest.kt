@@ -55,11 +55,13 @@ class GgufModelProviderTest {
     }
 
     @Test
-    fun `failed load leaves ERROR and rethrows`() = runBlocking {
-        engine.loadError = IllegalStateException("binding crashed")
-        val p = provider()
-        assertThrows(IllegalStateException::class.java) { p.load() }
-        assertEquals(ModelState.ERROR, p.state.value)
+    fun `failed load leaves ERROR and rethrows`() {
+        runBlocking {
+            engine.loadError = IllegalStateException("binding crashed")
+            val p = provider()
+            assertThrows(IllegalStateException::class.java) { runBlocking { p.load() } }
+            assertEquals(ModelState.ERROR, p.state.value)
+        }
     }
 
     @Test
@@ -82,11 +84,13 @@ class GgufModelProviderTest {
     }
 
     @Test
-    fun `blank text is rejected`() = runBlocking {
-        val p = provider()
-        p.load()
-        assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { p.complete(ModelRequest(text = "   ")) }
+    fun `blank text is rejected`() {
+        runBlocking {
+            val p = provider()
+            p.load()
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { p.complete(ModelRequest(text = "   ")) }
+            }
         }
     }
 
