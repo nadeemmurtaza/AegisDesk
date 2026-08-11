@@ -5,10 +5,16 @@ import android.os.Build
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.AppRecord
 import com.newax.aegis.db.entity.EntityAlias
+import com.newax.aegis.db.entity.Episode
+import com.newax.aegis.db.entity.EpisodeOutcome
 import com.newax.aegis.db.entity.GraphEdge
 import com.newax.aegis.db.entity.GraphEntity
 import com.newax.aegis.db.entity.GraphPredicate
+import com.newax.aegis.db.entity.HandoffEntry
+import com.newax.aegis.db.entity.HandoffStatus
 import com.newax.aegis.db.entity.KvStoreEntity
+import com.newax.aegis.db.entity.LibraryEntry
+import com.newax.aegis.db.entity.LibraryStatus
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
 import com.newax.aegis.db.entity.TriggerRule
@@ -82,6 +88,17 @@ object SyncRuntime {
     const val TABLE_APP_CAPABILITY_LINKS = "app_capability_links"
     const val TABLE_TRIGGER_RULES = "trigger_rules"
     const val TABLE_COMMANDS = "commands"
+
+    /**
+     * The three synced layers of the hierarchical agent memory (schema v14,
+     * docs/MEMORY_DESIGN.md): episodes (collective learning), handoffs (shared
+     * write), library_entries (the gated Global Library). Journal keys are the
+     * entry ids; LWW per key like every other RECORD table. `agent_scratchpad`
+     * and `work_log` deliberately have no constants here — they never sync.
+     */
+    const val TABLE_EPISODES = "episodes"
+    const val TABLE_HANDOFFS = "handoffs"
+    const val TABLE_LIBRARY_ENTRIES = "library_entries"
     private const val EDGE_SEP = "\u0001"
     private const val LINK_SEP = "\u0001"
     private const val COMMAND_TARGET_PREFIX = "to:"
@@ -520,6 +537,10 @@ object SyncRuntime {
                     TABLE_APP_RECORDS -> materializeAppRecord(entry)
                     TABLE_APP_CAPABILITY_LINKS -> materializeAppCapabilityLink(entry)
                     TABLE_TRIGGER_RULES -> materializeTriggerRule(entry)
+                    // Hierarchical agent memory (schema v14): the synced layers.
+                    TABLE_EPISODES -> materializeEpisode(entry)
+                    TABLE_HANDOFFS -> materializeHandoff(entry)
+                    TABLE_LIBRARY_ENTRIES -> materializeLibrary(entry)
                     // Pairing/revocation records (Slice 5).
                     TABLE_PEER_TRUST -> materializeTrust(entry)
                     else -> Unit // tables not yet captured/materialized
@@ -735,6 +756,116 @@ object SyncRuntime {
                         confidence = fields["confidence"]?.toIntOrNull() ?: 80
                     )
                 )
+            }
+        }
+    }
+
+    /**
+     * Incoming episode (hierarchical memory) — LWW per episodeId; a tombstone
+     * deletes. Episodes are append-only facts, so insert-if-absent (upsert
+     * keeps a replayed entry from duplicating).
+     */
+    private fun materializeEpisode(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val episodeId = fields["episodeId"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            runCatching {
+                val dao = AegisDatabase.get.agentMemoryDao()
+                if (entry.tombstone) {
+                    dao.deleteEpisode(episodeId)
+                } else {
+                    dao.upsertEpisode(
+                        Episode(
+                            episodeId = episodeId,
+                            agentId = fields["agentId"] ?: "",
+                            category = fields["category"] ?: "",
+                            summary = fields["summary"] ?: "",
+                            outcome = fields["outcome"] ?: EpisodeOutcome.OBSERVATION,
+                            lesson = fields["lesson"] ?: "",
+                            occurredAtMs = fields["occurredAtMs"]?.toLongOrNull() ?: entry.createdAt,
+                            contextRef = fields["contextRef"] ?: ""
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Incoming handoff (L3 shared write) — LWW per handoffId. Status-only
+     * entries (an ack from the consumer) merge into the existing row; full
+     * entries insert. Tombstones delete.
+     */
+    private fun materializeHandoff(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val handoffId = fields["handoffId"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            runCatching {
+                val dao = AegisDatabase.get.agentMemoryDao()
+                if (entry.tombstone) {
+                    dao.deleteHandoff(handoffId)
+                    return@runCatching
+                }
+                val existing = dao.handoffById(handoffId)
+                val status = fields["status"]?.takeIf { it.isNotBlank() }
+                if (existing != null && status != null) {
+                    dao.updateHandoffStatus(handoffId, status)
+                } else if (existing == null) {
+                    dao.upsertHandoff(
+                        HandoffEntry(
+                            handoffId = handoffId,
+                            fromAgent = fields["fromAgent"] ?: "",
+                            toAgent = fields["toAgent"] ?: "",
+                            task = fields["task"] ?: "",
+                            summary = fields["summary"] ?: "",
+                            artifactJson = fields["artifactJson"] ?: "{}",
+                            status = status ?: HandoffStatus.PENDING,
+                            refId = fields["refId"] ?: "",
+                            createdAtMs = fields["createdAtMs"]?.toLongOrNull() ?: entry.createdAt
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Incoming library entry (L1 gated library) — LWW per entryId. Status-only
+     * entries (an approval/decision from the gate) merge into the existing
+     * row; full entries insert. Tombstones delete. REJECTED entries stay in
+     * the journal (audit) but are never surfaced by the read-only library.
+     */
+    private fun materializeLibrary(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val entryId = fields["entryId"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            runCatching {
+                val dao = AegisDatabase.get.agentMemoryDao()
+                if (entry.tombstone) {
+                    dao.deleteLibrary(entryId)
+                    return@runCatching
+                }
+                val existing = dao.libraryById(entryId)
+                val status = fields["status"]?.takeIf { it.isNotBlank() }
+                if (existing != null && status != null) {
+                    dao.setLibraryStatus(entryId, status, System.currentTimeMillis())
+                } else if (existing == null) {
+                    dao.upsertLibrary(
+                        LibraryEntry(
+                            entryId = entryId,
+                            category = fields["category"] ?: "",
+                            title = fields["title"] ?: "",
+                            content = fields["content"] ?: "",
+                            confidence = fields["confidence"]?.toIntOrNull() ?: 80,
+                            source = fields["source"] ?: "",
+                            status = status ?: LibraryStatus.PENDING_APPROVAL,
+                            createdAtMs = fields["createdAtMs"]?.toLongOrNull() ?: entry.createdAt
+                        )
+                    )
+                }
             }
         }
     }

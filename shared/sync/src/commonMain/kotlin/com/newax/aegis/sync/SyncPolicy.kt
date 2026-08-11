@@ -14,13 +14,21 @@ object SyncPolicy {
     /** kv_store keys under this prefix are syncable; all others stay local. */
     const val SYNCABLE_PREFIX = "syncable:"
 
-    /** The 17 tables that carry sync metadata (schema v13, slice S0). */
+    /**
+     * Tables that carry sync metadata. The 17 v13 tables plus the three synced
+     * layers of the hierarchical agent memory (schema v14,
+     * docs/MEMORY_DESIGN.md): episodes (collective learning), handoffs (shared
+     * write), library_entries (the gated Global Library). `agent_scratchpad`
+     * and `work_log` are deliberately NOT here — scratchpad is private by
+     * design, work_log is device-scoped dedupe.
+     */
     val SYNCABLE_TABLES: Set<String> = setOf(
         "memory_records", "triples", "entities", "predicates", "edges",
         "blobs", "entity_aliases", "persons", "person_facts",
         "person_mentions", "person_snapshots", "person_policies",
         "ui_procedures", "app_records", "app_capability_links",
-        "trigger_rules", "file_objects"
+        "trigger_rules", "file_objects",
+        "episodes", "handoffs", "library_entries"
     )
 
     fun isSyncableTable(table: String): Boolean = table in SYNCABLE_TABLES

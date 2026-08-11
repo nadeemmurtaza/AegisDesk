@@ -463,6 +463,62 @@ private fun printSyncCommand(arg: String) {
                 println("    ✓ command sent to $deviceId ($commandClass) — journaled, relays to the target")
             }
         }
+        arg.startsWith("episodes", ignoreCase = true) -> {
+            val episodes = DesktopSync.recentEpisodes(20)
+            if (episodes.isEmpty()) {
+                println("    No episodes yet — record one with: sync know ... / sync lesson ...")
+            } else {
+                episodes.forEach { ep ->
+                    println("    [${ep.outcome}] ${ep.agentId} · ${ep.category}: ${ep.summary}" +
+                        (if (ep.lesson.isNotBlank()) " — lesson: ${ep.lesson}" else ""))
+                }
+            }
+        }
+        arg.startsWith("library", ignoreCase = true) -> {
+            val entries = DesktopSync.library()
+            if (entries.isEmpty()) {
+                println("    Library empty — submit with: sync know <category> <title> <content>")
+            } else {
+                entries.forEach { e ->
+                    println("    [${e.category}] ${e.title} (${e.confidence}): ${e.content}")
+                }
+            }
+        }
+        arg.startsWith("know ", ignoreCase = true) -> {
+            val parts = arg.substring(5).trim().split("|", limit = 4)
+            if (parts.size < 3) {
+                println("    usage: sync know <category> | <title> | <content>  (lands PENDING — approve with: sync approve <entryId>)")
+            } else {
+                DesktopSync.submitKnowledge(parts[0].trim(), parts[1].trim(), parts[2].trim())
+                println("    ✓ submitted to the human gate (PENDING_APPROVAL)")
+            }
+        }
+        arg.startsWith("approve ", ignoreCase = true) -> {
+            DesktopSync.approveKnowledge(arg.substring(8).trim())
+            println("    ✓ approved (ACTIVE — visible to all agents)")
+        }
+        arg.startsWith("lesson ", ignoreCase = true) -> {
+            val parts = arg.substring(7).trim().split("|", limit = 4)
+            if (parts.size < 3) {
+                println("    usage: sync lesson <category> | <summary> | <lesson>  (FAILURE episode — propagates the fix)")
+            } else {
+                DesktopSync.recordEpisode("desktop", parts[0].trim(), parts[1].trim(), "FAILURE", parts[2].trim())
+                println("    ✓ lesson recorded + journaled into the mesh")
+            }
+        }
+        arg.startsWith("handoff ", ignoreCase = true) -> {
+            val parts = arg.substring(8).trim().split("|", limit = 4)
+            if (parts.size < 3) {
+                println("    usage: sync handoff <toAgent> | <task> | <summary>")
+            } else {
+                DesktopSync.createHandoff("desktop", parts[0].trim(), parts[1].trim(), parts[2].trim())
+                println("    ✓ handoff written to ${parts[0].trim()} — ack with: sync ack <id>")
+            }
+        }
+        arg.startsWith("ack ", ignoreCase = true) -> {
+            DesktopSync.ackHandoff(arg.substring(4).trim())
+            println("    ✓ acked")
+        }
         arg.startsWith("history", ignoreCase = true) -> {
             val history = DesktopSync.commandHistory()
             if (history.isEmpty()) {
@@ -476,7 +532,7 @@ private fun printSyncCommand(arg: String) {
                 }
             }
         }
-        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory, categories, category <name> on|off, perms, perm <id> <class> on|off, send <id> <class> <json>, history")
+        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory, categories, category <name> on|off, perms, perm <id> <class> on|off, send <id> <class> <json>, history, episodes, library, know <cat>|<title>|<content>, approve <id>, lesson <cat>|<summary>|<lesson>, handoff <to>|<task>|<summary>, ack <id>")
     }
     println()
 }

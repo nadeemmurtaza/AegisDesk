@@ -45,7 +45,9 @@ fun getAegisDatabase(path: String): AegisDatabase =
             AegisDatabase.MIGRATION_8_9,
             AegisDatabase.MIGRATION_9_10,
             AegisDatabase.MIGRATION_10_11,
-            AegisDatabase.MIGRATION_11_12
+            AegisDatabase.MIGRATION_11_12,
+            AegisDatabase.MIGRATION_12_13,
+            AegisDatabase.MIGRATION_13_14
         )
         .build()
 

@@ -41,9 +41,14 @@ import androidx.sqlite.execSQL
         FileTextFts::class,
         FileEntityLink::class,
         SyncJournalEntity::class,
-        SyncVectorEntity::class
+        SyncVectorEntity::class,
+        AgentScratchpad::class,
+        Episode::class,
+        HandoffEntry::class,
+        WorkLogEntry::class,
+        LibraryEntry::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 @ConstructedBy(AegisDatabaseConstructor::class)
@@ -64,6 +69,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun fileDao(): FileDao
     abstract fun syncJournalDao(): SyncJournalDao
     abstract fun syncVectorDao(): SyncVectorDao
+    abstract fun agentMemoryDao(): AgentMemoryDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -211,6 +217,122 @@ abstract class AegisDatabase : RoomDatabase() {
                     connection.execSQL("ALTER TABLE $t ADD COLUMN syncDeviceId TEXT NOT NULL DEFAULT ''")
                     connection.execSQL("ALTER TABLE $t ADD COLUMN syncTombstone INTEGER NOT NULL DEFAULT 0")
                 }
+            }
+        }
+
+        /**
+         * v14 — the three-layer hierarchical agent memory (docs/MEMORY_DESIGN.md):
+         * L2 `agent_scratchpad` (private per-agent, TTL-scoped, LOCAL ONLY — no
+         * sync columns, isolation is the point), the `work_log` dedupe ledger
+         * (device-local — the swarm shares one DB), and the three SYNCED layers:
+         * `episodes` (episodic memory with outcome + lesson — collective
+         * learning), `handoffs` (shared-write structured artifacts + pointers),
+         * `library_entries` (the shared read-only Global Library behind the
+         * PENDING_APPROVAL human-in-the-loop gate). All three synced tables get
+         * the same four sync columns as the v13 syncable set.
+         */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(connection: SQLiteConnection) {
+                // L2 — local only, no sync columns.
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS agent_scratchpad (
+                        agentId TEXT NOT NULL,
+                        `key` TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        updatedAtMs INTEGER NOT NULL DEFAULT 0,
+                        expiresAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (agentId, `key`)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_agent_scratchpad_agentId ON agent_scratchpad(agentId)")
+
+                // Zero-duplication ledger — local only. Kotlin defaults, no
+                // @ColumnInfo → the migration must match Room's generated
+                // schema exactly (no DEFAULT clauses it won't emit).
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS work_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        action TEXT NOT NULL,
+                        resource TEXT NOT NULL,
+                        agentId TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        atMs INTEGER NOT NULL
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_work_log_action ON work_log(action)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_work_log_resource ON work_log(resource)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_work_log_status ON work_log(status)")
+
+                // Episodic — synced. Kotlin defaults, no @ColumnInfo → no
+                // DEFAULT clauses except the sync columns (which carry
+                // @ColumnInfo(defaultValue) in the entity).
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS episodes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        episodeId TEXT NOT NULL,
+                        agentId TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        outcome TEXT NOT NULL,
+                        lesson TEXT NOT NULL,
+                        occurredAtMs INTEGER NOT NULL,
+                        contextRef TEXT NOT NULL,
+                        syncHcWall INTEGER NOT NULL DEFAULT 0,
+                        syncHcCounter INTEGER NOT NULL DEFAULT 0,
+                        syncDeviceId TEXT NOT NULL DEFAULT '',
+                        syncTombstone INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_episodes_agentId ON episodes(agentId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_episodes_occurredAtMs ON episodes(occurredAtMs)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_episodes_outcome ON episodes(outcome)")
+
+                // Handoffs — synced.
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS handoffs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        handoffId TEXT NOT NULL,
+                        fromAgent TEXT NOT NULL,
+                        toAgent TEXT NOT NULL,
+                        task TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        artifactJson TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        refId TEXT NOT NULL,
+                        createdAtMs INTEGER NOT NULL,
+                        syncHcWall INTEGER NOT NULL DEFAULT 0,
+                        syncHcCounter INTEGER NOT NULL DEFAULT 0,
+                        syncDeviceId TEXT NOT NULL DEFAULT '',
+                        syncTombstone INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_handoffs_fromAgent ON handoffs(fromAgent)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_handoffs_toAgent ON handoffs(toAgent)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_handoffs_status ON handoffs(status)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_handoffs_createdAtMs ON handoffs(createdAtMs)")
+
+                // Global Library — synced.
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS library_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        entryId TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        confidence INTEGER NOT NULL,
+                        source TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        createdAtMs INTEGER NOT NULL,
+                        decidedAtMs INTEGER NOT NULL,
+                        syncHcWall INTEGER NOT NULL DEFAULT 0,
+                        syncHcCounter INTEGER NOT NULL DEFAULT 0,
+                        syncDeviceId TEXT NOT NULL DEFAULT '',
+                        syncTombstone INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_library_entries_category ON library_entries(category)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_library_entries_status ON library_entries(status)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_library_entries_title ON library_entries(title)")
             }
         }
 

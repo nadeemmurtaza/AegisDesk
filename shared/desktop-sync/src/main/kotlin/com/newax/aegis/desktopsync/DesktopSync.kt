@@ -78,6 +78,11 @@ object DesktopSync {
     private const val TABLE_TRIGGER_RULES = "trigger_rules"
     private const val TABLE_KV_STORE = "kv_store"
     private const val TABLE_COMMANDS = "commands"
+
+    /** The three synced layers of the hierarchical agent memory (schema v14). */
+    private const val TABLE_EPISODES = "episodes"
+    private const val TABLE_HANDOFFS = "handoffs"
+    private const val TABLE_LIBRARY_ENTRIES = "library_entries"
     private const val EDGE_SEP = "\u0001"
     private const val COMMAND_TARGET_PREFIX = "to:"
     private const val COMMAND_ACK_PREFIX = "ack:"
@@ -405,6 +410,128 @@ object DesktopSync {
     fun peerSignPublicKey(peerDeviceId: String): ByteArray? =
         platformKeyStore().pairedPeers().firstOrNull { it.deviceId == peerDeviceId }?.signPublicKey
 
+    // ── Hierarchical agent memory — desktop producer (docs/MEMORY_DESIGN.md) ──
+    // The desktop is a first-class producer of the three synced layers, mirror
+    // of Android's AgentMemory: journal RECORD entries (LWW per id) + local
+    // row. `agent_scratchpad` and `work_log` stay device-local on purpose.
+
+    fun recordEpisode(agentId: String, category: String, summary: String, outcome: String, lesson: String = "") {
+        if (summary.isBlank()) return
+        val episodeId = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                db.agentMemoryDao().insertEpisode(
+                    com.newax.aegis.db.entity.Episode(
+                        episodeId = episodeId, agentId = agentId, category = category, summary = summary,
+                        outcome = outcome, lesson = lesson, occurredAtMs = now
+                    )
+                )
+            }
+        }
+        journalRecord(
+            TABLE_EPISODES, episodeId,
+            SyncPayload.encode(
+                listOf(
+                    "episodeId" to episodeId, "agentId" to agentId, "category" to category, "summary" to summary,
+                    "outcome" to outcome, "lesson" to lesson, "occurredAtMs" to now.toString(), "contextRef" to ""
+                )
+            )
+        )
+    }
+
+    fun submitKnowledge(category: String, title: String, content: String, confidence: Int = 80, source: String = "desktop") {
+        if (category.isBlank() || title.isBlank() || content.isBlank()) return
+        val entryId = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                db.agentMemoryDao().upsertLibrary(
+                    com.newax.aegis.db.entity.LibraryEntry(
+                        entryId = entryId, category = category, title = title, content = content,
+                        confidence = confidence, source = source,
+                        status = com.newax.aegis.db.entity.LibraryStatus.PENDING_APPROVAL, createdAtMs = now
+                    )
+                )
+            }
+        }
+        journalRecord(
+            TABLE_LIBRARY_ENTRIES, entryId,
+            SyncPayload.encode(
+                listOf(
+                    "entryId" to entryId, "category" to category, "title" to title, "content" to content,
+                    "confidence" to confidence.toString(), "source" to source,
+                    "status" to com.newax.aegis.db.entity.LibraryStatus.PENDING_APPROVAL, "createdAtMs" to now.toString()
+                )
+            )
+        )
+    }
+
+    fun approveKnowledge(entryId: String) {
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching { db.agentMemoryDao().setLibraryStatus(entryId, com.newax.aegis.db.entity.LibraryStatus.ACTIVE, System.currentTimeMillis()) }
+        }
+        journalRecord(
+            TABLE_LIBRARY_ENTRIES, entryId,
+            SyncPayload.encode(listOf("entryId" to entryId, "status" to com.newax.aegis.db.entity.LibraryStatus.ACTIVE))
+        )
+    }
+
+    fun createHandoff(fromAgent: String, toAgent: String, task: String, summary: String, artifactJson: String = "{}") {
+        if (fromAgent.isBlank() || toAgent.isBlank() || task.isBlank()) return
+        val handoffId = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                db.agentMemoryDao().insertHandoff(
+                    com.newax.aegis.db.entity.HandoffEntry(
+                        handoffId = handoffId, fromAgent = fromAgent, toAgent = toAgent, task = task, summary = summary,
+                        artifactJson = artifactJson, status = com.newax.aegis.db.entity.HandoffStatus.PENDING, createdAtMs = now
+                    )
+                )
+            }
+        }
+        journalRecord(
+            TABLE_HANDOFFS, handoffId,
+            SyncPayload.encode(
+                listOf(
+                    "handoffId" to handoffId, "fromAgent" to fromAgent, "toAgent" to toAgent, "task" to task,
+                    "summary" to summary, "artifactJson" to artifactJson,
+                    "status" to com.newax.aegis.db.entity.HandoffStatus.PENDING, "createdAtMs" to now.toString()
+                )
+            )
+        )
+    }
+
+    fun ackHandoff(handoffId: String) {
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching { db.agentMemoryDao().updateHandoffStatus(handoffId, com.newax.aegis.db.entity.HandoffStatus.ACKED) }
+        }
+        journalRecord(
+            TABLE_HANDOFFS, handoffId,
+            SyncPayload.encode(listOf("handoffId" to handoffId, "status" to com.newax.aegis.db.entity.HandoffStatus.ACKED))
+        )
+    }
+
+    fun library(): List<com.newax.aegis.db.entity.LibraryEntry> {
+        val db = database ?: return emptyList()
+        return kotlinx.coroutines.runBlocking {
+            runCatching { db.agentMemoryDao().activeLibrary() }.getOrDefault(emptyList())
+        }
+    }
+
+    fun recentEpisodes(limit: Int = 30): List<com.newax.aegis.db.entity.Episode> {
+        val db = database ?: return emptyList()
+        return kotlinx.coroutines.runBlocking {
+            runCatching { db.agentMemoryDao().recentEpisodes(limit) }.getOrDefault(emptyList())
+        }
+    }
+
     /** The target's acknowledgement back to the sender — surfaced in status. */
     fun sendCommandAck(toDeviceId: String, refOpId: String, result: String, reason: String = "") {
         if (toDeviceId.isBlank()) return
@@ -615,6 +742,9 @@ object DesktopSync {
                 TABLE_APP_CAPABILITY_LINKS -> materializeAppCapabilityLink(entry)
                 TABLE_TRIGGER_RULES -> materializeTriggerRule(entry)
                 TABLE_KV_STORE -> materializeKv(entry)
+                TABLE_EPISODES -> materializeEpisode(entry)
+                TABLE_HANDOFFS -> materializeHandoff(entry)
+                TABLE_LIBRARY_ENTRIES -> materializeLibrary(entry)
                 TABLE_PEER_TRUST -> materializeTrust(entry)
                 else -> Unit
             }
@@ -839,6 +969,109 @@ object DesktopSync {
                         confidence = fields["confidence"]?.toIntOrNull() ?: 80
                     )
                 )
+            }
+        }
+    }
+
+    /**
+     * Incoming episode (hierarchical memory, schema v14) — LWW per episodeId;
+     * tombstones delete. Append-only facts → insert-if-absent.
+     */
+    private fun materializeEpisode(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val episodeId = fields["episodeId"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                val dao = db.agentMemoryDao()
+                if (entry.tombstone) {
+                    dao.deleteEpisode(episodeId)
+                } else {
+                    dao.upsertEpisode(
+                        com.newax.aegis.db.entity.Episode(
+                            episodeId = episodeId,
+                            agentId = fields["agentId"] ?: "",
+                            category = fields["category"] ?: "",
+                            summary = fields["summary"] ?: "",
+                            outcome = fields["outcome"] ?: com.newax.aegis.db.entity.EpisodeOutcome.OBSERVATION,
+                            lesson = fields["lesson"] ?: "",
+                            occurredAtMs = fields["occurredAtMs"]?.toLongOrNull() ?: entry.createdAt,
+                            contextRef = fields["contextRef"] ?: ""
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /** Incoming handoff (L3 shared write) — LWW per handoffId; status merges. */
+    private fun materializeHandoff(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val handoffId = fields["handoffId"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                val dao = db.agentMemoryDao()
+                if (entry.tombstone) {
+                    dao.deleteHandoff(handoffId)
+                    return@runCatching
+                }
+                val existing = dao.handoffById(handoffId)
+                val status = fields["status"]?.takeIf { it.isNotBlank() }
+                if (existing != null && status != null) {
+                    dao.updateHandoffStatus(handoffId, status)
+                } else if (existing == null) {
+                    dao.upsertHandoff(
+                        com.newax.aegis.db.entity.HandoffEntry(
+                            handoffId = handoffId,
+                            fromAgent = fields["fromAgent"] ?: "",
+                            toAgent = fields["toAgent"] ?: "",
+                            task = fields["task"] ?: "",
+                            summary = fields["summary"] ?: "",
+                            artifactJson = fields["artifactJson"] ?: "{}",
+                            status = status ?: com.newax.aegis.db.entity.HandoffStatus.PENDING,
+                            refId = fields["refId"] ?: "",
+                            createdAtMs = fields["createdAtMs"]?.toLongOrNull() ?: entry.createdAt
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /** Incoming library entry (L1 gated library) — LWW per entryId; status merges. */
+    private fun materializeLibrary(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val entryId = fields["entryId"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                val dao = db.agentMemoryDao()
+                if (entry.tombstone) {
+                    dao.deleteLibrary(entryId)
+                    return@runCatching
+                }
+                val existing = dao.libraryById(entryId)
+                val status = fields["status"]?.takeIf { it.isNotBlank() }
+                if (existing != null && status != null) {
+                    dao.setLibraryStatus(entryId, status, System.currentTimeMillis())
+                } else if (existing == null) {
+                    dao.upsertLibrary(
+                        com.newax.aegis.db.entity.LibraryEntry(
+                            entryId = entryId,
+                            category = fields["category"] ?: "",
+                            title = fields["title"] ?: "",
+                            content = fields["content"] ?: "",
+                            confidence = fields["confidence"]?.toIntOrNull() ?: 80,
+                            source = fields["source"] ?: "",
+                            status = status ?: com.newax.aegis.db.entity.LibraryStatus.PENDING_APPROVAL,
+                            createdAtMs = fields["createdAtMs"]?.toLongOrNull() ?: entry.createdAt
+                        )
+                    )
+                }
             }
         }
     }

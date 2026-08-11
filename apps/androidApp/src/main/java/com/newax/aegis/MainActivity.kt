@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
@@ -103,6 +104,7 @@ sealed class Screen(val label: String) {
     object Nearby : Screen("Nearby")
     object Sync : Screen("Sync")
     object PolicyHistory : Screen("Policy History")
+    object AgentMemory : Screen("Agent Memory")
 }
 
 class MainActivity : FragmentActivity() {
@@ -194,7 +196,8 @@ fun AegisApp(
                         NavEntry(Screen.Goals, Icons.Rounded.CheckCircle,            "Goals"),
                         NavEntry(Screen.Capabilities, Icons.Rounded.Shield,         "Capabilities"),
                         NavEntry(Screen.Nearby, Icons.Outlined.NearMe,              "Nearby"),
-                        NavEntry(Screen.Sync, Icons.Rounded.Sync,                  "Sync")
+                        NavEntry(Screen.Sync, Icons.Rounded.Sync,                  "Sync"),
+                        NavEntry(Screen.AgentMemory, Icons.Outlined.Memory,         "Agent Memory")
                     ).forEach { entry ->
                         NavigationDrawerItem(
                             label  = {
@@ -257,6 +260,7 @@ fun AegisApp(
                                         Screen.AppPermissions -> "App Permissions"
                                         Screen.Capabilities -> "Capabilities"
                                         Screen.Goals -> "Goals"
+                                        Screen.AgentMemory -> "Agent Memory"
                                         Screen.Nearby -> "Nearby Share"
                                         Screen.Sync -> "Sync"
                                         Screen.PolicyHistory -> "Policy History"
@@ -319,6 +323,7 @@ fun AegisApp(
                     Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions }, onNavigateToSync = { screen = Screen.Sync })
                     Screen.Nearby -> NearbyShareScreen(padding)
                     Screen.Sync -> SyncScreen(padding)
+                    Screen.AgentMemory -> AgentMemoryScreen(padding)
                 }
             }
             BiometricOverlay(vm)
