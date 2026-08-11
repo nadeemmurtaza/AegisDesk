@@ -96,9 +96,15 @@ object AgentOrchestrator {
                 val d = step.dominant ?: return@forEachIndexed
                 append("- Step ${index + 1}: ${d.name} (${d.category}) — ${d.description}")
                 val permitted = runCatching { SkillManager.skillsForAgent(d.agentId) }.getOrDefault(emptyList())
-                    .map { it.name }
                 if (permitted.isNotEmpty()) {
-                    append("  Permitted skills: ${permitted.joinToString(", ")}")
+                    val names = permitted.joinToString(", ") { skill ->
+                        val flags = buildString {
+                            if (skill.requiresApproval) append("⚠approval")
+                            if (skill.sandboxRequired) { if (isNotEmpty()) append("+"); append("sandbox") }
+                        }
+                        skill.name + if (flags.isNotEmpty()) " ($flags)" else ""
+                    }
+                    append("  Permitted skills: $names")
                 } else {
                     append("  Permitted skills: none")
                 }

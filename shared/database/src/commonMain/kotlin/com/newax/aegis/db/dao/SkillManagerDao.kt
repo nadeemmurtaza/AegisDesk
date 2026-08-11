@@ -30,10 +30,18 @@ interface SkillManagerDao {
     @Query("DELETE FROM skills WHERE skillId = :skillId")
     suspend fun deleteSkill(skillId: String): Int
 
+    // ── PBAC — capability bridge + tool schemas ─────────────────────────────
+
+    @Query("SELECT skillId FROM skills WHERE capability = :capability AND enabled = 1")
+    suspend fun skillsForCapability(capability: String): List<String>
+
+    @Query("SELECT toolSchema FROM skills WHERE enabled = 1")
+    suspend fun allToolSchemas(): List<String>
+
     // ── Permissions (agent_skills join) ─────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun grantSkill(agentId: String, skillId: String, now: Long = System.currentTimeMillis())
+    suspend fun grantSkill(grant: AgentSkill)
 
     @Query("DELETE FROM agent_skills WHERE agentId = :agentId AND skillId = :skillId")
     suspend fun revokeSkill(agentId: String, skillId: String): Int
@@ -78,7 +86,7 @@ interface SkillManagerDao {
     suspend fun deleteSet(setId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun addToSet(setId: String, skillId: String)
+    suspend fun addToSet(member: SkillSetMember)
 
     @Query("DELETE FROM skill_set_members WHERE setId = :setId AND skillId = :skillId")
     suspend fun removeFromSet(setId: String, skillId: String): Int
@@ -91,4 +99,24 @@ interface SkillManagerDao {
 
     @Query("SELECT skillId FROM skill_set_members WHERE setId = :setId")
     suspend fun setMemberIds(setId: String): List<String>
+
+    // ── HITL approval ledger (skill_approvals) ──────────────────────────────
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertApproval(approval: SkillApproval)
+
+    @Query("SELECT * FROM skill_approvals WHERE approvalId = :approvalId LIMIT 1")
+    suspend fun approvalById(approvalId: String): SkillApproval?
+
+    @Query("UPDATE skill_approvals SET status = :status, decidedAtMs = :now WHERE approvalId = :approvalId")
+    suspend fun setApprovalStatus(approvalId: String, status: String, now: Long): Int
+
+    @Query("SELECT * FROM skill_approvals WHERE status = 'PENDING' ORDER BY requestedAtMs DESC")
+    suspend fun pendingApprovals(): List<SkillApproval>
+
+    @Query("SELECT * FROM skill_approvals ORDER BY requestedAtMs DESC LIMIT :limit")
+    suspend fun recentApprovals(limit: Int = 50): List<SkillApproval>
+
+    @Query("UPDATE skill_approvals SET status = 'EXPIRED' WHERE status = 'PENDING' AND requestedAtMs < :olderThan")
+    suspend fun expireOldApprovals(olderThan: Long): Int
 }

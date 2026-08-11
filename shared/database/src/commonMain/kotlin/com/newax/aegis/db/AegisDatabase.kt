@@ -51,9 +51,10 @@ import androidx.sqlite.execSQL
         SkillEntity::class,
         AgentSkill::class,
         SkillSet::class,
-        SkillSetMember::class
+        SkillSetMember::class,
+        SkillApproval::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 @ConstructedBy(AegisDatabaseConstructor::class)
@@ -421,6 +422,38 @@ abstract class AegisDatabase : RoomDatabase() {
                     )
                 """)
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_skill_set_members_skillId ON skill_set_members(skillId)")
+            }
+        }
+
+        /**
+         * v17 — capability/skill separation + PBAC guard surfaces
+         * (docs/AGENTS_DESIGN.md §permissions):
+         *  - `skills` gains capability / toolSchema / sandboxRequired /
+         *    requiresApproval / risks (the manifest fields),
+         *  - `agents` gains `capabilities` (what the agent knows how to do),
+         *  - `skill_approvals` — the HITL decision ledger.
+         */
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE skills ADD COLUMN capability TEXT NOT NULL DEFAULT ''")
+                connection.execSQL("ALTER TABLE skills ADD COLUMN toolSchema TEXT NOT NULL DEFAULT '{}'")
+                connection.execSQL("ALTER TABLE skills ADD COLUMN sandboxRequired INTEGER NOT NULL DEFAULT 0")
+                connection.execSQL("ALTER TABLE skills ADD COLUMN requiresApproval INTEGER NOT NULL DEFAULT 0")
+                connection.execSQL("ALTER TABLE skills ADD COLUMN risks TEXT NOT NULL DEFAULT ''")
+                connection.execSQL("ALTER TABLE agents ADD COLUMN capabilities TEXT NOT NULL DEFAULT ''")
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS skill_approvals (
+                        approvalId TEXT NOT NULL,
+                        agentId TEXT NOT NULL,
+                        skillId TEXT NOT NULL,
+                        requestContext TEXT NOT NULL DEFAULT '',
+                        untrustedSource INTEGER NOT NULL DEFAULT 0,
+                        status TEXT NOT NULL DEFAULT 'PENDING',
+                        requestedAtMs INTEGER NOT NULL DEFAULT 0,
+                        decidedAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (approvalId)
+                    )
+                """)
             }
         }
 

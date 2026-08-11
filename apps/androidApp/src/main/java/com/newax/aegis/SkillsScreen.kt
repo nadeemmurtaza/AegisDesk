@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.agents.AgentRegistry
+import com.newax.aegis.agents.SkillGuard
 import com.newax.aegis.agents.SkillManager
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
@@ -50,7 +51,7 @@ private val Border = Color(0xFFD8D8D3)
 private val AccentGreen = Color(0xFF22C55E)
 private val AccentRed = Color(0xFFDC2626)
 
-private val SECTIONS = listOf("Skills", "Skill sets", "Permissions")
+private val SECTIONS = listOf("Skills", "Skill sets", "Permissions", "Approvals")
 
 /**
  * The skills management surface (docs/AGENTS_DESIGN.md §skills; R13): the
@@ -82,6 +83,7 @@ fun SkillsScreen(padding: PaddingValues) {
             "Skills" -> item { SkillsSection() }
             "Skill sets" -> item { SkillSetsSection() }
             "Permissions" -> item { PermissionsSection() }
+            "Approvals" -> item { ApprovalsSection() }
         }
     }
 }
@@ -93,6 +95,12 @@ private fun SkillsSection() {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
             message = SkillManager.importSkill(uri)
+            skills = SkillManager.skills()
+        }
+    }
+    val setPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            message = SkillManager.importSkillSet(uri)
             skills = SkillManager.skills()
         }
     }
@@ -108,6 +116,8 @@ private fun SkillsSection() {
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = { picker.launch(arrayOf("application/zip", "application/x-zip-compressed", "*/*")) }) { Text("Import skill (.zip)") }
+                Spacer(Modifier.width(10.dp))
+                Button(onClick = { setPicker.launch(arrayOf("application/json", "text/json", "*/*")) }) { Text("Import skill set (.json)") }
                 Spacer(Modifier.width(10.dp))
                 TextButton(onClick = { skills = SkillManager.skills() }) { Text("Refresh") }
             }
@@ -125,10 +135,19 @@ private fun SkillsSection() {
         ) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${skill.name} — v${skill.version}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
-                        Text("${skill.category} · ${skill.skillId} · ${skill.source}", fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                Column(Modifier.weight(1f)) {
+                    Text("${skill.name} — v${skill.version}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+                    Text("${skill.category} · ${skill.skillId} · ${skill.source}", fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                    val flags = buildString {
+                        if (skill.capability.isNotBlank()) { append("capability: ${skill.capability}") }
+                        if (skill.sandboxRequired) { if (isNotEmpty()) append(" · "); append("sandbox") }
+                        if (skill.requiresApproval) { if (isNotEmpty()) append(" · "); append("approval") }
                     }
+                    if (flags.isNotEmpty()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(flags, fontSize = 11.sp, color = if (skill.requiresApproval || skill.sandboxRequired) AccentRed else TextTer)
+                    }
+                }
                     Switch(
                         checked = skill.enabled,
                         onCheckedChange = { on ->
@@ -300,6 +319,84 @@ private fun PermissionsSection() {
                 }
             }
             Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+/** The HITL window: paused skill requests waiting for a human allow/deny. */
+@Composable
+private fun ApprovalsSection() {
+    var approvals by remember { mutableStateOf(SkillGuard.pendingApprovals()) }
+    var history by remember { mutableStateOf(SkillGuard.recentApprovals(20)) }
+    val agentsById = remember { AgentRegistry.agents().associateBy { it.agentId } }
+    val skillsById = remember { SkillManager.skills().associateBy { it.skillId } }
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Paused executions — a skill request needs your decision", fontSize = 13.sp, color = TextSec)
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = {
+                approvals = SkillGuard.pendingApprovals()
+                history = SkillGuard.recentApprovals(20)
+            }) { Text("Refresh") }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    if (approvals.isEmpty()) {
+        Text("No pending approvals — high-impact skills pause here before they run.", fontSize = 12.sp, color = TextTer)
+    } else {
+        approvals.forEach { a ->
+            val agentName = agentsById[a.agentId]?.name ?: a.agentId
+            val skillName = skillsById[a.skillId]?.name ?: a.skillId
+            val skill = skillsById[a.skillId]
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("$agentName → $skillName", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPri)
+                    if (a.untrustedSource) {
+                        Text("⚠ triggered from UNTRUSTED content (prompt-injection guard)", fontSize = 11.sp, color = AccentRed)
+                    }
+                    if (a.requestContext.isNotBlank()) {
+                        Text("Context: ${a.requestContext}", fontSize = 12.sp, color = TextSec, maxLines = 3)
+                    }
+                    skill?.risks?.takeIf { it.isNotBlank() }?.let {
+                        Text("Risk: $it", fontSize = 11.sp, color = TextTer)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                SkillGuard.decideApproval(a.approvalId, allow = true)
+                                approvals = SkillGuard.pendingApprovals()
+                                history = SkillGuard.recentApprovals(20)
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) { Text("Allow once", fontSize = 12.sp) }
+                        TextButton(onClick = {
+                            SkillGuard.decideApproval(a.approvalId, allow = false)
+                            approvals = SkillGuard.pendingApprovals()
+                            history = SkillGuard.recentApprovals(20)
+                        }) { Text("Deny", fontSize = 12.sp, color = AccentRed) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+    }
+    if (history.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        Text("Recent decisions", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer)
+        history.filter { it.status != "PENDING" }.take(10).forEach { a ->
+            Text("${a.status} · ${agentsById[a.agentId]?.name ?: a.agentId} → ${skillsById[a.skillId]?.name ?: a.skillId}", fontSize = 11.sp, color = TextTer)
         }
     }
 }

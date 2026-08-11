@@ -25,7 +25,15 @@ data class AgentEntity(
     val category: String,
     /** Comma-separated routing keywords (matched word-boundary, case-insensitive). */
     val keywords: String = "",
-    /** Comma-separated capability names the agent declares. */
+    /**
+     * CAPABILITIES — what the agent KNOWS HOW TO DO ("code_execution",
+     * "web_research", …). Distinct from skills (the code that does the work):
+     * a skill's `capability` field must be in this set for the permission
+     * guard to allow it. Legacy comma string from v15 (was `skills`);
+     * migrated into grant rows + capability checks.
+     */
+    val capabilities: String = "",
+    /** Deprecated v15 column — what the agent declares it can do; superseded by [capabilities]. */
     val skills: String = "",
     /** Disabled agents never route, never dominate. */
     @ColumnInfo(defaultValue = "1")

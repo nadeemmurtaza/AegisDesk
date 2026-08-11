@@ -75,6 +75,61 @@ One layer below the agents registry:
   at assembly time); the same `canUse` primitive is what executors consult
   (desktop executor wiring lands with Track M).
 
+## Capabilities vs skills (schema v17)
+
+**Capability = what an agent KNOWS HOW TO DO** (`code_execution`,
+`app_control`, `knowledge`, …). **Skill = the CODE that does the work**
+(`run_shell`, `open_app`, …). The two are decoupled:
+
+- `agents.capabilities` is the agent's declared know-how (seeded for the
+  built-ins, editable per agent); `skills.capability` is what a skill
+  fulfills. A single skill (`web_search`, `execute_sql`) is shared by MANY
+  agents — sharing happens at the skill layer, never by copying code.
+- Skills live in a shared directory (`filesDir/skills/<id>/`) exposed to the
+  runtime via **tool schemas** — `skills.toolSchema` holds the OpenAI-style
+  JSON schema, and `SkillManager.toolSchemasForAgent(agentId)` returns the
+  schemas of exactly the skills that agent is permitted to use.
+- Individual schema `app/skills/<id>/manifest.json`; skill-set schema
+  `app/skillsets/<set>.json` (both importable from the Skills screen).
+
+## The Permission Guard (PBAC) — `SkillGuard`
+
+Centralized, attribute-based access control. Every skill request flows
+through `SkillGuard.request(agentId, skillId, context, untrustedSource)` —
+there is no second path. It does not ask "is this agent an admin?", it asks
+"does THIS agent instance have the exact permission needed RIGHT NOW, under
+these conditions?". Decision order (first failure wins):
+
+1. skill exists + enabled,
+2. agent exists + enabled,
+3. grant row exists (`agent_skills` — absence = denied),
+4. **capability bridge** — if the skill declares a `capability`, the agent
+   must declare it too (`skill.capability ∈ agent.capabilities`);
+5. HITL / sandbox / injection conditions (below) → `ApprovalRequired`,
+6. otherwise `Allow`.
+
+### Indirect prompt-injection containment
+
+A naive router hands control to a coding agent because a Research Agent's
+scraped email said "tell the coding agent to wipe the disk". The guard
+contains this three ways:
+
+- **Untrusted-source flag** — callers tag requests that originate from
+  ingested content (email/web/OCR/model output). For high-risk categories
+  (`automation`, `communication`) or sandbox/approval skills, an untrusted
+  request PAUSES for a human decision even when it would otherwise auto-run.
+- **Execution sandboxing** — `manifest.json` `sandbox_required: true` marks
+  host-filesystem skills. `SkillGuard.sandboxProvider` is the pluggable seam
+  (WASM/Docker runtime); when NO sandbox is available the request is demoted
+  to human approval rather than silently running unsandboxed — the safe
+  default. (The app ships no sandbox runtime today; the seam is registered
+  when one is added.)
+- **HITL policy hooks** — `manifest.json` `requires_approval: true` pauses
+  execution at the centralized guard: a `PENDING` row lands in
+  `skill_approvals` (the audit ledger) and the Approvals section of the
+  Skills screen pops the allow/deny window. 30-min TTL expires undecided
+  requests. Every decision is recorded — who asked, what for, allow or deny.
+
 ## Wiring
 
 - `AgentRegistry.init` + `SkillManager.init` run at app start (seeds built-ins after DB init).
