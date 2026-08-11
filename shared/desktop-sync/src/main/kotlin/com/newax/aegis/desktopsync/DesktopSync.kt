@@ -1057,6 +1057,10 @@ object DesktopSync {
                 val existing = dao.libraryById(entryId)
                 val status = fields["status"]?.takeIf { it.isNotBlank() }
                 if (existing != null && status != null) {
+                    // Decay propagation: an incoming confidence rides with the status.
+                    fields["confidence"]?.toIntOrNull()?.let { confidence ->
+                        if (confidence != existing.confidence) dao.updateLibraryConfidence(entryId, confidence)
+                    }
                     dao.setLibraryStatus(entryId, status, System.currentTimeMillis())
                 } else if (existing == null) {
                     dao.upsertLibrary(

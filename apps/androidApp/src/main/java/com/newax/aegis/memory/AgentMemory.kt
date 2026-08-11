@@ -137,6 +137,12 @@ object AgentMemory {
                 "contextRef" to contextRef
             )
         )
+        // Semantic path — best-effort: no-op when the embedder isn't ready.
+        runCatching {
+            com.newax.aegis.engine.embedding.VectorStore.indexEpisode(
+                AegisDatabase.get, episodeId, summary, lesson, outcome
+            )
+        }
         return episodeId
     }
 
@@ -294,13 +300,21 @@ object AgentMemory {
         return entryId
     }
 
-    /** The human-in-the-loop gate: promote to ACTIVE. */
+    /** The human-in-the-loop gate: promote to ACTIVE (and into the vector index). */
     fun approveKnowledge(entryId: String) {
         setLibraryStatus(entryId, LibraryStatus.ACTIVE)
+        runCatching {
+            val db = AegisDatabase.get
+            val entry = runBlocking { db.agentMemoryDao().libraryById(entryId) } ?: return
+            com.newax.aegis.engine.embedding.VectorStore.indexLibrary(db, entryId, entry.category, entry.title, entry.content)
+        }
     }
 
     fun rejectKnowledge(entryId: String) {
         setLibraryStatus(entryId, LibraryStatus.REJECTED)
+        runCatching {
+            com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, entryId)
+        }
     }
 
     private fun setLibraryStatus(entryId: String, status: String) {
@@ -334,20 +348,49 @@ object AgentMemory {
      * ordered by confidence; episodes with lessons are appended when the query
      * matches their lesson text. Offline-first by design (repo invariant).
      */
+    /**
+     * Unified recall over the three synced layers — the snippet the assistant
+     * actually consumes (via [com.newax.aegis.engine.embedding.VectorMemorySearch]).
+     * Merge order, deduped:
+     *   1. semantic vector results (indexed ACTIVE library + episodes + the
+     *      repo's existing fact/memory/triple/edge embeddings),
+     *   2. keyword matches over ACTIVE library entries,
+     *   3. matching lessons from FAILURE episodes.
+     * The vector leg is best-effort (graceful degradation when the embedder
+     * isn't ready — keyword + lessons still answer).
+     */
     fun recall(query: String, limit: Int = 5): List<String> {
         if (query.isBlank()) return emptyList()
-        val snippets = runBlocking {
-            runCatching { AegisDatabase.get.agentMemoryDao().recall(query, limit) }.getOrDefault(emptyList())
+        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val seen = LinkedHashSet<String>(limit * 3)
+        val out = mutableListOf<String>()
+        fun add(text: String) {
+            val key = text.take(140)
+            if (seen.add(key) && out.size < limit) out.add(text)
         }
-        val out = snippets.map { "[${it.category}] ${it.title}: ${it.content}" }
-        if (out.size < limit) {
-            lessonsLearned(limit).filter { ep ->
-                query.lowercase().let { q -> ep.summary.lowercase().contains(q) || ep.lesson.lowercase().contains(q) }
-            }.take(limit - out.size).forEach { ep ->
-                out.add("[lesson:${ep.outcome}] ${ep.lesson.ifBlank { ep.summary }}")
-            }
+
+        // 1. Semantic vector recall over everything indexed (incl. the agent layers).
+        runCatching {
+            com.newax.aegis.engine.embedding.VectorStore.search(db, query, limit).forEach { add(it.text) }
         }
-        return out
+
+        // 2. Keyword recall over the ACTIVE library (deterministic, offline-first),
+        //    recency-boosted: claims confirmed in the last month rank above
+        //    stale ones at equal confidence (forgetting is a ranking signal).
+        runBlocking {
+            runCatching { db.agentMemoryDao().recall(query, limit * 3) }.getOrDefault(emptyList())
+        }.sortedByDescending { entry ->
+            val ageAnchor = if (entry.decidedAtMs > 0) entry.decidedAtMs else entry.createdAtMs
+            entry.confidence + if (System.currentTimeMillis() - ageAnchor < RECENT_WINDOW_MS) RECENT_BONUS else 0
+        }.take(limit).forEach { add("[${it.category}] ${it.title}: ${it.content}") }
+
+        // 3. Lessons from FAILURE episodes matching the query.
+        val q = query.lowercase()
+        lessonsLearned(limit).filter { ep ->
+            ep.summary.lowercase().contains(q) || ep.lesson.lowercase().contains(q)
+        }.forEach { ep -> add("[lesson:${ep.outcome}] ${ep.lesson.ifBlank { ep.summary }}") }
+
+        return out.take(limit)
     }
 
     // ── Background distillation (conflict resolution primitives) ──────────
@@ -364,9 +407,15 @@ object AgentMemory {
      *  3. Everything else — including any conflicting claim (same category +
      *     title, different content) — STAYS PENDING for the human gate
      *     (human-in-the-loop for critical memory).
-     * Returns the count of entries this run resolved. Never throws.
+     * Runs the full background pass: conflict resolution + episodic→semantic
+     * consolidation ([consolidateLessons]) + forgetting/decay ([decay]).
+     * Returns the number of entries this run resolved. Never throws.
      */
-    fun distill(): Int = runBlocking {
+    fun distill(): Int {
+        return resolveConflicts() + consolidateLessons() + decay()
+    }
+
+    private fun resolveConflicts(): Int = runBlocking {
         runCatching {
             val dao = AegisDatabase.get.agentMemoryDao()
             var resolved = 0
@@ -377,10 +426,14 @@ object AgentMemory {
                 when {
                     dup -> {
                         dao.setLibraryStatus(pending.entryId, LibraryStatus.REJECTED, System.currentTimeMillis())
+                        com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, pending.entryId)
                         resolved++
                     }
                     !conflict && pending.confidence >= 90 -> {
                         dao.setLibraryStatus(pending.entryId, LibraryStatus.ACTIVE, System.currentTimeMillis())
+                        com.newax.aegis.engine.embedding.VectorStore.indexLibrary(
+                            AegisDatabase.get, pending.entryId, pending.category, pending.title, pending.content
+                        )
                         resolved++
                     }
                     // conflict or low confidence → stays PENDING (human gate)
@@ -389,4 +442,103 @@ object AgentMemory {
             resolved
         }.getOrDefault(0)
     }
+
+    /**
+     * Episodic → semantic consolidation (the "sleep" step): a lesson repeated
+     * across ≥ 2 FAILURE episodes is promoted to an ACTIVE library entry
+     * (category `learned`, source `consolidation`, confidence 90) — the fix
+     * becomes semantic knowledge every agent inherits. Skips lessons already
+     * covered by an ACTIVE entry (zero duplication). Journaled so the
+     * promotion propagates. Returns the number promoted.
+     */
+    fun consolidateLessons(): Int = runBlocking {
+        runCatching {
+            val db = AegisDatabase.get
+            val dao = db.agentMemoryDao()
+            val lessons = dao.allLessonTexts().map { it.trim().lowercase() }.filter { it.isNotBlank() }
+            if (lessons.isEmpty()) return@runCatching 0
+            val repeated = lessons.groupingBy { it }.eachCount().filterValues { it >= 2 }.keys
+            if (repeated.isEmpty()) return@runCatching 0
+            val activeContent = dao.activeLibrary().map { it.content.trim().lowercase() }.toSet()
+            var promoted = 0
+            repeated.forEach { lesson ->
+                if (lesson in activeContent) return@forEach
+                val entryId = UUID.randomUUID().toString()
+                val now = System.currentTimeMillis()
+                dao.upsertLibrary(
+                    LibraryEntry(
+                        entryId = entryId,
+                        category = "learned",
+                        title = lesson.take(64),
+                        content = lesson,
+                        confidence = 90,
+                        source = "consolidation",
+                        status = LibraryStatus.ACTIVE,
+                        createdAtMs = now,
+                        decidedAtMs = now
+                    )
+                )
+                com.newax.aegis.engine.embedding.VectorStore.indexLibrary(db, entryId, "learned", lesson.take(64), lesson)
+                SyncRuntime.captureRecord(
+                    SyncRuntime.TABLE_LIBRARY_ENTRIES, entryId,
+                    listOf(
+                        "entryId" to entryId,
+                        "category" to "learned",
+                        "title" to lesson.take(64),
+                        "content" to lesson,
+                        "confidence" to "90",
+                        "source" to "consolidation",
+                        "status" to LibraryStatus.ACTIVE,
+                        "createdAtMs" to now.toString()
+                    )
+                )
+                promoted++
+            }
+            promoted
+        }.getOrDefault(0)
+    }
+
+    /**
+     * Forgetting/decay for semantic memory (docs/MEMORY_DESIGN.md): ACTIVE
+     * library entries older than [DECAY_AFTER_MS] with no re-confirmation lose
+     * 10 confidence per pass; once below [FORGET_BELOW], the claim is REJECTED
+     * (forgotten) and dropped from the vector index. Journaled so the decay
+     * propagates. Episodic memory deliberately never decays — chronological
+     * records are meant to persist. Returns the number of entries touched.
+     */
+    fun decay(): Int = runBlocking {
+        runCatching {
+            val db = AegisDatabase.get
+            val dao = db.agentMemoryDao()
+            val now = System.currentTimeMillis()
+            var touched = 0
+            for (entry in dao.activeLibrary()) {
+                val ageAnchor = if (entry.decidedAtMs > 0) entry.decidedAtMs else entry.createdAtMs
+                if (now - ageAnchor < DECAY_AFTER_MS) continue
+                val next = entry.confidence - DECAY_STEP
+                if (next < FORGET_BELOW) {
+                    dao.setLibraryStatus(entry.entryId, LibraryStatus.REJECTED, now)
+                    com.newax.aegis.engine.embedding.VectorStore.removeLibrary(db, entry.entryId)
+                    SyncRuntime.captureRecord(
+                        SyncRuntime.TABLE_LIBRARY_ENTRIES, entry.entryId,
+                        listOf("entryId" to entry.entryId, "status" to LibraryStatus.REJECTED)
+                    )
+                } else {
+                    dao.updateLibraryConfidence(entry.entryId, next)
+                    SyncRuntime.captureRecord(
+                        SyncRuntime.TABLE_LIBRARY_ENTRIES, entry.entryId,
+                        listOf("entryId" to entry.entryId, "status" to LibraryStatus.ACTIVE, "confidence" to next.toString())
+                    )
+                }
+                touched++
+            }
+            touched
+        }.getOrDefault(0)
+    }
+
+    private const val DECAY_AFTER_MS = 90L * 24 * 60 * 60 * 1000L
+    private const val DECAY_STEP = 10
+    private const val FORGET_BELOW = 40
+    private const val RECENT_WINDOW_MS = 30L * 24 * 60 * 60 * 1000L
+    private const val RECENT_BONUS = 20
 }

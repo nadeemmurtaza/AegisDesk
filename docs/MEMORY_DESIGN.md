@@ -19,7 +19,7 @@ Supporting layers:
 |---|---|---|
 | **Episodic memory** (the "periodic" layer) | `episodes` | Chronological records with `outcome` + `lesson`. Agents learn from mistakes (FAILURE episodes carry the distilled fix) and keep temporal awareness (`occurredAtMs`, `contextRef`). Syncs. |
 | **Zero work duplication** | `work_log` | One `(action, resource)` done once — the swarm skips finished work. Device-local (the swarm shares one DB). |
-| **Embeddings (future)** | `embeddings` (v1) | Reserved seat for semantic recall; today retrieval is deterministic keyword (offline-first invariant). |
+| **Embeddings** | `embeddings` (v1) | ACTIVE library entries + episodes are indexed into `VectorStore` (types `library`/`episode`); `recall()` merges semantic vector + keyword + lessons. Offline-first: the embedder is best-effort, keyword always answers. |
 
 ## The production-memory requirements, mapped
 
@@ -29,16 +29,29 @@ Supporting layers:
    mesh; every device's `lessonsLearned` feed inherits the fix. Approved
    `library_entries` (ACTIVE) propagate the same way.
 3. **Drastically lower costs** — `recall(query, limit)` returns only the tiny
-   relevant snippets an agent needs (keyword match over ACTIVE library entries
-   + matching lessons). Agents never pull whole chat histories.
-4. **Conflict resolution primitives** — background `distill()`:
+   relevant snippets an agent needs, merging (a) semantic vector search over
+   indexed ACTIVE library entries + episodes, (b) keyword match over ACTIVE
+   library entries, (c) matching lessons. Agents never pull whole chat
+   histories. The assistant body consumes this at inference time through
+   `VectorMemorySearch.search` (MainViewModel's chat + command path) — memory
+   is read where the model reasons, not just in the UI.
+4. **Conflict resolution primitives** — background `distill()` (three passes;
+   runs on every 15-min sync cycle AND from the Distill button):
    - exact duplicate of an ACTIVE claim (same category + title + content) →
      the new PENDING copy is REJECTED (zero duplication, original stays
      authoritative);
    - high-confidence (≥90) non-conflicting claim → auto-APPROVED (non-critical
      learning flows without a human round-trip);
    - everything else — including any same-category conflicting claim — stays
-     PENDING for the human gate.
+     PENDING for the human gate;
+   - **episodic → semantic consolidation** — a lesson repeated across ≥ 2
+     FAILURE episodes is promoted to an ACTIVE `learned` library entry
+     (confidence 90, source `consolidation`), journaled + indexed;
+   - **forgetting/decay** — ACTIVE claims older than 90 days with no
+     re-confirmation lose 10 confidence per pass; below 40 they are REJECTED
+     (forgotten) and dropped from the vector index. Episodic memory never
+     decays (chronological records persist by design). Recall is recency-
+     boosted: claims confirmed in the last 30 days rank above stale ones.
 5. **Atomic operations** — every syncable write goes through the append-only
    journal (event sourcing): opId dedup, LWW per key, tombstones. No bare
    table writes for synced layers.

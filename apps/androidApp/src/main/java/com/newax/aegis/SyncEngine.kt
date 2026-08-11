@@ -2,6 +2,7 @@ package com.newax.aegis
 
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.sync.RoomJournalStore
+import com.newax.aegis.memory.AgentMemory
 import com.newax.aegis.sync.AntiEntropyRunner
 import com.newax.aegis.sync.JvmLanTransport
 import com.newax.aegis.sync.PeerEndpoint
@@ -171,6 +172,11 @@ object SyncEngine {
             relayPeers = relayP
             applied += relayApplied
         }
+        // Background memory maintenance (docs/MEMORY_DESIGN.md): conflict
+        // resolution + episodic→semantic consolidation + forgetting/decay run
+        // with every periodic cycle, not just from the Distill button.
+        runCatching { AgentMemory.distill() }
+
         // Surface the round exactly like the original worker did — the Sync
         // screen's status line reads this after each periodic cycle.
         SyncRuntime.recordStatus(

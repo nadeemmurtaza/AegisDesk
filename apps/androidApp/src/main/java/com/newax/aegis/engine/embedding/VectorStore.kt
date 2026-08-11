@@ -27,6 +27,8 @@ object VectorStore {
     const val TYPE_MEMORY = "memory"
     const val TYPE_TRIPLE = "triple"
     const val TYPE_EDGE   = "edge"
+    const val TYPE_LIBRARY = "library"
+    const val TYPE_EPISODE = "episode"
     private const val THRESHOLD = 0.35f
 
     data class SearchResult(
@@ -80,6 +82,51 @@ object VectorStore {
                 )
             )
         }
+    }
+
+    /**
+     * Index an ACTIVE library entry (the gated Global Library) — text carries
+     * category + title so semantic recall can hit it. Only ACTIVE entries are
+     * ever indexed (PENDING/REJECTED never enter the retrievable space).
+     */
+    fun indexLibrary(db: AegisDatabase, entryId: String, category: String, title: String, content: String) {
+        val emb = EmbeddingEngine.embed("[$category] $title: $content") ?: return
+        runBlocking {
+            db.embeddingDao().upsert(
+                EmbeddingEntity(
+                    sourceType = TYPE_LIBRARY,
+                    sourceId   = "library:$entryId",
+                    text       = "[$category] $title: $content",
+                    embedding  = emb.toByteArray()
+                )
+            )
+        }
+    }
+
+    /** Drop a library entry from the vector index (reject/tombstone). */
+    fun removeLibrary(db: AegisDatabase, entryId: String) {
+        runBlocking { runCatching { db.embeddingDao().deleteBySource(TYPE_LIBRARY, "library:$entryId") } }
+    }
+
+    /** Index an episode (chronological, outcome + lesson) for semantic recall. */
+    fun indexEpisode(db: AegisDatabase, episodeId: String, summary: String, lesson: String, outcome: String) {
+        val text = if (lesson.isBlank()) summary else "$summary — lesson ($outcome): $lesson"
+        val emb = EmbeddingEngine.embed(text) ?: return
+        runBlocking {
+            db.embeddingDao().upsert(
+                EmbeddingEntity(
+                    sourceType = TYPE_EPISODE,
+                    sourceId   = "episode:$episodeId",
+                    text       = text,
+                    embedding  = emb.toByteArray()
+                )
+            )
+        }
+    }
+
+    /** Drop an episode from the vector index (tombstone). */
+    fun removeEpisode(db: AegisDatabase, episodeId: String) {
+        runBlocking { runCatching { db.embeddingDao().deleteBySource(TYPE_EPISODE, "episode:$episodeId") } }
     }
 
     /**

@@ -230,7 +230,7 @@ private fun LibraryGateSection() {
                 OutlinedButton(
                     onClick = {
                         val resolved = AgentMemory.distill()
-                        message = "Distill: $resolved resolved (duplicates rejected, high-confidence auto-approved)"
+                        message = "Background pass: $resolved touched (conflicts, consolidation, decay)"
                         approvals = AgentMemory.pendingApprovals()
                     }
                 ) { Text("Distill") }

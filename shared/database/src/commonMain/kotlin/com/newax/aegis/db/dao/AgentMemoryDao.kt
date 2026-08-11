@@ -58,6 +58,10 @@ interface AgentMemoryDao {
     @Query("SELECT * FROM episodes WHERE outcome = 'FAILURE' ORDER BY occurredAtMs DESC LIMIT :limit")
     suspend fun lessonsLearned(limit: Int = 50): List<Episode>
 
+    /** Every non-blank FAILURE lesson text — the consolidation feed. */
+    @Query("SELECT lesson FROM episodes WHERE outcome = 'FAILURE' AND lesson != ''")
+    suspend fun allLessonTexts(): List<String>
+
     // ── L3 Handoffs (shared write, pointers) ────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -108,6 +112,9 @@ interface AgentMemoryDao {
 
     @Query("UPDATE library_entries SET status = :status, decidedAtMs = :now WHERE entryId = :entryId")
     suspend fun setLibraryStatus(entryId: String, status: String, now: Long): Int
+
+    @Query("UPDATE library_entries SET confidence = :confidence WHERE entryId = :entryId")
+    suspend fun updateLibraryConfidence(entryId: String, confidence: Int): Int
 
     @Query("SELECT * FROM library_entries WHERE status = 'ACTIVE' ORDER BY category ASC, confidence DESC")
     suspend fun activeLibrary(): List<LibraryEntry>

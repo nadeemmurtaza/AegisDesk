@@ -774,18 +774,21 @@ object SyncRuntime {
                 val dao = AegisDatabase.get.agentMemoryDao()
                 if (entry.tombstone) {
                     dao.deleteEpisode(episodeId)
+                    com.newax.aegis.engine.embedding.VectorStore.removeEpisode(AegisDatabase.get, episodeId)
                 } else {
-                    dao.upsertEpisode(
-                        Episode(
-                            episodeId = episodeId,
-                            agentId = fields["agentId"] ?: "",
-                            category = fields["category"] ?: "",
-                            summary = fields["summary"] ?: "",
-                            outcome = fields["outcome"] ?: EpisodeOutcome.OBSERVATION,
-                            lesson = fields["lesson"] ?: "",
-                            occurredAtMs = fields["occurredAtMs"]?.toLongOrNull() ?: entry.createdAt,
-                            contextRef = fields["contextRef"] ?: ""
-                        )
+                    val episode = Episode(
+                        episodeId = episodeId,
+                        agentId = fields["agentId"] ?: "",
+                        category = fields["category"] ?: "",
+                        summary = fields["summary"] ?: "",
+                        outcome = fields["outcome"] ?: EpisodeOutcome.OBSERVATION,
+                        lesson = fields["lesson"] ?: "",
+                        occurredAtMs = fields["occurredAtMs"]?.toLongOrNull() ?: entry.createdAt,
+                        contextRef = fields["contextRef"] ?: ""
+                    )
+                    dao.upsertEpisode(episode)
+                    com.newax.aegis.engine.embedding.VectorStore.indexEpisode(
+                        AegisDatabase.get, episodeId, episode.summary, episode.lesson, episode.outcome
                     )
                 }
             }
@@ -846,25 +849,43 @@ object SyncRuntime {
                 val dao = AegisDatabase.get.agentMemoryDao()
                 if (entry.tombstone) {
                     dao.deleteLibrary(entryId)
+                    com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, entryId)
                     return@runCatching
                 }
                 val existing = dao.libraryById(entryId)
                 val status = fields["status"]?.takeIf { it.isNotBlank() }
                 if (existing != null && status != null) {
+                    // Decay propagation: an incoming confidence rides along with
+                    // the status; reindex when the value changed.
+                    val confidence = fields["confidence"]?.toIntOrNull()
+                    if (confidence != null && confidence != existing.confidence) {
+                        dao.updateLibraryConfidence(entryId, confidence)
+                    }
                     dao.setLibraryStatus(entryId, status, System.currentTimeMillis())
-                } else if (existing == null) {
-                    dao.upsertLibrary(
-                        LibraryEntry(
-                            entryId = entryId,
-                            category = fields["category"] ?: "",
-                            title = fields["title"] ?: "",
-                            content = fields["content"] ?: "",
-                            confidence = fields["confidence"]?.toIntOrNull() ?: 80,
-                            source = fields["source"] ?: "",
-                            status = status ?: LibraryStatus.PENDING_APPROVAL,
-                            createdAtMs = fields["createdAtMs"]?.toLongOrNull() ?: entry.createdAt
+                    if (status == LibraryStatus.ACTIVE) {
+                        com.newax.aegis.engine.embedding.VectorStore.indexLibrary(
+                            AegisDatabase.get, entryId, existing.category, existing.title, existing.content
                         )
+                    } else if (status == LibraryStatus.REJECTED) {
+                        com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, entryId)
+                    }
+                } else if (existing == null) {
+                    val entry = LibraryEntry(
+                        entryId = entryId,
+                        category = fields["category"] ?: "",
+                        title = fields["title"] ?: "",
+                        content = fields["content"] ?: "",
+                        confidence = fields["confidence"]?.toIntOrNull() ?: 80,
+                        source = fields["source"] ?: "",
+                        status = status ?: LibraryStatus.PENDING_APPROVAL,
+                        createdAtMs = fields["createdAtMs"]?.toLongOrNull() ?: entry.createdAt
                     )
+                    dao.upsertLibrary(entry)
+                    if (entry.status == LibraryStatus.ACTIVE) {
+                        com.newax.aegis.engine.embedding.VectorStore.indexLibrary(
+                            AegisDatabase.get, entryId, entry.category, entry.title, entry.content
+                        )
+                    }
                 }
             }
         }
