@@ -3,8 +3,9 @@ package com.newax.aegis.sync
 /**
  * Where device identity and paired peers live (docs/SYNC_DESIGN.md §3).
  * Implementations are platform keystores in production (Android Keystore /
- * Keychain / DPAPI via the wiring slice); [InMemoryKeyStore] serves tests,
- * and jvmAndroidMain ships a dev-only [FileKeyStore].
+ * Keychain / DPAPI — `AndroidSyncKeyStore` on Android, `OsKeyStore` on the
+ * JVM desktops); [InMemoryKeyStore] serves tests, and jvmAndroidMain ships
+ * the dev [FileKeyStore].
  */
 interface KeyStore {
 

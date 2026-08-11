@@ -31,8 +31,8 @@ import java.io.File
  * macOS macosApp) — the JVM twin of Android's SyncRuntime + SyncWorker
  * (docs/SYNC_DESIGN.md §4.2). One object per process:
  *
- *  - device identity (load-or-generate via [platformKeyStore], dev FileKeyStore
- *    on the JVM),
+ *  - device identity (load-or-generate via [platformKeyStore] — OsKeyStore:
+ *    DPAPI on Windows, Keychain on macOS, FileKeyStore fallback on Linux),
  *  - the Room-backed journal (~/.aegis/sync.db, bundled sqlite) + the tested
  *    [JvmLanTransport]: inbound anti-entropy rounds on the accept thread,
  *    outbound rounds to every discovered peer every [LOOP_INTERVAL_MS],
