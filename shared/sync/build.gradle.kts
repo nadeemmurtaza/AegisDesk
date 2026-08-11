@@ -26,8 +26,12 @@ kotlin {
 
         // Shared JVM + Android implementation source set (java.security /
         // javax.crypto / java.io are available on both), so each expect in
-        // commonMain has exactly one actual per compiled target. iOS actuals
-        // (Keychain/CommonCrypto via cinterop) land with Phase 0.
+        // commonMain has exactly one actual per compiled target. iOS targets
+        // + iosMain actuals (Keychain + CryptoKit shim — CommonCrypto has no
+        // Ed25519/X25519/AES-GCM; exact checklist in docs/SYNC_DESIGN.md §15)
+        // are a Mac/Xcode job and are deliberately NOT declared here yet —
+        // declaring them breaks Linux builds (K/N cannot target Apple from
+        // Linux) and the Linux CI must stay green.
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
             dependencies {

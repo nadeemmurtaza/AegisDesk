@@ -1,6 +1,6 @@
 # SYNC DESIGN — the 4-device encrypted mesh (I / A / M / W)
 
-Date: 2026-08-11. Status: design + slice plan (S0–S7 + P1–P2). **Landed: S0 (DB substrate), S1 (engine core), S2 (identity/pairing/session crypto), S3 (LAN transport), S4 (relay), P1 (encrypted Quick Share protocol + discovery seam), P2 (Android BLE/WiFi-Direct proximity actual + Nearby Share UI + desktop CLI listener).** Remaining: S5 wiring/surfaces, S6 commands, S7 files, P2-iOS (Multipeer Connectivity actual — Mac + Phase 0 needed).
+Date: 2026-08-11. Status: design + slice plan (S0–S7 + P1–P2). **Landed: S0 (DB substrate), S1 (engine core), S2 (identity/pairing/session crypto), S3 (LAN transport), S4 (relay), P1 (encrypted Quick Share protocol + discovery seam), P2 (Android BLE/WiFi-Direct proximity actual + Nearby Share UI + desktop CLI listener), W1 (Room-backed JournalStore + automatic loops on Android/Windows/macOS), capture slice 1 (graph + people record tables sync end-to-end).** Remaining: S5 wiring/surfaces, S6 commands, S7 files, P2-iOS (Multipeer Connectivity actual), and the rest of the syncable-table capture coverage. **Track I (iOS) status:** audit + driver research done — `shared/sync` + `shared/database` commonMain verified platform-free (zero java./android./platform imports); Room 2.7.0-alpha13 KMP officially supports iOS (bundled sqlite driver); the remaining work — declaring the iOS targets, the 4 iosMain `actual`s (Keychain/CommonCrypto/CryptoKit-shim + Network.framework/POSIX transport + CoreBluetooth proximity), the `shared/database` iOS builder, and the `apps/iosApp` shell — **requires a Mac + Xcode and cannot be compiled or verified in the Linux sandbox**; exact steps in §15.
 This document specifies how the four Aegis devices — **I** (iOS), **A**
 (Android), **M** (macOS), **W** (Windows) — keep one shared reality across
 four private, encrypted databases.
@@ -456,3 +456,81 @@ exit 0 after every slice; each slice's table row lists its exact gate.
    this is just the default set).
 4. **Field-level LWW** for long records (people, procedures) — v1 is
    value-level; per-field merge is a refinement if you hit edit collisions.
+
+---
+
+## 15. Track I — iOS execution checklist (Mac + Xcode required)
+
+Everything below is blocked on a macOS host with Xcode: Kotlin/Native can
+only target Apple platforms from a Mac, and the actuals need Apple frameworks.
+This section is the exact handoff so the Mac session is mechanical. State
+verified 2026-08-11: the engine core is platform-free (audited — no
+java./android./platform imports in `shared/sync` or `shared/database`
+commonMain), and **Room 2.7.0-alpha13 KMP supports iOS** (bundled sqlite
+driver — the "Native driver (planned)" matrix cell is stale).
+
+### 15.1 Order of work (each step compiles on a Mac before the next)
+
+1. **`shared/sync`: declare iOS targets.** `iosX64()`, `iosArm64()`,
+   `iosSimulatorArm64()` in `kotlin { }`; create `iosMain` source set
+   (dependsOn commonMain; `default hierarchy` template puts jvmAndroidMain
+   below it — do NOT let iosMain inherit java.*). **CI constraint:** the
+   Linux `android.yml` builds must stay green — either macOS-gate the target
+   declarations (`if (System.getProperty("os.name").contains("Mac"))`), or
+   keep iOS compilation out of every Linux CI task. Unconditional Apple
+   targets break Linux configuration/builds (K/N cannot target Apple from
+   Linux) and force a ~1 GB toolchain download on every machine.
+2. **`shared/sync`: the 4 iosMain actuals.** Every `expect` in commonMain
+   needs an iosMain actual before the iOS targets compile (AGENTS.md R3 —
+   no expect without actual):
+   - `platformCrypto()` → `IosCrypto`. **Design decision: CommonCrypto is
+     NOT enough** — it has no Ed25519/X25519/AES-GCM. Wrap CryptoKit via a
+     small Swift shim: an `IosCryptoShim.swift` exposing `@objc` functions
+     (sign/verify Ed25519, X25519 key agreement, AES-GCM seal/open, HMAC,
+     HKDF, SHA-256) compiled into the module and reached through a cinterop
+     `.def` (stable pattern: swiftc → static lib → `linkerOpts`). Keep the
+     pure-Kotlin hash/HMAC/HKDF already in commonMain as the fallback for
+     the non-EC primitives.
+   - `platformKeyStore()` → `IosKeyStore`: Keychain (`Security.framework`,
+     `SecItemAdd/CopyMatching/Update/Delete` with `kSecClassGenericPassword`
+     — same shape as `AndroidSyncKeyStore`).
+   - `proximityDiscovery()` → `IosProximityDiscovery`: CoreBluetooth
+     (advertise/scan reusing `ProximityAdCodec`'s manufacturer-data byte
+     format) + Multipeer Connectivity for the channel (P2-iOS).
+   - `acquireMulticastLock()` → iOS has no multicast lock — return the
+     no-op handle (the LAN transport must already degrade gracefully when
+     multicast is unavailable; verify the mDNS path via Bonjour
+     `NWBrowser`/`NWListener` instead of relying on raw multicast).
+3. **`shared/sync`: the iOS transport actual.** The LAN transport contract
+   is platform-free (`SyncTransport`/`TransportConnection`); the iOS actual
+   is `IosTcpTransport` over `platform.posix` BSD sockets (Kotlin/Native
+   exposes them; the framing + SessionCrypto handshake from
+   `JvmTransportConnection` ports directly) or `Network.framework` via
+   cinterop. mDNS discovery via Bonjour. The relay path ports later.
+4. **`shared/database`: iOS target + builder.** Add the three iOS targets +
+   `iosMain`, and an `AegisDatabaseBuilder` actual over
+   `BundledSQLiteDriver` (the same constructor the desktop builder uses —
+   `androidx.sqlite:sqlite-bundled:2.5.0-alpha13` ships iOS KMP artifacts).
+   No schema change — v13 is frozen; this is a per-target builder only.
+   Room KSP: add `kspIosArm64`/`kspIosX64`/`kspIosSimulatorArm64`
+   configurations the moment the targets are declared (R5).
+5. **`apps/iosApp`: the shell.** Compose Multiplatform iOS app (CMP 1.7.1 +
+   Kotlin 2.1.0 already support iOS) mirroring `apps/macosApp`: the
+   `SyncScreen` (status, pairing code, SAS confirm, paired list) + the
+   `SyncRuntime`-twin coordinator (WorkManager doesn't exist — use
+   `UIApplication` lifecycle: sync on foreground + a background task
+   permit). Needs an Xcode project / `MainViewController` entry.
+6. **Verify on the Mac:** `./gradlew :shared:sync:compileKotlinIosSimulatorArm64
+   :shared:database:compileKotlinIosSimulatorArm64 :apps:iosApp:build`,
+   then a device smoke test: pair iOS↔Android over LAN, exchange memory +
+   graph/people records, confirm convergence.
+
+### 15.2 What is already verified / needs no re-check
+
+- Engine commonMain platform-freedom audit (this slice) — clean.
+- Room 2.7.0-alpha13 iOS support (official release page, 2026-08-11).
+- All capture/materialize logic is platform-free (`SyncPayload` codec,
+  `RoomJournalStore`, the LWW guard, the per-table materializers) — iOS
+  reuses it unchanged once the targets + builder exist.
+- The iOS module must NOT be added to the Linux CI tasks (android.yml
+  builds `:apps:androidApp` + `:platform:*` only — keep it that way).
