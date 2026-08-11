@@ -2,6 +2,7 @@ package com.newax.aegis.desktop
 
 import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState
+import com.newax.aegis.desktopsync.DesktopSync
 import com.newax.aegis.desktop.planner.TaskGraph
 import com.newax.aegis.desktop.planner.TaskNode
 import com.newax.aegis.desktop.planner.TaskStatus
@@ -71,12 +72,16 @@ class FileGoalsStore(private val file: Path) : GoalsStore {
         try {
             file.parent?.let { Files.createDirectories(it) }
             val tmp = file.resolveSibling("${file.fileName}.tmp")
-            Files.write(tmp, snapshot.toJson().toByteArray(Charsets.UTF_8))
+            val json = snapshot.toJson().toString()
+            Files.write(tmp, json.toByteArray(Charsets.UTF_8))
             try {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: AtomicMoveNotSupportedException) {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
             }
+            // Item 8 — desktop-originated capture: journal our own goals into
+            // the mesh (syncable kv_store; peers apply via their kv materializer).
+            DesktopSync.captureSettings("desktop-goals", "snapshot", json)
         } catch (e: IOException) {
             // Best-effort persistence (named failure mode): a failed save must
             // never take down a run — the in-memory planner stays authoritative

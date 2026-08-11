@@ -53,6 +53,13 @@ interface SyncJournalDao {
     )
     suspend fun latestFor(tableName: String, key: String): SyncJournalEntity?
 
+    /** The most recent entries of one table (e.g. the command inbox/acks). */
+    @Query(
+        "SELECT * FROM sync_journal WHERE tableName = :tableName " +
+            "ORDER BY createdAt DESC, hlcWall DESC LIMIT :limit"
+    )
+    suspend fun recentForTable(tableName: String, limit: Int): List<SyncJournalEntity>
+
     @Query("SELECT COUNT(*) FROM sync_journal")
     suspend fun count(): Long
 

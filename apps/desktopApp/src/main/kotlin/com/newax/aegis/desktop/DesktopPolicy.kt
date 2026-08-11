@@ -17,6 +17,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import com.newax.aegis.desktopsync.DesktopSync
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -78,12 +79,16 @@ class FilePolicyStore(private val file: Path) : PolicyStore {
                 .put("modes", modes)
                 .put("denied", JSONArray(denied.toList()))
             val tmp = file.resolveSibling("${file.fileName}.tmp")
-            Files.write(tmp, root.toString().toByteArray(Charsets.UTF_8))
+            val json = root.toString()
+            Files.write(tmp, json.toByteArray(Charsets.UTF_8))
             try {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: AtomicMoveNotSupportedException) {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
             }
+            // Item 8 — desktop-originated capture: journal our own policy
+            // settings into the mesh (peers apply via kv materialize).
+            DesktopSync.captureSettings("desktop-policy", "settings", json)
         } catch (e: IOException) {
             // Best-effort persistence (named failure mode): a failed save keeps
             // the in-memory overrides authoritative for this session.

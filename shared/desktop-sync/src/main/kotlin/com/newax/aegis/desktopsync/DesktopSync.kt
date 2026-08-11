@@ -1,15 +1,19 @@
 package com.newax.aegis.desktopsync
 
 import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.entity.AppRecord
 import com.newax.aegis.db.entity.EntityAlias
+import com.newax.aegis.db.entity.GraphEdge
 import com.newax.aegis.db.entity.GraphEntity
 import com.newax.aegis.db.entity.GraphPredicate
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
+import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.db.getAegisDatabase
 import com.newax.aegis.db.sync.RoomJournalStore
 import com.newax.aegis.db.sync.SyncPayload
 import com.newax.aegis.db.sync.toEntity
+import com.newax.aegis.sync.CommandSigning
 import com.newax.aegis.sync.Hlc
 import com.newax.aegis.sync.AntiEntropyRunner
 import com.newax.aegis.sync.Hex
@@ -21,6 +25,7 @@ import com.newax.aegis.sync.PairingRequest
 import com.newax.aegis.sync.PeerEndpoint
 import com.newax.aegis.sync.StoredIdentity
 import com.newax.aegis.sync.SyncEntry
+import com.newax.aegis.sync.SyncPolicy
 import com.newax.aegis.sync.TransportConnection
 import com.newax.aegis.sync.TransportListener
 import com.newax.aegis.sync.platformCrypto
@@ -66,6 +71,18 @@ object DesktopSync {
     private const val CAT_PREFIX = "sync:cat:"
     private const val PEER_PERM_PREFIX = "sync:peerperm:"
 
+    /** Fabric journal tables (item 1) + the command inbox (item 6) — names match schema v13. */
+    private const val TABLE_EDGES = "edges"
+    private const val TABLE_APP_RECORDS = "app_records"
+    private const val TABLE_APP_CAPABILITY_LINKS = "app_capability_links"
+    private const val TABLE_TRIGGER_RULES = "trigger_rules"
+    private const val TABLE_KV_STORE = "kv_store"
+    private const val TABLE_COMMANDS = "commands"
+    private const val EDGE_SEP = "\u0001"
+    private const val COMMAND_TARGET_PREFIX = "to:"
+    private const val COMMAND_ACK_PREFIX = "ack:"
+    private const val DEFAULT_COMMAND_TTL_MS = 24 * 60 * 60 * 1000L
+
     /**
      * The four user-facing sync categories → journal table names (mirror of
      * SyncRuntime.CATEGORY_TABLES; same keys so a policy written on one
@@ -96,6 +113,20 @@ object DesktopSync {
 
     @Volatile
     private var lastStatus = "sync not started"
+
+    @Volatile
+    private var commandDispatcher: ((SyncEntry) -> Unit)? = null
+
+    /**
+     * Fix C — the desktopApp body registers its CommandDispatcher here so
+     * DesktopSync (shared) can hand it incoming targeted commands. One
+     * dispatcher per process, first registration wins.
+     */
+    fun setCommandDispatcher(dispatcher: (SyncEntry) -> Unit) {
+        synchronized(identityLock) {
+            if (commandDispatcher == null) commandDispatcher = dispatcher
+        }
+    }
 
     @Volatile
     private var transport: JvmLanTransport? = null
@@ -334,6 +365,136 @@ object DesktopSync {
         captureTrust(deviceId, null, tombstone = true)
     }
 
+    // ── desktop-originated capture (item 8) + commands (item 6) ───────────────
+
+    /**
+     * Journal one of THIS device's own settings/goals into the mesh as a
+     * syncable kv_store record (`syncable:<namespace>:<id>`) — the desktop
+     * becomes a producer, not just a consumer. Applied on other devices via
+     * their kv_store materializer (SyncPolicy.isSyncableKey gate). Gated by
+     * the "Settings & preferences" category toggle (Fix E): when the user
+     * turns the category off, the desktop stops journaling its own
+     * preferences — mirror of SyncRuntime's per-category capture gate.
+     */
+    fun captureSettings(namespace: String, id: String, value: String) {
+        if (namespace.isBlank() || id.isBlank()) return
+        if (!categoryEnabled(TABLE_KV_STORE)) return
+        journalRecord(TABLE_KV_STORE, SyncPolicy.syncKey(namespace, id), value.encodeToByteArray())
+    }
+
+    /**
+     * Send a command to one paired peer (docs/SYNC_DESIGN.md §6): a LOG-kind
+     * entry addressed to the peer's inbox. The target's CommandDispatcher
+     * gates it by its per-peer allowlist + policy spine; it acks back.
+     */
+    fun sendCommand(peerDeviceId: String, commandClass: String, args: Map<String, String>) {
+        if (commandClass !in COMMAND_CLASSES || peerDeviceId.isBlank()) return
+        val ttl = System.currentTimeMillis() + DEFAULT_COMMAND_TTL_MS
+        val payload = JSONObject().apply {
+            put("class", commandClass)
+            put("ttl", ttl.toString())
+            args.forEach { (k, v) -> put(k, v) }
+            // Per-entry Ed25519 signature (CommandSigning) — the target
+            // verifies it against OUR paired public key before dispatching.
+            put("sig", Hex.encode(CommandSigning.sign(platformCrypto(), identity().signPrivateKey, commandClass, ttl, args)))
+        }.toString().encodeToByteArray()
+        journalLog(TABLE_COMMANDS, COMMAND_TARGET_PREFIX + peerDeviceId, payload)
+    }
+
+    /** The paired peer's Ed25519 public key for [peerDeviceId], or null. */
+    fun peerSignPublicKey(peerDeviceId: String): ByteArray? =
+        platformKeyStore().pairedPeers().firstOrNull { it.deviceId == peerDeviceId }?.signPublicKey
+
+    /** The target's acknowledgement back to the sender — surfaced in status. */
+    fun sendCommandAck(toDeviceId: String, refOpId: String, result: String, reason: String = "") {
+        if (toDeviceId.isBlank()) return
+        val payload = JSONObject().apply {
+            put("ref", refOpId)
+            put("result", result)
+            put("reason", reason)
+        }.toString().encodeToByteArray()
+        journalLog(TABLE_COMMANDS, COMMAND_ACK_PREFIX + toDeviceId, payload)
+    }
+
+    /** One row of the command history — sent commands and their acks (Fix B). */
+    data class CommandHistoryEntry(
+        val sent: Boolean,
+        val peerDeviceId: String,
+        val detail: String,
+        val atMs: Long
+    )
+
+    /**
+     * The most recent command activity on this device — `to:` entries we sent
+     * and `ack:` entries targets sent back (newest first). Straight from the
+     * journal, no separate history table.
+     */
+    fun commandHistory(limit: Int = 50): List<CommandHistoryEntry> {
+        val db = database ?: return emptyList()
+        return kotlinx.coroutines.runBlocking {
+            runCatching { db.syncJournalDao().recentForTable(TABLE_COMMANDS, limit) }.getOrElse { emptyList() }
+        }.mapNotNull { entry ->
+            val key = entry.key
+            val peer = when {
+                key.startsWith(COMMAND_TARGET_PREFIX) -> key.removePrefix(COMMAND_TARGET_PREFIX)
+                key.startsWith(COMMAND_ACK_PREFIX) -> key.removePrefix(COMMAND_ACK_PREFIX)
+                else -> return@mapNotNull null
+            }
+            val payload = runCatching { JSONObject(entry.payload.decodeToString()) }.getOrNull() ?: return@mapNotNull null
+            val detail = if (key.startsWith(COMMAND_TARGET_PREFIX)) {
+                "→ ${payload.optString("class")}" +
+                    payload.optString("name").takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+            } else {
+                "ack ${payload.optString("result")}" +
+                    payload.optString("reason").takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
+            }
+            CommandHistoryEntry(
+                sent = key.startsWith(COMMAND_TARGET_PREFIX),
+                peerDeviceId = peer,
+                detail = detail,
+                atMs = entry.createdAt
+            )
+        }
+    }
+
+    /** Journal one RECORD entry (LWW per key) — the desktop's capture path. */
+    private fun journalRecord(table: String, key: String, payload: ByteArray, tombstone: Boolean = false) {
+        val db = database ?: return
+        val entry = SyncEntry.of(
+            opId = java.util.UUID.randomUUID().toString(),
+            deviceId = identity().identity.deviceId,
+            hlc = nextHlc(),
+            kind = SyncEntry.Kind.RECORD,
+            table = table,
+            key = key,
+            payload = payload,
+            tombstone = tombstone,
+            createdAt = System.currentTimeMillis()
+        )
+        kotlinx.coroutines.runBlocking {
+            runCatching { db.syncJournalDao().insert(entry.toEntity()) }
+        }
+    }
+
+    /** Journal one LOG entry (append-only — the command inbox). */
+    private fun journalLog(table: String, key: String, payload: ByteArray) {
+        val db = database ?: return
+        val entry = SyncEntry.of(
+            opId = java.util.UUID.randomUUID().toString(),
+            deviceId = identity().identity.deviceId,
+            hlc = nextHlc(),
+            kind = SyncEntry.Kind.LOG,
+            table = table,
+            key = key,
+            payload = payload,
+            tombstone = false,
+            createdAt = System.currentTimeMillis()
+        )
+        kotlinx.coroutines.runBlocking {
+            runCatching { db.syncJournalDao().insert(entry.toEntity()) }
+        }
+    }
+
     /** Journal this device's pairing decision (live record or revocation tombstone). */
     private fun captureTrust(peerDeviceId: String, peer: PairedPeer?, tombstone: Boolean) {
         val db = database ?: return
@@ -406,6 +567,35 @@ object DesktopSync {
     }
 
     private fun materialize(entry: SyncEntry) {
+        // Commands are LOG-kind (append-only, targeted) — every entry is
+        // processed, opId dedup happens at append. The desktop has no command
+        // dispatcher yet (its action executor lands with Track M), so commands
+        // targeting THIS device are refused with an explicit ack — the sender
+        // never waits silently (item 6). Acks TO this device surface in status.
+        if (entry.kind == SyncEntry.Kind.LOG && entry.table == TABLE_COMMANDS) {
+            val key = entry.key
+            val myId = identity().identity.deviceId
+            when {
+                key.startsWith(COMMAND_ACK_PREFIX) && key.removePrefix(COMMAND_ACK_PREFIX) == myId -> {
+                    val p = runCatching { JSONObject(entry.payload.decodeToString()) }.getOrNull() ?: return
+                    lastStatus = "command ${p.optString("ref").take(8)} → ${p.optString("result")}" +
+                        (p.optString("reason").takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "")
+                }
+                key.startsWith(COMMAND_TARGET_PREFIX) && key.removePrefix(COMMAND_TARGET_PREFIX) == myId -> {
+                    // Fix C — the desktop now dispatches through its own
+                    // CommandDispatcher (registered by the desktopApp body);
+                    // without one, refuse explicitly so the sender never waits
+                    // silently.
+                    val dispatcher = commandDispatcher
+                    if (dispatcher != null) {
+                        runCatching { dispatcher(entry) }
+                    } else {
+                        sendCommandAck(entry.deviceId, entry.opId, "refused", "desktop-dispatch-not-wired")
+                    }
+                }
+            }
+            return
+        }
         if (entry.kind != SyncEntry.Kind.RECORD) return
         // Per-category toggle — disabled categories are not applied (mirror of
         // SyncRuntime; peer_trust always flows).
@@ -419,6 +609,12 @@ object DesktopSync {
                 "entity_aliases" -> materializeAlias(entry)
                 "persons" -> materializePerson(entry)
                 "person_facts" -> materializePersonFact(entry)
+                // Fabric tables (item 1): graph edges, app usage, triggers, settings.
+                TABLE_EDGES -> materializeEdge(entry)
+                TABLE_APP_RECORDS -> materializeAppRecord(entry)
+                TABLE_APP_CAPABILITY_LINKS -> materializeAppCapabilityLink(entry)
+                TABLE_TRIGGER_RULES -> materializeTriggerRule(entry)
+                TABLE_KV_STORE -> materializeKv(entry)
                 TABLE_PEER_TRUST -> materializeTrust(entry)
                 else -> Unit
             }
@@ -548,6 +744,147 @@ object DesktopSync {
                     timestampMs = fields["timestampMs"]?.toLongOrNull() ?: 0L
                 )
             )
+        }
+    }
+
+    /** Resolve (or create) an entity by canonical name — the edge materializer's ref resolver. */
+    private fun entityIdFor(name: String): Long? {
+        val db = database ?: return null
+        return kotlinx.coroutines.runBlocking {
+            runCatching {
+                val dao = db.graphDao()
+                dao.findByName(name)?.id
+                    ?: dao.insertEntity(GraphEntity(type = 0, canonicalName = name, createdAt = System.currentTimeMillis()))
+            }.getOrNull()
+        }
+    }
+
+    /** Incoming graph edge (item 1) — names resolve to local ids; dupes deduped. */
+    private fun materializeEdge(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val subject = fields["subject"]?.takeIf { it.isNotBlank() } ?: return
+        val predicate = fields["predicate"]?.takeIf { it.isNotBlank() } ?: return
+        val objectName = fields["object"]?.takeIf { it.isNotBlank() }
+        val objectValue = fields["objectValue"]?.takeIf { it.isNotBlank() }
+        if (objectName == null && objectValue == null) return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                val dao = db.graphDao()
+                val subjectId = entityIdFor(subject)
+                val predicateId = dao.predicateByName(predicate)?.id
+                    ?: dao.insertPredicate(GraphPredicate(name = predicate))
+                val objectId = objectName?.let { entityIdFor(it) }
+                if (subjectId == null || predicateId == 0L) return@runCatching
+                val dup = dao.currentEdgesBySubjectPredicate(subjectId, predicateId).any {
+                    it.objectId == objectId && it.objectValue == objectValue && it.validUntil == null
+                }
+                if (dup) return@runCatching
+                dao.insertEdge(
+                    GraphEdge(
+                        subjectId = subjectId,
+                        predicateId = predicateId,
+                        objectId = objectId,
+                        objectValue = objectValue,
+                        confidence = fields["confidence"]?.toIntOrNull() ?: 80,
+                        importance = fields["importance"]?.toIntOrNull() ?: 50,
+                        createdAt = fields["createdAt"]?.toLongOrNull() ?: entry.createdAt,
+                        validFrom = fields["validFrom"]?.toLongOrNull(),
+                        validUntil = fields["validUntil"]?.toLongOrNull()
+                    )
+                )
+            }
+        }
+    }
+
+    /** Incoming app record (item 1) — LWW per package name. */
+    private fun materializeAppRecord(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val pkg = fields["packageName"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                db.appRegistryDao().upsertRecord(
+                    AppRecord(
+                        packageName = pkg,
+                        label = fields["label"] ?: pkg,
+                        version = fields["version"] ?: "",
+                        category = fields["category"] ?: "",
+                        launchActivity = fields["launchActivity"],
+                        lastScanMs = fields["lastScanMs"]?.toLongOrNull() ?: entry.createdAt
+                    )
+                )
+            }
+        }
+    }
+
+    /** Incoming app capability link (Fix H) — LWW per (packageName, capability). */
+    private fun materializeAppCapabilityLink(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val pkg = fields["packageName"]?.takeIf { it.isNotBlank() } ?: return
+        val cap = fields["capability"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                db.appRegistryDao().upsertLink(
+                    com.newax.aegis.db.entity.AppCapabilityLink(
+                        packageName = pkg,
+                        capability = cap,
+                        intentAction = fields["intentAction"],
+                        deepLinkPattern = fields["deepLinkPattern"],
+                        mimeTypes = fields["mimeTypes"],
+                        confidence = fields["confidence"]?.toIntOrNull() ?: 80
+                    )
+                )
+            }
+        }
+    }
+
+    /** Incoming trigger rule (item 1) — LWW per label; tombstones delete. */
+    private fun materializeTriggerRule(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val label = fields["label"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching {
+                val dao = db.triggerDao()
+                if (entry.tombstone) {
+                    dao.allRules().firstOrNull { it.label == label }?.let { dao.deleteById(it.id) }
+                    return@runCatching
+                }
+                if (dao.allRules().any { it.label == label }) return@runCatching
+                dao.insert(
+                    TriggerRule(
+                        label = label,
+                        conditionType = fields["conditionType"] ?: "",
+                        conditionParams = fields["conditionParams"] ?: "{}",
+                        actionType = fields["actionType"] ?: "",
+                        actionParams = fields["actionParams"] ?: "{}",
+                        enabled = fields["enabled"] != "false",
+                        debounceMs = fields["debounceMs"]?.toLongOrNull() ?: 30_000L,
+                        createdMs = fields["createdMs"]?.toLongOrNull() ?: entry.createdAt
+                    )
+                )
+            }
+        }
+    }
+
+    /** Incoming syncable kv_store key (item 8) — mirror of SyncRuntime.materializeKv. */
+    private fun materializeKv(entry: SyncEntry) {
+        val localKey = SyncPolicy.localKey(entry.key) ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            if (entry.tombstone) {
+                runCatching { db.kvStoreDao().delete(localKey) }
+            } else {
+                runCatching {
+                    db.kvStoreDao().put(com.newax.aegis.db.entity.KvStoreEntity(localKey, entry.payload.decodeToString()))
+                }
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package com.newax.aegis.engine.trigger
 
 import android.content.Context
 import android.os.BatteryManager
+import com.newax.aegis.SyncRuntime
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.engine.CalendarQueries
@@ -80,9 +81,56 @@ object TriggerEngine {
 
     // ── Rule management helpers ───────────────────────────────────────────────
 
-    fun addRule(rule: TriggerRule): Long = kotlinx.coroutines.runBlocking { db?.triggerDao()?.insert(rule) ?: -1L }
-    fun removeRule(id: Long) { kotlinx.coroutines.runBlocking { db?.triggerDao()?.deleteById(id) } }
-    fun enableRule(id: Long, on: Boolean) { kotlinx.coroutines.runBlocking { db?.triggerDao()?.setEnabled(id, on) } }
+    fun addRule(rule: TriggerRule): Long = kotlinx.coroutines.runBlocking {
+        val id = db?.triggerDao()?.insert(rule) ?: -1L
+        // Item 1 — journal the rule (LWW per label) so it reaches the mesh.
+        SyncRuntime.captureRecord(
+            SyncRuntime.TABLE_TRIGGER_RULES, rule.label,
+            listOf(
+                "label" to rule.label,
+                "conditionType" to rule.conditionType,
+                "conditionParams" to rule.conditionParams,
+                "actionType" to rule.actionType,
+                "actionParams" to rule.actionParams,
+                "enabled" to rule.enabled.toString(),
+                "debounceMs" to rule.debounceMs.toString(),
+                "createdMs" to rule.createdMs.toString()
+            )
+        )
+        id
+    }
+
+    fun removeRule(id: Long) {
+        // Resolve the label first — it is the cross-device key for the tombstone.
+        val label = kotlinx.coroutines.runBlocking { db?.triggerDao()?.allRules()?.firstOrNull { it.id == id }?.label }
+        kotlinx.coroutines.runBlocking { db?.triggerDao()?.deleteById(id) }
+        if (label != null) {
+            SyncRuntime.captureRecord(
+                SyncRuntime.TABLE_TRIGGER_RULES, label,
+                listOf("label" to label), tombstone = true
+            )
+        }
+    }
+
+    fun enableRule(id: Long, on: Boolean) {
+        val rule = kotlinx.coroutines.runBlocking { db?.triggerDao()?.allRules()?.firstOrNull { it.id == id } }
+        kotlinx.coroutines.runBlocking { db?.triggerDao()?.setEnabled(id, on) }
+        if (rule != null) {
+            SyncRuntime.captureRecord(
+                SyncRuntime.TABLE_TRIGGER_RULES, rule.label,
+                listOf(
+                    "label" to rule.label,
+                    "conditionType" to rule.conditionType,
+                    "conditionParams" to rule.conditionParams,
+                    "actionType" to rule.actionType,
+                    "actionParams" to rule.actionParams,
+                    "enabled" to on.toString(),
+                    "debounceMs" to rule.debounceMs.toString(),
+                    "createdMs" to rule.createdMs.toString()
+                )
+            )
+        }
+    }
     fun allRules(): List<TriggerRule> = kotlinx.coroutines.runBlocking { db?.triggerDao()?.allRules().orEmpty() }
 
     // ── Condition evaluation ──────────────────────────────────────────────────

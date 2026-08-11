@@ -157,7 +157,7 @@ object GraphStore {
     ): Long {
         return kotlinx.coroutines.runBlocking {
             val predicateId = predicate(db, predicateName)
-            db.graphDao().insertEdge(
+            val edgeId = db.graphDao().insertEdge(
                 GraphEdge(
                     subjectId   = subjectId,
                     predicateId = predicateId,
@@ -169,6 +169,22 @@ object GraphStore {
                     sourceId    = sourceId
                 )
             )
+            // Item 1 — journal the edge into the mesh under its cross-device key
+            // (names, not local ids — entity ids differ per device).
+            val subjectName = db.graphDao().entityById(subjectId)?.canonicalName ?: return@runBlocking edgeId
+            val objectName  = objectId?.let { db.graphDao().entityById(it)?.canonicalName }
+            SyncRuntime.captureEdge(
+                subjectName   = subjectName,
+                predicateName = predicateName,
+                objectName    = objectName,
+                objectValue   = objectValue,
+                confidence    = confidence,
+                importance    = importance,
+                createdAt     = System.currentTimeMillis(),
+                validFrom     = null,
+                validUntil    = null
+            )
+            edgeId
         }
     }
 
@@ -188,7 +204,7 @@ object GraphStore {
             val predicateId = predicate(db, predicateName)
             val now = System.currentTimeMillis()
             db.graphDao().invalidateEdges(subjectId, predicateId, now)
-            db.graphDao().insertEdge(
+            val edgeId = db.graphDao().insertEdge(
                 GraphEdge(
                     subjectId   = subjectId,
                     predicateId = predicateId,
@@ -199,6 +215,22 @@ object GraphStore {
                     validFrom   = now
                 )
             )
+            // Item 1 — journal the replacement edge (old ones stay expired
+            // locally; the mesh converges on the newest per key).
+            val subjectName = db.graphDao().entityById(subjectId)?.canonicalName ?: return@runBlocking edgeId
+            val objectName  = newObjectId?.let { db.graphDao().entityById(it)?.canonicalName }
+            SyncRuntime.captureEdge(
+                subjectName   = subjectName,
+                predicateName = predicateName,
+                objectName    = objectName,
+                objectValue   = newObjectValue,
+                confidence    = confidence,
+                importance    = 50,
+                createdAt     = now,
+                validFrom     = now,
+                validUntil    = null
+            )
+            edgeId
         }
     }
 
@@ -314,6 +346,18 @@ object GraphStore {
                     )
                 )
             }
+            // Item 1 — journal the normalized edge (names from the triple).
+            SyncRuntime.captureEdge(
+                subjectName   = triple.subject,
+                predicateName = triple.predicate,
+                objectName    = if (triple.predicate in StandardPredicates.ENTITY_OBJECT) triple.objectValue else null,
+                objectValue   = if (triple.predicate in StandardPredicates.ENTITY_OBJECT) null else triple.objectValue,
+                confidence    = (triple.confidence * 100).toInt().coerceIn(0, 100),
+                importance    = 50,
+                createdAt     = triple.createdMs,
+                validFrom     = null,
+                validUntil    = null
+            )
             result += EdgeIndex(edgeId, triple.subject, triple.predicate, triple.objectValue)
         }
         return result

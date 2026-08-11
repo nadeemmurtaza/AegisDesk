@@ -116,6 +116,14 @@ class AegisApplication : Application() {
         scheduleNightlyWork()
         IntelligenceWorker.schedule(this)
         scheduleSyncWork()
+        // Item 7 — continuous listening: the foreground service keeps the sync
+        // transport up between worker windows so a paired peer can reach this
+        // device at any moment (auto-sync default on; the Sync screen toggles
+        // it and stops/starts the service). START_STICKY restarts it if the
+        // system kills it; the worker stays as the catch-up net.
+        if (SyncRuntime.enabled()) {
+            SyncForegroundService.start(this)
+        }
     }
 
     /**

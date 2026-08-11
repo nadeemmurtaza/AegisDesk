@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
@@ -27,6 +28,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
@@ -46,12 +48,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.sync.PairedPeer
+import org.json.JSONObject
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
 private val Surface = Color(0xFFFFFFFF)
@@ -89,7 +93,10 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
             SyncRuntime.CATEGORY_TABLES.mapValues { (_, tables) -> tables.any { SyncRuntime.categoryEnabled(it) } }
         )
     }
+    var sendCmdPeer by remember { mutableStateOf<PairedPeer?>(null) }
+    var commandMessage by remember { mutableStateOf<String?>(null) }
     var permsPeer by remember { mutableStateOf<PairedPeer?>(null) }
+    var history by remember { mutableStateOf(SyncRuntime.commandHistory()) }
 
     val pairingCode = remember { SyncRuntime.pairingCode() }
 
@@ -125,6 +132,9 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                             onCheckedChange = {
                                 autoOn = it
                                 SyncRuntime.setEnabled(it)
+                                // Item 7 — flip the continuous listener with the toggle.
+                                if (it) SyncForegroundService.start(context)
+                                else SyncForegroundService.stop(context)
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
@@ -406,11 +416,75 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                 PairedPeerRow(
                     peer = peer,
                     onPermissions = { permsPeer = peer },
+                    onSendCommand = { sendCmdPeer = peer },
                     onUnpair = {
                         SyncRuntime.unpair(peer.deviceId)
                         peers = SyncRuntime.peers()
                     }
                 )
+            }
+            commandMessage?.let { msg ->
+                item {
+                    Text(
+                        msg,
+                        fontSize = 12.sp, color = TextSec,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
+
+        // ── Command history (Fix B) ─────────────────────────────────────
+        item { Spacer(Modifier.height(4.dp)) }
+        item {
+            Text(
+                "Command history",
+                fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+            )
+        }
+        if (history.isEmpty()) {
+            item {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(SurfaceMuted)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        "No commands yet — use Send on a paired device row to ask it to perform an action.",
+                        fontSize = 13.sp, color = TextTer
+                    )
+                }
+            }
+        } else {
+            items(history) { h ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier
+                            .size(6.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (h.sent) Primary else AccentGreen)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            (if (h.sent) "Sent · " else "Received · ") + h.detail,
+                            fontSize = 13.sp, color = TextPri, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            h.peerDeviceId.take(12) + " · " +
+                                java.text.DateFormat.getDateTimeInstance(
+                                    java.text.DateFormat.SHORT, java.text.DateFormat.SHORT
+                                ).format(java.util.Date(h.atMs)),
+                            fontSize = 11.sp, color = TextTer
+                        )
+                    }
+                }
             }
         }
     }
@@ -426,6 +500,87 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
             }
         )
     }
+
+    sendCmdPeer?.let { peer ->
+        SendCommandDialog(
+            peer = peer,
+            onDismiss = { sendCmdPeer = null },
+            onSend = { commandClass, args ->
+                SyncRuntime.sendCommand(peer.deviceId, commandClass, args)
+                commandMessage = "Command sent to ${peer.displayName} ($commandClass) — journaled, relayed to the target"
+                history = SyncRuntime.commandHistory()
+                sendCmdPeer = null
+            }
+        )
+    }
+}
+
+/**
+ * The per-peer "Send command" authoring surface (docs/SYNC_DESIGN.md §6, item
+ * 6): pick one of the mesh command classes and give it JSON args. The command
+ * journals as a targeted LOG entry; ONLY the peer's CommandDispatcher may
+ * process it, gated by the peer's per-peer allowlist + its policy spine as
+ * AGENT origin. The peer acks back (executed/refused/expired).
+ */
+@Composable
+private fun SendCommandDialog(
+    peer: PairedPeer,
+    onDismiss: () -> Unit,
+    onSend: (String, Map<String, String>) -> Unit
+) {
+    var selected by remember { mutableStateOf("open_app") }
+    var argsText by remember { mutableStateOf("{}") }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Send command to ${peer.displayName}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+        text = {
+            Column {
+                Text(
+                    "The peer only processes this if you are allowlisted for its class (permissions dialog), and it runs through its policy spine as AGENT origin — it grants zero authority by itself.",
+                    fontSize = 12.sp, color = TextSec
+                )
+                Spacer(Modifier.height(10.dp))
+                Text("Command class", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                Spacer(Modifier.height(6.dp))
+                SyncRuntime.COMMAND_CLASSES.forEach { cls ->
+                    FilterChip(
+                        selected = selected == cls,
+                        onClick = { selected = cls },
+                        label = { Text(cls, fontSize = 12.sp) },
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = argsText,
+                    onValueChange = { argsText = it },
+                    label = { Text("Args (JSON)") },
+                    textStyle = TextStyle(fontSize = 13.sp, fontFamily = FontFamily.Monospace),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                error?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(it, fontSize = 12.sp, color = AccentRed)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val args = runCatching {
+                    val o = JSONObject(if (argsText.isBlank()) "{}" else argsText)
+                    buildMap { o.keys().forEach { k -> put(k, o.optString(k)) } }
+                }.getOrElse {
+                    error = "Invalid JSON: ${it.message}"
+                    return@TextButton
+                }
+                onSend(selected, args)
+            }) { Text("Send") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -503,7 +658,12 @@ private fun PeerPermissionsDialog(
 }
 
 @Composable
-private fun PairedPeerRow(peer: PairedPeer, onPermissions: () -> Unit, onUnpair: () -> Unit) {
+private fun PairedPeerRow(
+    peer: PairedPeer,
+    onPermissions: () -> Unit,
+    onSendCommand: () -> Unit,
+    onUnpair: () -> Unit
+) {
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Surface),
@@ -524,6 +684,9 @@ private fun PairedPeerRow(peer: PairedPeer, onPermissions: () -> Unit, onUnpair:
             }
             IconButton(onClick = onPermissions) {
                 Icon(Icons.Outlined.Sync, contentDescription = "Permissions", tint = TextSec, modifier = Modifier.size(18.dp))
+            }
+            IconButton(onClick = onSendCommand) {
+                Icon(Icons.Outlined.Send, contentDescription = "Send command", tint = TextSec, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onUnpair) {
                 Icon(Icons.Rounded.Delete, contentDescription = "Unpair", tint = AccentRed, modifier = Modifier.size(18.dp))

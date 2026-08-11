@@ -57,6 +57,7 @@ import com.newax.aegis.assistant.ProposedAction
 import com.newax.aegis.assistant.riskLevel
 import com.newax.aegis.authority.PolicyEngine
 import com.newax.aegis.authority.PolicyMode
+import com.newax.aegis.desktop.execution.DesktopCommandDispatcher
 import com.newax.aegis.desktop.execution.DesktopGoalExecutor
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.Goal
@@ -97,7 +98,11 @@ private fun windowMain() {
     DesktopPolicyHolder.init()
     // Automatic encrypted sync with paired devices (docs/SYNC_DESIGN.md §4.2):
     // the shared desktop engine (Room-backed journal + LAN transport) runs
-    // behind the window — `sync` commands in CLI mode drive it too.
+    // behind the window — `sync` commands in CLI mode drive it too. The
+    // command dispatcher (Fix C) is the desktop leg of the mesh's remote-action
+    // channel: incoming `to:<me>` commands verify signature → allowlist →
+    // policy and execute open_app/run_shell.
+    DesktopSync.setCommandDispatcher(DesktopCommandDispatcher::onIncoming)
     DesktopSync.start()
     val goalsStore = FileGoalsStore()
     restorePersistedState(goalsStore)
@@ -166,6 +171,9 @@ private suspend fun cliMain(args: Array<String>) {
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
     DesktopCapabilitiesHolder.init()
     DesktopPolicyHolder.init()
+    // The command dispatcher (Fix C) — the desktop leg of the mesh's remote
+    // action channel; registered before start so no inbound command is missed.
+    DesktopSync.setCommandDispatcher(DesktopCommandDispatcher::onIncoming)
     DesktopSync.start()
     val goalsStore = FileGoalsStore()
     restorePersistedState(goalsStore)
@@ -439,7 +447,36 @@ private fun printSyncCommand(arg: String) {
                 println("    ✓ ${parts[1]} ${parts[2]} for ${parts[0]}")
             }
         }
-        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory, categories, category <name> on|off, perms, perm <id> <class> on|off")
+        arg.startsWith("send ", ignoreCase = true) -> {
+            val parts = arg.substring(5).trim().split(Regex("\\s+"))
+            if (parts.size < 3) {
+                println("    usage: sync send <deviceId> <class> <json-args>  (classes: ${DesktopSync.COMMAND_CLASSES.joinToString(", ")})")
+            } else {
+                val deviceId = parts[0]
+                val commandClass = parts[1]
+                val jsonArgs = parts.drop(2).joinToString(" ")
+                val args = runCatching {
+                    val o = org.json.JSONObject(jsonArgs)
+                    buildMap { o.keys().forEach { k -> put(k, o.optString(k)) } }
+                }.getOrDefault(emptyMap())
+                DesktopSync.sendCommand(deviceId, commandClass, args)
+                println("    ✓ command sent to $deviceId ($commandClass) — journaled, relays to the target")
+            }
+        }
+        arg.startsWith("history", ignoreCase = true) -> {
+            val history = DesktopSync.commandHistory()
+            if (history.isEmpty()) {
+                println("    No commands sent or received yet — send one with: sync send <id> <class> <json>")
+            } else {
+                history.forEach { h ->
+                    println("    ${if (h.sent) "sent" else "recv"}  ${h.detail}  ·  ${h.peerDeviceId.take(12)}  ·  " +
+                        java.text.DateFormat.getDateTimeInstance(
+                            java.text.DateFormat.SHORT, java.text.DateFormat.SHORT
+                        ).format(java.util.Date(h.atMs)))
+                }
+            }
+        }
+        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory, categories, category <name> on|off, perms, perm <id> <class> on|off, send <id> <class> <json>, history")
     }
     println()
 }

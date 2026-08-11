@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import kotlinx.coroutines.runBlocking
+import com.newax.aegis.SyncRuntime
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.AppCapabilityLink
 import com.newax.aegis.db.entity.AppRecord
@@ -26,6 +27,18 @@ object AppScanner {
             val existing = runBlocking { db.appRegistryDao().recordByPackage(pkg) }
             if (existing != null && existing.version != version) {
                 runBlocking { db.appRegistryDao().updateVersion(pkg, version, true, now) }
+                // Item 1 — journal the version bump (LWW per package name).
+                SyncRuntime.captureRecord(
+                    SyncRuntime.TABLE_APP_RECORDS, pkg,
+                    listOf(
+                        "packageName" to pkg,
+                        "label" to (existing.label.ifBlank { label }),
+                        "version" to version,
+                        "category" to (existing.category.ifBlank { categoryOf(info) }),
+                        "launchActivity" to (existing.launchActivity ?: launch ?: ""),
+                        "lastScanMs" to now.toString()
+                    )
+                )
             } else if (existing == null) {
                 runBlocking {
                     db.appRegistryDao().upsertRecord(
@@ -33,6 +46,18 @@ object AppScanner {
                             category = categoryOf(info), launchActivity = launch, lastScanMs = now)
                     )
                 }
+                // Item 1 — journal the new app record into the mesh.
+                SyncRuntime.captureRecord(
+                    SyncRuntime.TABLE_APP_RECORDS, pkg,
+                    listOf(
+                        "packageName" to pkg,
+                        "label" to label,
+                        "version" to version,
+                        "category" to categoryOf(info),
+                        "launchActivity" to (launch ?: ""),
+                        "lastScanMs" to now.toString()
+                    )
+                )
                 seedKnownCapabilities(db, pkg)
                 seedIntentCapabilities(context, db, pkg)
             }
@@ -134,15 +159,16 @@ object AppScanner {
     private fun seedKnownCapabilities(db: AegisDatabase, pkg: String) {
         KNOWN_CAPABILITIES[pkg]?.forEach { cap ->
             runBlocking {
-                db.appRegistryDao().upsertLink(
-                    AppCapabilityLink(
-                        packageName     = pkg,
-                        capability      = cap.name,
-                        intentAction    = INTENT_ACTIONS[cap],
-                        deepLinkPattern = if (cap == OPEN_URL || cap == NAVIGATE || cap == OPEN_APP) DEEP_LINKS[pkg] else null,
-                        confidence      = 90
-                    )
+                val link = AppCapabilityLink(
+                    packageName     = pkg,
+                    capability      = cap.name,
+                    intentAction    = INTENT_ACTIONS[cap],
+                    deepLinkPattern = if (cap == OPEN_URL || cap == NAVIGATE || cap == OPEN_APP) DEEP_LINKS[pkg] else null,
+                    confidence      = 90
                 )
+                db.appRegistryDao().upsertLink(link)
+                // Fix H — journal the link into the mesh (LWW per package+capability).
+                SyncRuntime.captureCapabilityLink(link)
             }
         }
     }
@@ -154,20 +180,24 @@ object AppScanner {
         val targets = pm.queryIntentActivities(shareIntent, 0).map { it.activityInfo.packageName }.toSet()
         if (pkg in targets) {
             runBlocking {
-                db.appRegistryDao().upsertLink(AppCapabilityLink(
+                val link = AppCapabilityLink(
                     packageName = pkg, capability = SHARE_TEXT.name,
                     intentAction = android.content.Intent.ACTION_SEND, mimeTypes = "text/plain", confidence = 85
-                ))
+                )
+                db.appRegistryDao().upsertLink(link)
+                SyncRuntime.captureCapabilityLink(link)
             }
         }
         val mediaIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "image/*" }
         val mediaTargets = pm.queryIntentActivities(mediaIntent, 0).map { it.activityInfo.packageName }.toSet()
         if (pkg in mediaTargets) {
             runBlocking {
-                db.appRegistryDao().upsertLink(AppCapabilityLink(
+                val link = AppCapabilityLink(
                     packageName = pkg, capability = SHARE_MEDIA.name,
                     intentAction = android.content.Intent.ACTION_SEND, mimeTypes = "image/*", confidence = 85
-                ))
+                )
+                db.appRegistryDao().upsertLink(link)
+                SyncRuntime.captureCapabilityLink(link)
             }
         }
     }

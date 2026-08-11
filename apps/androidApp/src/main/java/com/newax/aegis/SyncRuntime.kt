@@ -3,15 +3,19 @@ package com.newax.aegis
 import android.content.Context
 import android.os.Build
 import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.entity.AppRecord
 import com.newax.aegis.db.entity.EntityAlias
+import com.newax.aegis.db.entity.GraphEdge
 import com.newax.aegis.db.entity.GraphEntity
 import com.newax.aegis.db.entity.GraphPredicate
 import com.newax.aegis.db.entity.KvStoreEntity
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
+import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.db.sync.SyncPayload
 import com.newax.aegis.db.sync.toEntity
 import com.newax.aegis.memory.EncryptedMemory
+import com.newax.aegis.sync.CommandSigning
 import com.newax.aegis.sync.Crypto
 import com.newax.aegis.sync.Hex
 import com.newax.aegis.sync.Hlc
@@ -32,6 +36,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
+import org.json.JSONObject
 import java.util.UUID
 
 /**
@@ -64,6 +69,26 @@ object SyncRuntime {
      */
     const val TABLE_PEER_TRUST = "peer_trust"
     private const val TRUST_SEP = "\u0001"
+
+    /**
+     * Journal table names for the remaining syncable fabric (item 1 — capture
+     * coverage): graph edges, app usage records, and user trigger rules. The
+     * names match the schema-v13 table names, so the same journal namespace
+     * works on every platform. `commands` is the targeted command inbox
+     * (LOG-kind, append-only — item 6).
+     */
+    const val TABLE_EDGES = "edges"
+    const val TABLE_APP_RECORDS = "app_records"
+    const val TABLE_APP_CAPABILITY_LINKS = "app_capability_links"
+    const val TABLE_TRIGGER_RULES = "trigger_rules"
+    const val TABLE_COMMANDS = "commands"
+    private const val EDGE_SEP = "\u0001"
+    private const val LINK_SEP = "\u0001"
+    private const val COMMAND_TARGET_PREFIX = "to:"
+    private const val COMMAND_ACK_PREFIX = "ack:"
+
+    /** Commands expire after this long unprocessed (design §6 ttl). */
+    private const val DEFAULT_COMMAND_TTL_MS = 24 * 60 * 60 * 1000L
 
     /** Local-only kv_store keys (NOT under `syncable:` — they never sync). */
     private const val KEY_ENABLED = "sync:enabled"
@@ -291,6 +316,141 @@ object SyncRuntime {
         capture(SyncEntry.Kind.RECORD, table, key, SyncPayload.encode(fields), tombstone)
     }
 
+    /**
+     * Journal one graph edge by its cross-device natural key (names, not local
+     * ids — entity ids differ per device). [objectName] is the target entity's
+     * canonical name, or null when the edge holds an inline [objectValue].
+     */
+    /**
+     * Journal one app capability link (Fix H) — LWW per (packageName,
+     * capability) composite key, same namespace on both platforms.
+     */
+    fun captureCapabilityLink(link: com.newax.aegis.db.entity.AppCapabilityLink) {
+        captureRecord(
+            TABLE_APP_CAPABILITY_LINKS,
+            link.packageName + LINK_SEP + link.capability,
+            listOf(
+                "packageName" to link.packageName,
+                "capability" to link.capability,
+                "intentAction" to (link.intentAction ?: ""),
+                "deepLinkPattern" to (link.deepLinkPattern ?: ""),
+                "mimeTypes" to (link.mimeTypes ?: ""),
+                "confidence" to link.confidence.toString()
+            )
+        )
+    }
+
+    fun captureEdge(
+        subjectName: String,
+        predicateName: String,
+        objectName: String?,
+        objectValue: String?,
+        confidence: Int,
+        importance: Int,
+        createdAt: Long,
+        validFrom: Long?,
+        validUntil: Long?
+    ) {
+        val obj = objectName ?: objectValue.orEmpty()
+        if (subjectName.isBlank() || predicateName.isBlank() || obj.isBlank()) return
+        captureRecord(
+            TABLE_EDGES,
+            listOf(subjectName, predicateName, obj).joinToString(EDGE_SEP),
+            listOf(
+                "subject" to subjectName,
+                "predicate" to predicateName,
+                "object" to (objectName ?: ""),
+                "objectValue" to (objectValue ?: ""),
+                "confidence" to confidence.toString(),
+                "importance" to importance.toString(),
+                "createdAt" to createdAt.toString(),
+                "validFrom" to (validFrom?.toString() ?: ""),
+                "validUntil" to (validUntil?.toString() ?: "")
+            )
+        )
+    }
+
+    // ── Commands (item 6 — targeted, allowlist-gated, AGENT-origin) ──────────
+
+    /**
+     * Send a command to one paired peer (docs/SYNC_DESIGN.md §6): a LOG-kind
+     * journal entry addressed to the peer's inbox (`to:<peerDeviceId>`). Every
+     * device that carries the journal relays it store-and-forward; ONLY the
+     * target dispatches it (CommandDispatcher), gated by the target's per-peer
+     * allowlist and its policy spine as AGENT origin. The peer acks back via
+     * [sendCommandAck]. Authoring surfaces: the Sync screen's per-peer "Send
+     * command" dialog and the desktop CLI (`sync send`).
+     */
+    fun sendCommand(peerDeviceId: String, commandClass: String, args: Map<String, String>) {
+        if (commandClass !in COMMAND_CLASSES || peerDeviceId.isBlank()) return
+        val ttl = System.currentTimeMillis() + DEFAULT_COMMAND_TTL_MS
+        val payload = JSONObject().apply {
+            put("class", commandClass)
+            put("ttl", ttl.toString())
+            args.forEach { (k, v) -> put(k, v) }
+            // Per-entry Ed25519 signature (CommandSigning) — the target
+            // verifies it against OUR paired public key before dispatching.
+            put("sig", Hex.encode(CommandSigning.sign(cryptoHolder, identityHolder.signPrivateKey, commandClass, ttl, args)))
+        }.toString().encodeToByteArray()
+        capture(SyncEntry.Kind.LOG, TABLE_COMMANDS, COMMAND_TARGET_PREFIX + peerDeviceId, payload)
+    }
+
+    /** The paired peer's Ed25519 public key for [peerDeviceId], or null. */
+    fun peerSignPublicKey(peerDeviceId: String): ByteArray? =
+        keyStoreHolder.pairedPeers().firstOrNull { it.deviceId == peerDeviceId }?.signPublicKey
+
+    /** The target's acknowledgement (executed/refused/expired) back to the sender. */
+    fun sendCommandAck(toDeviceId: String, refOpId: String, result: String, reason: String = "") {
+        if (toDeviceId.isBlank()) return
+        val payload = JSONObject().apply {
+            put("ref", refOpId)
+            put("result", result)
+            put("reason", reason)
+        }.toString().encodeToByteArray()
+        capture(SyncEntry.Kind.LOG, TABLE_COMMANDS, COMMAND_ACK_PREFIX + toDeviceId, payload)
+    }
+
+    /** One row of the command history — sent commands and their acks (Fix B). */
+    data class CommandHistoryEntry(
+        val sent: Boolean,
+        val peerDeviceId: String,
+        val detail: String,
+        val atMs: Long
+    )
+
+    /**
+     * The most recent command activity on this device: `to:` entries we sent
+     * and `ack:` entries the targets sent back (newest first). Reads straight
+     * from the journal — no separate history table.
+     */
+    fun commandHistory(limit: Int = 50): List<CommandHistoryEntry> {
+        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        return runBlocking {
+            runCatching { db.syncJournalDao().recentForTable(TABLE_COMMANDS, limit) }.getOrElse { emptyList() }
+        }.mapNotNull { entry ->
+            val key = entry.key
+            val peer = when {
+                key.startsWith(COMMAND_TARGET_PREFIX) -> key.removePrefix(COMMAND_TARGET_PREFIX)
+                key.startsWith(COMMAND_ACK_PREFIX) -> key.removePrefix(COMMAND_ACK_PREFIX)
+                else -> return@mapNotNull null
+            }
+            val payload = runCatching { JSONObject(entry.payload.decodeToString()) }.getOrNull() ?: return@mapNotNull null
+            val detail = if (key.startsWith(COMMAND_TARGET_PREFIX)) {
+                "→ ${payload.optString("class")}" +
+                    payload.optString("name").takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+            } else {
+                "ack ${payload.optString("result")}" +
+                    payload.optString("reason").takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
+            }
+            CommandHistoryEntry(
+                sent = key.startsWith(COMMAND_TARGET_PREFIX),
+                peerDeviceId = peer,
+                detail = detail,
+                atMs = entry.createdAt
+            )
+        }
+    }
+
     fun capture(
         kind: SyncEntry.Kind,
         table: String,
@@ -331,6 +491,16 @@ object SyncRuntime {
      */
     fun materialize(entries: List<SyncEntry>) {
         for (entry in entries) {
+            // Commands are LOG-kind (append-only, targeted) — every entry is
+            // processed, opId dedup happens at append. Only MY inbox dispatches.
+            if (entry.kind == SyncEntry.Kind.LOG && entry.table == TABLE_COMMANDS) {
+                try {
+                    CommandDispatcher.onIncoming(entry)
+                } catch (_: Exception) {
+                    // A malformed command must not kill the rest of the round.
+                }
+                continue
+            }
             if (entry.kind != SyncEntry.Kind.RECORD) continue
             // Per-category toggle — disabled categories are not applied either
             // (defense in depth; older entries stay in the journal, harmless).
@@ -345,6 +515,11 @@ object SyncRuntime {
                     "entity_aliases" -> materializeAlias(entry)
                     "persons" -> materializePerson(entry)
                     "person_facts" -> materializePersonFact(entry)
+                    // Fabric tables (item 1): graph edges, app usage, triggers.
+                    TABLE_EDGES -> materializeEdge(entry)
+                    TABLE_APP_RECORDS -> materializeAppRecord(entry)
+                    TABLE_APP_CAPABILITY_LINKS -> materializeAppCapabilityLink(entry)
+                    TABLE_TRIGGER_RULES -> materializeTriggerRule(entry)
                     // Pairing/revocation records (Slice 5).
                     TABLE_PEER_TRUST -> materializeTrust(entry)
                     else -> Unit // tables not yet captured/materialized
@@ -465,6 +640,131 @@ object SyncRuntime {
                     timestampMs = fields["timestampMs"]?.toLongOrNull() ?: 0L
                 )
             )
+        }
+    }
+
+    /** Resolve (or create) an entity by canonical name — the edge materializer's ref resolver. */
+    private fun entityIdFor(name: String): Long? = runBlocking {
+        runCatching {
+            val dao = AegisDatabase.get.graphDao()
+            dao.findByName(name)?.id
+                ?: dao.insertEntity(GraphEntity(type = 0, canonicalName = name, createdAt = System.currentTimeMillis()))
+        }.getOrNull()
+    }
+
+    /**
+     * Incoming graph edge (item 1): names resolve to local ids, identical
+     * current edges are deduped, and the LWW guard keeps the newest per
+     * (subject, predicate, object) key.
+     */
+    private fun materializeEdge(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val subject = fields["subject"]?.takeIf { it.isNotBlank() } ?: return
+        val predicate = fields["predicate"]?.takeIf { it.isNotBlank() } ?: return
+        val objectName = fields["object"]?.takeIf { it.isNotBlank() }
+        val objectValue = fields["objectValue"]?.takeIf { it.isNotBlank() }
+        if (objectName == null && objectValue == null) return
+        runBlocking {
+            runCatching {
+                val dao = AegisDatabase.get.graphDao()
+                val subjectId = entityIdFor(subject)
+                val predicateId = dao.predicateByName(predicate)?.id
+                    ?: dao.insertPredicate(GraphPredicate(name = predicate))
+                val objectId = objectName?.let { entityIdFor(it) }
+                if (subjectId == null || predicateId == 0L) return@runCatching
+                // Two devices learning the same fact produce two journal entries
+                // — skip when an identical current edge already exists.
+                val dup = dao.currentEdgesBySubjectPredicate(subjectId, predicateId).any {
+                    it.objectId == objectId && it.objectValue == objectValue && it.validUntil == null
+                }
+                if (dup) return@runCatching
+                dao.insertEdge(
+                    GraphEdge(
+                        subjectId = subjectId,
+                        predicateId = predicateId,
+                        objectId = objectId,
+                        objectValue = objectValue,
+                        confidence = fields["confidence"]?.toIntOrNull() ?: 80,
+                        importance = fields["importance"]?.toIntOrNull() ?: 50,
+                        createdAt = fields["createdAt"]?.toLongOrNull() ?: entry.createdAt,
+                        validFrom = fields["validFrom"]?.toLongOrNull(),
+                        validUntil = fields["validUntil"]?.toLongOrNull()
+                    )
+                )
+            }
+        }
+    }
+
+    /** Incoming app record (item 1) — LWW per package name. */
+    private fun materializeAppRecord(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val pkg = fields["packageName"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            runCatching {
+                AegisDatabase.get.appRegistryDao().upsertRecord(
+                    AppRecord(
+                        packageName = pkg,
+                        label = fields["label"] ?: pkg,
+                        version = fields["version"] ?: "",
+                        category = fields["category"] ?: "",
+                        launchActivity = fields["launchActivity"],
+                        lastScanMs = fields["lastScanMs"]?.toLongOrNull() ?: entry.createdAt
+                    )
+                )
+            }
+        }
+    }
+
+    /** Incoming app capability link (Fix H) — LWW per (packageName, capability). */
+    private fun materializeAppCapabilityLink(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val pkg = fields["packageName"]?.takeIf { it.isNotBlank() } ?: return
+        val cap = fields["capability"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            runCatching {
+                AegisDatabase.get.appRegistryDao().upsertLink(
+                    com.newax.aegis.db.entity.AppCapabilityLink(
+                        packageName = pkg,
+                        capability = cap,
+                        intentAction = fields["intentAction"],
+                        deepLinkPattern = fields["deepLinkPattern"],
+                        mimeTypes = fields["mimeTypes"],
+                        confidence = fields["confidence"]?.toIntOrNull() ?: 80
+                    )
+                )
+            }
+        }
+    }
+
+    /** Incoming trigger rule (item 1) — LWW per label; tombstones delete. */
+    private fun materializeTriggerRule(entry: SyncEntry) {
+        if (locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val label = fields["label"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            runCatching {
+                val dao = AegisDatabase.get.triggerDao()
+                if (entry.tombstone) {
+                    dao.allRules().firstOrNull { it.label == label }?.let { dao.deleteById(it.id) }
+                    return@runCatching
+                }
+                if (dao.allRules().any { it.label == label }) return@runCatching
+                dao.insert(
+                    TriggerRule(
+                        label = label,
+                        conditionType = fields["conditionType"] ?: "",
+                        conditionParams = fields["conditionParams"] ?: "{}",
+                        actionType = fields["actionType"] ?: "",
+                        actionParams = fields["actionParams"] ?: "{}",
+                        enabled = fields["enabled"] != "false",
+                        debounceMs = fields["debounceMs"]?.toLongOrNull() ?: 30_000L,
+                        createdMs = fields["createdMs"]?.toLongOrNull() ?: entry.createdAt
+                    )
+                )
+            }
         }
     }
 
