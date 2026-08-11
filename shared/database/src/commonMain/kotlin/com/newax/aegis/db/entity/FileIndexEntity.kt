@@ -65,7 +65,16 @@ data class FileObject(
     val indexState: Int = INDEX_STATE_BARE,
     @ColumnInfo(defaultValue = "0")
     val isDuplicate: Boolean = false,
-    val canonicalId: Long? = null
+    val canonicalId: Long? = null,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 ) {
     companion object {
         const val INDEX_STATE_BARE     = 0   // metadata + hash only

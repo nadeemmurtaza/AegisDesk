@@ -35,5 +35,14 @@ data class GraphEdge(
     /** Epoch ms when this fact expired; null = still current. */
     val validUntil: Long? = null,
     /** FK → entities.id of the source (e.g. a Conversation entity). */
-    val sourceId: Long? = null
+    val sourceId: Long? = null,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )

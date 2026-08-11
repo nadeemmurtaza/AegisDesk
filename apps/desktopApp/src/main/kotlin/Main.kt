@@ -25,6 +25,10 @@
  *      DesktopGoalExecutor — find_app resolves the target against the app index
  *      and launch_app runs the exact shortcut target, then the process →
  *      Win32-activateApp ladder (Phase 5i)
+ *      "proximity listen" / "proximity send <file> <deviceId>" / "proximity
+ *      nearby" drive the encrypted Quick Share (P2): mDNS discovery, direct
+ *      TCP, ECDH key exchange + ProximityTransfer sealing (receive confirms
+ *      per transfer; files land in ~/.aegis/shared/)
  *   7. On empty input, "exit", or Ctrl+D the model is closed, the holder returns
  *      to the fallback, and the app exits
  *
@@ -155,6 +159,10 @@ fun main(args: Array<String>) = runBlocking {
             }
             if (prompt.startsWith("abandon ", ignoreCase = true)) {
                 printAbandon(prompt.substring(8).trim())
+                continue
+            }
+            if (prompt.equals("proximity", ignoreCase = true) || prompt.startsWith("proximity ", ignoreCase = true)) {
+                printProximity(prompt.substring("proximity".length).trim())
                 continue
             }
 
@@ -364,6 +372,34 @@ private fun printApps(query: String, index: WindowsAppIndex) {
         println("      ${entry.lnkPath}")
     }
     if (entries.size > 40) println("    … and ${entries.size - 40} more")
+    println()
+}
+
+/**
+ * The desktop Quick Share surface (docs/SYNC_DESIGN.md §10.1 / P2) — CLI
+ * twin of Android's Nearby screen: listen (mDNS advertise + encrypted TCP
+ * receive), send <file> <deviceId> (discover, connect, encrypt, transfer),
+ * and nearby (list LAN peers).
+ */
+private fun printProximity(args: String) {
+    println()
+    println("  ── Proximity (encrypted Quick Share) ────────────────────")
+    when {
+        args == "listen" -> ProximityCli.listen()
+        args == "nearby" -> ProximityCli.nearby()
+        args.startsWith("send ") -> {
+            val rest = args.substring(5).trim()
+            val lastSpace = rest.lastIndexOf(' ')
+            if (lastSpace <= 0) {
+                println("    usage: proximity send <file> <deviceId>")
+            } else {
+                val file = rest.substring(0, lastSpace).trim().removeSurrounding("\"")
+                val deviceId = rest.substring(lastSpace + 1).trim()
+                ProximityCli.send(file, deviceId)
+            }
+        }
+        else -> println("    usage: proximity listen | send <file> <deviceId> | nearby")
+    }
     println()
 }
 

@@ -17,5 +17,14 @@ data class GraphEntity(
     val type: Int = 0,
     val canonicalName: String,
     val payloadPointer: Long? = null,
-    val createdAt: Long = currentTimeMillis()
+    val createdAt: Long = currentTimeMillis(),
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )

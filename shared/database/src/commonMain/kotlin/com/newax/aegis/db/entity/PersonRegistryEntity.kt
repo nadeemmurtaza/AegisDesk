@@ -33,7 +33,16 @@ data class PersonSnapshot(
     @ColumnInfo(defaultValue = "50")
     val importanceScore: Int = 50,
     @ColumnInfo(defaultValue = "0")
-    val snapshotUpdatedMs: Long = 0
+    val snapshotUpdatedMs: Long = 0,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )
 
 @Entity(tableName = "person_policies", primaryKeys = ["personEntityId"])
@@ -50,7 +59,16 @@ data class PersonPolicy(
     @ColumnInfo(defaultValue = "1")
     val canShareFiles: Int = 1,             // 0=block 1=ask 2=allow
     @ColumnInfo(defaultValue = "1")
-    val sensitiveActionsRequireConfirm: Boolean = true
+    val sensitiveActionsRequireConfirm: Boolean = true,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )
 
 @Entity(

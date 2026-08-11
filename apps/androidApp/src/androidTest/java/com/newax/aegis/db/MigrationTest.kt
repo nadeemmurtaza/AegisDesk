@@ -5,6 +5,9 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.newax.aegis.db.entity.SyncJournalEntity
+import com.newax.aegis.db.entity.SyncVectorEntity
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -129,12 +132,60 @@ class MigrationTest {
         cursor.use { assert(it.moveToFirst()) { "FTS index was not rebuilt from person_facts" } }
     }
 
+    /**
+     * v13 adds the sync substrate: two new tables (sync_journal, sync_vector) and
+     * four sync columns on every syncable table. Seeds rows in several syncable
+     * tables first so the ALTERs land on non-empty data and the defaults are
+     * asserted, then verifies the sync tables exist and the DAOs round-trip.
+     */
     @Test
     @Throws(IOException::class)
-    fun migrateFullPath_1To12() {
+    fun migrate12To13() {
+        helper.createDatabase(TEST_DB, 12).apply {
+            execSQL("INSERT INTO persons (name, importanceScore, sourceCount, totalMentions, lastSeenMs, profileBuilt) VALUES ('Ayesha', 0.5, 1, 1, 0, 0)")
+            execSQL("INSERT INTO memory_records (type, content, category, subject, source, confidence, importance, createdAt, updatedAt) VALUES (1, 'sync substrate test', 'personal', 'Ayesha', 'test', 80, 50, 0, 0)")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 13, true, AegisDatabase.MIGRATION_12_13)
+
+        // Existing rows carry the pre-sync baseline defaults (never win a merge).
+        // Column names are verbatim property names (Room convention — no snake_case).
+        val person = db.query("SELECT syncHcWall, syncHcCounter, syncDeviceId, syncTombstone FROM persons WHERE name = 'Ayesha'")
+        assert(person.moveToFirst())
+        assert(person.getLong(0) == 0L)
+        assert(person.getLong(1) == 0L)
+        assert(person.getString(2) == "")
+        assert(person.getLong(3) == 0L)
+        person.close()
+        val memory = db.query("SELECT syncTombstone FROM memory_records WHERE content = 'sync substrate test'")
+        assert(memory.moveToFirst())
+        assert(memory.getLong(0) == 0L)
+        memory.close()
+
+        // New rows accept real sync metadata.
+        db.execSQL("INSERT INTO persons (name, importanceScore, sourceCount, totalMentions, lastSeenMs, profileBuilt, syncHcWall, syncHcCounter, syncDeviceId, syncTombstone) VALUES ('Bilal', 0.5, 1, 1, 0, 0, 42, 7, 'dev-w', 0)")
+        val stamped = db.query("SELECT syncHcWall, syncHcCounter, syncDeviceId FROM persons WHERE name = 'Bilal'")
+        assert(stamped.moveToFirst())
+        assert(stamped.getLong(0) == 42L)
+        assert(stamped.getLong(1) == 7L)
+        assert(stamped.getString(2) == "dev-w")
+        stamped.close()
+
+        // Sync tables exist with the expected columns.
+        val journal = db.query("SELECT opId, deviceId, hlcWall, hlcCounter, kind, tableName, key, tombstone FROM sync_journal")
+        assert(!journal.moveToFirst())
+        journal.close()
+        val vector = db.query("SELECT peerDeviceId, lastAppliedHlcWall, lastAppliedHlcCounter FROM sync_vector")
+        assert(!vector.moveToFirst())
+        vector.close()
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrateFullPath_1To13() {
         helper.createDatabase(TEST_DB, 1).apply { close() }
         helper.runMigrationsAndValidate(
-            TEST_DB, 12, true,
+            TEST_DB, 13, true,
             AegisDatabase.MIGRATION_1_2,
             AegisDatabase.MIGRATION_2_3,
             AegisDatabase.MIGRATION_3_4,
@@ -145,8 +196,61 @@ class MigrationTest {
             AegisDatabase.MIGRATION_8_9,
             AegisDatabase.MIGRATION_9_10,
             AegisDatabase.MIGRATION_10_11,
-            AegisDatabase.MIGRATION_11_12
+            AegisDatabase.MIGRATION_11_12,
+            AegisDatabase.MIGRATION_12_13
         )
+    }
+
+    /**
+     * The sync DAOs round-trip against the v13 schema: journal dedup by opId,
+     * delta scan ordering, and vector upsert. Runs on an in-memory DB (same
+     * pattern as validateCurrentSchema) so the generated DAO implementations
+     * are exercised, not just the tables.
+     */
+    @Test
+    @Throws(IOException::class)
+    fun syncDaosRoundTrip() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AegisDatabase::class.java).build()
+        try {
+            val journalDao = db.syncJournalDao()
+            val vectorDao = db.syncVectorDao()
+
+            val e1 = SyncJournalEntity(
+                opId = "op-1", deviceId = "dev-w", hlcWall = 1, hlcCounter = 1,
+                kind = SyncJournalEntity.KIND_RECORD, tableName = "persons",
+                key = "1", payload = byteArrayOf(1, 2, 3)
+            )
+            val e2 = e1.copy(
+                opId = "op-2", hlcWall = 2, hlcCounter = 5, key = "2",
+                payload = byteArrayOf(4)
+            )
+            runBlocking {
+                // Dedup: same opId inserted twice applies once.
+                assert(journalDao.insert(e1) == 1L)
+                assert(journalDao.insert(e1) == 0L)
+                journalDao.insertAll(listOf(e2, e1)) // e1 already present — ignored
+                assert(journalDao.count() == 2L)
+
+                // Delta scan: strictly after (1,1) → only op-2.
+                val after = journalDao.entriesAfter(1, 1)
+                assert(after.map { it.opId } == listOf("op-2"))
+
+                // Per-record history.
+                val history = journalDao.entriesFor("persons", "2")
+                assert(history.map { it.opId } == listOf("op-2"))
+                assert(journalDao.getByOpId("op-1")!!.payload.contentEquals(byteArrayOf(1, 2, 3)))
+
+                // Vector upsert replaces (advances) the watermark.
+                vectorDao.upsert(SyncVectorEntity(peerDeviceId = "dev-m", lastAppliedHlcWall = 3, lastAppliedHlcCounter = 9))
+                vectorDao.upsert(SyncVectorEntity(peerDeviceId = "dev-m", lastAppliedHlcWall = 5, lastAppliedHlcCounter = 2))
+                val v = vectorDao.getByPeer("dev-m")!!
+                assert(v.lastAppliedHlcWall == 5L)
+                assert(v.lastAppliedHlcCounter == 2L)
+            }
+        } finally {
+            db.close()
+        }
     }
 
     @Test

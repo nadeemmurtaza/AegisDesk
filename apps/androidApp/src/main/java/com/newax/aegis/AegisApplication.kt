@@ -24,6 +24,7 @@ import com.newax.aegis.engine.embedding.EmbeddingIndexWorker
 import com.newax.aegis.engine.model.ModelManager
 import com.newax.aegis.engine.resource.ResourceGovernor
 import com.newax.aegis.memory.EncryptedMemory
+import com.newax.aegis.sync.AndroidSyncContext
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.concurrent.TimeUnit
@@ -51,6 +52,10 @@ class AegisApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         registerComponentCallbacks(memoryPressureCallbacks)
+        // The sync module's Android actuals (BLE/WiFi-Direct discovery, the
+        // TEE-wrapped identity store) read their Context from here — must be
+        // set before any sync API is touched.
+        AndroidSyncContext.init(this)
         // Initialize encrypted DB before any workers or viewmodels access it
         val memory = EncryptedMemory(this)
         SecureKeyVault.init(this)

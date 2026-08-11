@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Settings
@@ -98,6 +99,7 @@ sealed class Screen(val label: String) {
     object AppPermissions : Screen("App Permissions")
     object Capabilities : Screen("Capabilities")
     object Goals : Screen("Goals")
+    object Nearby : Screen("Nearby")
 }
 
 class MainActivity : FragmentActivity() {
@@ -183,7 +185,8 @@ fun AegisApp(
                         NavEntry(Screen.Backup,   Icons.Outlined.CloudSync,         "Backup"),
                         NavEntry(Screen.Settings, Icons.Outlined.Settings,          "Settings"),
                         NavEntry(Screen.Goals, Icons.Rounded.CheckCircle,            "Goals"),
-                        NavEntry(Screen.Capabilities, Icons.Rounded.Shield,         "Capabilities")
+                        NavEntry(Screen.Capabilities, Icons.Rounded.Shield,         "Capabilities"),
+                        NavEntry(Screen.Nearby, Icons.Outlined.NearMe,              "Nearby")
                     ).forEach { entry ->
                         NavigationDrawerItem(
                             label  = {
@@ -246,6 +249,7 @@ fun AegisApp(
                                         Screen.AppPermissions -> "App Permissions"
                                         Screen.Capabilities -> "Capabilities"
                                         Screen.Goals -> "Goals"
+                                        Screen.Nearby -> "Nearby Share"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize   = 18.sp,
@@ -287,6 +291,7 @@ fun AegisApp(
                         }
                     )
                     Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions })
+                    Screen.Nearby -> NearbyShareScreen(padding)
                 }
             }
             BiometricOverlay(vm)

@@ -39,9 +39,11 @@ import androidx.sqlite.execSQL
         FileObject::class,
         FileTextContent::class,
         FileTextFts::class,
-        FileEntityLink::class
+        FileEntityLink::class,
+        SyncJournalEntity::class,
+        SyncVectorEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 @ConstructedBy(AegisDatabaseConstructor::class)
@@ -60,6 +62,8 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun personRegistryDao(): PersonRegistryDao
     abstract fun triggerDao(): TriggerDao
     abstract fun fileDao(): FileDao
+    abstract fun syncJournalDao(): SyncJournalDao
+    abstract fun syncVectorDao(): SyncVectorDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -142,6 +146,71 @@ abstract class AegisDatabase : RoomDatabase() {
                         "VALUES (NEW.`rowid`, NEW.`fact`, NEW.`category`, NEW.`source`); END"
                 )
                 connection.execSQL("INSERT INTO person_facts_fts(person_facts_fts) VALUES('rebuild')")
+            }
+        }
+
+        /**
+         * v13 — the sync substrate (docs/SYNC_DESIGN.md §13, slice S0):
+         * the append-only CRDT journal + per-peer version vectors, plus the
+         * four sync metadata columns (syncHcWall, syncHcCounter, syncDeviceId,
+         * syncTombstone — verbatim Room property names) on every syncable
+         * table. Existing rows get the defaults (0/'') — they are the pre-sync
+         * baseline and never win an LWW merge. Derived/device-local tables
+         * (FTS, embeddings, file_text_content, screen_nodes/nav_edges,
+         * learning_drafts, kv_store, commitments, person_channel_prefs)
+         * deliberately get NO columns — kv_store sync is namespaced by key,
+         * the rest never sync.
+         */
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(connection: SQLiteConnection) {
+                // NOTE: Room keeps property names verbatim as column names (no
+                // snake_case — see schemas/*.json: packageName, personId, ...).
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS sync_journal (
+                        opId TEXT NOT NULL,
+                        deviceId TEXT NOT NULL,
+                        hlcWall INTEGER NOT NULL DEFAULT 0,
+                        hlcCounter INTEGER NOT NULL DEFAULT 0,
+                        kind TEXT NOT NULL,
+                        tableName TEXT NOT NULL,
+                        key TEXT NOT NULL,
+                        payload BLOB NOT NULL,
+                        tombstone INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL,
+                        PRIMARY KEY (opId)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_sync_journal_tableName ON sync_journal(tableName)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_sync_journal_tableName_key ON sync_journal(tableName, key)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_sync_journal_deviceId ON sync_journal(deviceId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_sync_journal_hlcWall_hlcCounter ON sync_journal(hlcWall, hlcCounter)")
+
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS sync_vector (
+                        peerDeviceId TEXT NOT NULL,
+                        lastAppliedHlcWall INTEGER NOT NULL DEFAULT 0,
+                        lastAppliedHlcCounter INTEGER NOT NULL DEFAULT 0,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY (peerDeviceId)
+                    )
+                """)
+
+                // 17 syncable tables × 4 sync columns. Table names are compile-time
+                // constants (never runtime input — R12), same pattern as the FTS
+                // trigger drops in MIGRATION_11_12.
+                val syncable = listOf(
+                    "memory_records", "triples", "entities", "predicates", "edges",
+                    "blobs", "entity_aliases", "persons", "person_facts",
+                    "person_mentions", "person_snapshots", "person_policies",
+                    "ui_procedures", "app_records", "app_capability_links",
+                    "trigger_rules", "file_objects"
+                )
+                syncable.forEach { t ->
+                    connection.execSQL("ALTER TABLE $t ADD COLUMN syncHcWall INTEGER NOT NULL DEFAULT 0")
+                    connection.execSQL("ALTER TABLE $t ADD COLUMN syncHcCounter INTEGER NOT NULL DEFAULT 0")
+                    connection.execSQL("ALTER TABLE $t ADD COLUMN syncDeviceId TEXT NOT NULL DEFAULT ''")
+                    connection.execSQL("ALTER TABLE $t ADD COLUMN syncTombstone INTEGER NOT NULL DEFAULT 0")
+                }
             }
         }
 

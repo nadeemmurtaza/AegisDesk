@@ -18,7 +18,16 @@ data class AppRecord(
     val launchActivity: String? = null,
     @ColumnInfo(defaultValue = "0")
     val needsValidation: Boolean = false,
-    val lastScanMs: Long = currentTimeMillis()
+    val lastScanMs: Long = currentTimeMillis(),
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )
 
 @Entity(
@@ -33,7 +42,16 @@ data class AppCapabilityLink(
     val deepLinkPattern: String? = null,
     val mimeTypes: String? = null,
     @ColumnInfo(defaultValue = "80")
-    val confidence: Int = 80
+    val confidence: Int = 80,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )
 
 @Entity(tableName = "ui_procedures", indices = [Index("packageName"), Index("taskCapability")])
@@ -60,7 +78,16 @@ data class UiProcedure(
     @ColumnInfo(defaultValue = "0")
     val lastRunMs: Long = 0,
     @ColumnInfo(defaultValue = "0")
-    val needsValidation: Boolean = false
+    val needsValidation: Boolean = false,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )
 
 @Entity(tableName = "screen_nodes", primaryKeys = ["packageName", "screenSignature"])

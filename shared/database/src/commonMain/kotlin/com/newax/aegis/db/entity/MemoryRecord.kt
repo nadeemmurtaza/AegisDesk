@@ -49,7 +49,16 @@ data class MemoryRecord(
     /** FK → edges.id if this record is backed by a normalized graph edge. */
     val graphEdgeId: Long?  = null,
     /** VectorStore sourceId (e.g. "record:123") for embedding pointer. */
-    val embeddingId: String? = null
+    val embeddingId: String? = null,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): provenance + LOG ordering ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )
 
 object RecordType {

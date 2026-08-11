@@ -11,6 +11,7 @@ include(":shared:core")
 include(":shared:database")
 include(":shared:platform-api")
 include(":shared:model-api")
+include(":shared:sync")
 
 include(":platform:android")
 include(":platform:windows")

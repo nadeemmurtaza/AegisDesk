@@ -18,6 +18,10 @@ dependencies {
     // explicitly — same as platform:windows and platform:android.
     implementation(project(":shared:core"))
 
+    // The sync engine's JVM seam (mDNS proximity discovery, TCP transfer
+    // channel, the encrypted Quick Share protocol — P2 desktop listener).
+    implementation(project(":shared:sync"))
+
     // Coroutines for the interactive prompt loop (runBlocking)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 

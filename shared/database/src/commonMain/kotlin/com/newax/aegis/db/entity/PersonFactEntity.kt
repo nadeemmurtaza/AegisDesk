@@ -30,7 +30,16 @@ data class PersonFactEntity(
     val category: String,
     val confidence: Float = 0.7f,
     val source: String = "",
-    val timestampMs: Long = 0L
+    val timestampMs: Long = 0L,
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 )
 
 /**

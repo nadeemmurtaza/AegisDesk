@@ -24,7 +24,16 @@ data class TriggerRule(
     val debounceMs: Long = 30_000L,
     @ColumnInfo(defaultValue = "0")
     val lastFiredMs: Long = 0L,
-    val createdMs: Long = currentTimeMillis()
+    val createdMs: Long = currentTimeMillis(),
+    // ── sync metadata (docs/SYNC_DESIGN.md §4): LWW merge ordering + tombstone ──
+    @ColumnInfo(defaultValue = "0")
+    val syncHcWall: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val syncHcCounter: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    val syncDeviceId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val syncTombstone: Boolean = false
 ) {
     companion object {
         // conditionType constants
