@@ -28,6 +28,7 @@ object ProximityTransfer {
 
     private const val ACCEPT_TIMEOUT_MS = 30_000L
     private const val CHUNK_TIMEOUT_MS = 60_000L
+    private const val COMPLETE_TIMEOUT_MS = 60_000L
     private const val MAX_FILE_BYTES = 1L * 1024 * 1024 * 1024
     private const val MAX_CHUNKS = 1_000_000
     private const val ACCEPT_OK = "accept"

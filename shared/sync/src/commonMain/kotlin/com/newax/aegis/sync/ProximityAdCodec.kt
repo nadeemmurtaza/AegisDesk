@@ -18,12 +18,12 @@ object ProximityAdCodec {
     /** Manufacturer-specific-data company id (arbitrary, unused range). */
     const val COMPANY_ID = 0x0A45
 
-    const val VERSION = 0x01
+    const val VERSION: Byte = 0x01
 
     /** Usable payload budget in a 31-byte connectable advertisement. */
     const val MAX_AD_BYTES = 27
 
-    private const val FIELD_SEP = 0x00
+    private const val FIELD_SEP: Byte = 0x00
 
     /**
      * Encode [deviceId] + [displayName] into an advertisement payload.
@@ -51,7 +51,8 @@ object ProximityAdCodec {
      */
     fun decode(bytes: ByteArray): Pair<String, String>? {
         if (bytes.size < 3 || bytes[0] != VERSION) return null
-        val sep = bytes.indexOf(FIELD_SEP, 1)
+        // start at 1: index 0 is the version byte, never the separator
+        val sep = (1 until bytes.size).firstOrNull { bytes[it] == FIELD_SEP } ?: -1
         if (sep <= 1) return null
         val id = bytes.copyOfRange(1, sep).decodeToString()
         if (id.isBlank()) return null

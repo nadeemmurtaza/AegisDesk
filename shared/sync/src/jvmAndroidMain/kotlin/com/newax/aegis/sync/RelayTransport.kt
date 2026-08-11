@@ -286,7 +286,7 @@ private object RelayEnvelope {
 
     fun parse(bytes: ByteArray): Envelope? {
         if (bytes.size < 2) return null
-        val nul = bytes.indexOf(NUL, 1)
+        val nul = (1 until bytes.size).firstOrNull { bytes[it] == NUL } ?: -1
         if (nul < 0) return null
         return Envelope(
             type = bytes[0],

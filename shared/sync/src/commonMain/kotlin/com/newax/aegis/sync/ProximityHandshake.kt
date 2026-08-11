@@ -18,7 +18,7 @@ package com.newax.aegis.sync
 object ProximityHandshake {
 
     /** 'K' — never the first byte of a ProximityTransfer sealed blob. */
-    const val KEY_MARKER = 0x4B
+    const val KEY_MARKER: Byte = 0x4B
 
     const val TIMEOUT_MS = 30_000L
 

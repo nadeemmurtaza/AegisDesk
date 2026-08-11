@@ -39,10 +39,10 @@ object Sha256 {
         while (offset < padded.size) {
             for (i in 0 until 16) {
                 val j = offset + i * 4
-                w[i] = ((padded[j].toInt() and 0xFF) shl 24) or
+                w[i] = (((padded[j].toInt() and 0xFF) shl 24) or
                     ((padded[j + 1].toInt() and 0xFF) shl 16) or
                     ((padded[j + 2].toInt() and 0xFF) shl 8) or
-                    (padded[j + 3].toInt() and 0xFF)
+                    (padded[j + 3].toInt() and 0xFF)).toUInt()
             }
             for (i in 16 until 64) {
                 val s0 = rotr(w[i - 15], 7) xor rotr(w[i - 15], 18) xor (w[i - 15] shr 3)
@@ -68,9 +68,10 @@ object Sha256 {
 
         val out = ByteArray(32)
         for (i in 0 until 8) {
-            out[i * 4] = (h[i] ushr 24).toByte()
-            out[i * 4 + 1] = (h[i] ushr 16).toByte()
-            out[i * 4 + 2] = (h[i] ushr 8).toByte()
+            // UInt.shr is already a logical (zero-fill) shift — ushr does not exist on UInt.
+            out[i * 4] = (h[i] shr 24).toByte()
+            out[i * 4 + 1] = (h[i] shr 16).toByte()
+            out[i * 4 + 2] = (h[i] shr 8).toByte()
             out[i * 4 + 3] = h[i].toByte()
         }
         return out

@@ -10,8 +10,8 @@ import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
 import javax.crypto.KeyAgreement
 import javax.crypto.Mac
-import javax.crypto.SecretKeySpec
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * The production crypto implementation — JDK 17 (and Android 12+ conscrypt)
