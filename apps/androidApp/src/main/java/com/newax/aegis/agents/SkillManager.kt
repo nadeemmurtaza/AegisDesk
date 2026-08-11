@@ -117,7 +117,17 @@ object SkillManager {
             "skill.sys.task_control", "Task Control",
             "Abort, suspend, or resume a running agent session from the runtime.",
             "system", "system", sandboxRequired = false, requiresApproval = false,
-            "Stops a running session", emptyList(), scope = "global")
+            "Stops a running session", emptyList(), scope = "global"),
+        SkillSeed(
+            "skill.sys.self_learn", "Self-Learning Ledger",
+            "The RLAIF-E engine: per-skill evolution ledger, Bayesian confidence scoring, and exploit/explore method selection from execution outcomes.",
+            "system", "system", sandboxRequired = false, requiresApproval = false,
+            "Reads/writes the device-local evolution ledger", emptyList(), scope = "global"),
+        SkillSeed(
+            "skill.sys.background_fuzzer", "Background Fuzzer",
+            "The continuous exploration service: when the device is idle, duplicates active skills, proposes alternative approaches, benchmarks observed stats, and stages candidates behind the user approval gate.",
+            "system", "system", sandboxRequired = false, requiresApproval = false,
+            "Stages candidate mutations for user approval — never deploys without the gate", emptyList(), scope = "global")
     )
 
     private val DEFAULT_SETS = listOf(
@@ -201,6 +211,15 @@ object SkillManager {
                         if (dao.skillById(skillId) != null) dao.grantSkill(AgentSkill(agentId = agent.agentId, skillId = skillId))
                     }
                 }
+                // RLAIF-E (schema v19): backfill the per-skill Learning
+                // Specification Interface for skills upgraded from v18 (their
+                // learningSpec column defaults to '{}'). Idempotent — only
+                // blank specs are filled, never a user's customization.
+                dao.allSkills().forEach { skill ->
+                    if (skill.learningSpec.isBlank() || skill.learningSpec == "{}") {
+                        dao.upsertSkill(skill.copy(learningSpec = LearningSpecs.defaultSpec(skill)))
+                    }
+                }
             }
         }
     }
@@ -258,7 +277,7 @@ object SkillManager {
                         description = manifest.description, category = manifest.category,
                         capability = manifest.capability, toolSchema = manifest.toolSchema,
                         sandboxRequired = manifest.sandboxRequired, requiresApproval = manifest.requiresApproval,
-                        risks = manifest.risks,
+                        risks = manifest.risks, learningSpec = manifest.learningSpec,
                         enabled = existing?.enabled ?: true,
                         source = SOURCE_ZIP, installedAtMs = System.currentTimeMillis(),
                         packageDir = dest.absolutePath
@@ -284,7 +303,9 @@ object SkillManager {
         val toolSchema: String,
         val sandboxRequired: Boolean,
         val requiresApproval: Boolean,
-        val risks: String
+        val risks: String,
+        /** The Learning Specification Interface (docs/AGENTS_DESIGN.md §evolution). */
+        val learningSpec: String = "{}"
     )
 
     fun parseSkillManifest(json: String): SkillManifest? = runCatching {
@@ -302,7 +323,8 @@ object SkillManager {
             toolSchema = o.optJSONObject("tool_schema")?.toString() ?: "{}",
             sandboxRequired = o.optBoolean("sandbox_required", false),
             requiresApproval = o.optBoolean("requires_approval", false),
-            risks = o.optString("risks").trim()
+            risks = o.optString("risks").trim(),
+            learningSpec = o.optJSONObject("learning")?.toString() ?: "{}"
         )
     }.getOrNull()
 

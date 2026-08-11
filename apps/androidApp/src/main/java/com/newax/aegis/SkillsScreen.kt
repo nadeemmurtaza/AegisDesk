@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -50,8 +51,10 @@ private val TextTer = Color(0xFF8D8D87)
 private val Border = Color(0xFFD8D8D3)
 private val AccentGreen = Color(0xFF22C55E)
 private val AccentRed = Color(0xFFDC2626)
+private val AccentAmber = Color(0xFFF59E0B)
+private val SurfaceStr = Color(0xFFE7E7E2)
 
-private val SECTIONS = listOf("Skills", "Skill sets", "Permissions", "Approvals")
+private val SECTIONS = listOf("Skills", "Skill sets", "Permissions", "Approvals", "Evolution")
 
 /**
  * The skills management surface (docs/AGENTS_DESIGN.md §skills; R13): the
@@ -84,6 +87,7 @@ fun SkillsScreen(padding: PaddingValues) {
             "Skill sets" -> item { SkillSetsSection() }
             "Permissions" -> item { PermissionsSection() }
             "Approvals" -> item { ApprovalsSection() }
+            "Evolution" -> item { EvolutionSection() }
         }
     }
 }
@@ -319,6 +323,82 @@ private fun PermissionsSection() {
                 }
             }
             Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+/**
+ * The Evolution Ledger view (docs/AGENTS_DESIGN.md §evolution — RLAIF-E):
+ * every skill's method variants with their Bayesian confidence, execution
+ * telemetry, and lineage. Skills are dynamic mutations — this is the scoreboard
+ * the exploit/explore picker reads from.
+ */
+@Composable
+private fun EvolutionSection() {
+    var tick by remember { mutableStateOf(0) }
+    val ledger = remember(tick) { com.newax.aegis.agents.LearningEngine.recentLedger(500) }
+    val bySkill = ledger.groupBy { it.skillId }
+    val skillsByName = remember { SkillManager.skills().associateBy { it.skillId } }
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Evolution ledger — ${bySkill.size} skills learning", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Spacer(Modifier.height(4.dp))
+            Text("Each method's confidence is its observed success rate pulled toward 50% while evidence is thin. Methods only change the live skill after your approval.", fontSize = 12.sp, color = TextSec)
+            Spacer(Modifier.height(6.dp))
+            TextButton(onClick = { tick++ }) { Text("Refresh", fontSize = 12.sp) }
+        }
+    }
+
+    if (bySkill.isEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        Text("No ledger entries yet — they appear as skills are used.", fontSize = 12.sp, color = TextTer)
+        return
+    }
+
+    bySkill.forEach { (skillId, methods) ->
+        Spacer(Modifier.height(8.dp))
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Column(Modifier.padding(12.dp)) {
+                val label = skillsByName[skillId]?.name ?: skillId
+                Text(label, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPri)
+                Text(skillId, fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                Spacer(Modifier.height(6.dp))
+                methods.forEach { m ->
+                    val pct = (m.confidence * 100).toInt()
+                    val total = m.executionCount
+                    val successRate = if (total > 0) (m.successCount * 100.0 / total).toInt() else 0
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("${m.methodId} · ${m.source} · ${m.status}", fontSize = 11.sp, color = TextSec, fontFamily = FontFamily.Monospace)
+                            Spacer(Modifier.height(2.dp))
+                            LinearProgressIndicator(
+                                progress = { m.confidence.toFloat() },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = if (m.status == "ACTIVE") AccentGreen else if (m.status == "REJECTED") AccentRed else AccentAmber,
+                                trackColor = SurfaceStr
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text("$pct% · $successRate% ($total runs)", fontSize = 10.sp, color = TextTer)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+                if (methods.any { it.lastError.isNotBlank() }) {
+                    val err = methods.first { it.lastError.isNotBlank() }.lastError
+                    Text("last error: ${err.take(100)}", fontSize = 10.sp, color = AccentRed, maxLines = 1)
+                }
+            }
         }
     }
 }

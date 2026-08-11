@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.NearMe
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
@@ -68,6 +69,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newax.aegis.ui.devconsole.DevConsoleActivity
 import com.newax.aegis.assistant.ChatMessage
 import com.newax.aegis.assistant.ProposedAction
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -109,6 +111,7 @@ sealed class Screen(val label: String) {
     object AgentMemory : Screen("Agent Memory")
     object Agents : Screen("Agents")
     object Skills : Screen("Skills")
+    object Updates : Screen("Updates")
 }
 
 class MainActivity : FragmentActivity() {
@@ -155,6 +158,20 @@ fun AegisApp(
     var policyScrollTarget by remember { mutableStateOf<String?>(null) }
     val pendingDrafts by vm.pendingDrafts.collectAsStateWithLifecycle()
     val draftCount = pendingDrafts.size
+    // RLAIF-E live notification (docs/AGENTS_DESIGN.md §evolution): poll the
+    // staging registry; the count feeds the Updates nav badge and the banner
+    // that pops up the minute a patch is staged.
+    var pendingUpdateCount by remember { mutableIntStateOf(com.newax.aegis.agents.LearningEngine.pendingCount()) }
+    var updateBannerDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            pendingUpdateCount = com.newax.aegis.agents.LearningEngine.pendingCount()
+            delay(4000)
+        }
+    }
+    LaunchedEffect(pendingUpdateCount) {
+        if (pendingUpdateCount == 0) updateBannerDismissed = false
+    }
 
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -203,7 +220,8 @@ fun AegisApp(
                         NavEntry(Screen.Sync, Icons.Rounded.Sync,                  "Sync"),
                         NavEntry(Screen.AgentMemory, Icons.Outlined.Memory,         "Agent Memory"),
                         NavEntry(Screen.Agents, Icons.Outlined.SmartToy,            "Agents"),
-                        NavEntry(Screen.Skills, Icons.Outlined.Build,               "Skills")
+                        NavEntry(Screen.Skills, Icons.Outlined.Build,               "Skills"),
+                        NavEntry(Screen.Updates, Icons.Outlined.Notifications,      "Updates", pendingUpdateCount)
                     ).forEach { entry ->
                         NavigationDrawerItem(
                             label  = {
@@ -269,6 +287,7 @@ fun AegisApp(
                                         Screen.AgentMemory -> "Agent Memory"
                                         Screen.Agents -> "Agents"
                                         Screen.Skills -> "Skills"
+                                        Screen.Updates -> "Pending System Updates"
                                         Screen.Nearby -> "Nearby Share"
                                         Screen.Sync -> "Sync"
                                         Screen.PolicyHistory -> "Policy History"
@@ -292,7 +311,8 @@ fun AegisApp(
                     )
                 }
             ) { padding ->
-                when (screen) {
+                Box(Modifier.fillMaxSize()) {
+                    when (screen) {
                     Screen.Chat     -> ChatScreen(vm, padding, voiceLauncher)
                     Screen.Memory   -> MemoryScreen(vm, padding)
                     Screen.Drafts   -> DraftsScreen(vm, padding)
@@ -334,6 +354,18 @@ fun AegisApp(
                     Screen.AgentMemory -> AgentMemoryScreen(padding)
                     Screen.Agents -> AgentsScreen(padding, onContinueTask = { vm.submit(it) })
                     Screen.Skills -> SkillsScreen(padding)
+                    Screen.Updates -> UpdatesScreen(padding)
+                    }
+                    if (pendingUpdateCount > 0 && !updateBannerDismissed) {
+                        PendingUpdatesBanner(
+                            count = pendingUpdateCount,
+                            onOpen = { updateBannerDismissed = true; screen = Screen.Updates },
+                            onDismiss = { updateBannerDismissed = true },
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = padding.calculateTopPadding() + 8.dp, start = 16.dp, end = 16.dp)
+                        )
+                    }
                 }
             }
             BiometricOverlay(vm)

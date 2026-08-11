@@ -258,6 +258,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Explicit user corrections — the CRITIC protocol's trigger set
+     * (docs/AGENTS_DESIGN.md §evolution). Conservative on purpose: only
+     * unambiguous corrections of the assistant's output register a Negative
+     * Reward Signal ("that research report is completely wrong…"), never
+     * ordinary requests that merely contain a negated word.
+     */
+    private val correctionMarkers = listOf(
+        "you're wrong", "you are wrong", "that's wrong", "that was wrong",
+        "thats wrong", "wrong answer", "your answer is wrong", "this is wrong",
+        "that is wrong", "that's incorrect", "that is incorrect", "you got it wrong"
+    )
+
     fun submit(text: String, isBackground: Boolean = false) {
         if (text.isBlank()) return
         if (!isBackground) messages += ChatMessage(text.trim(), true)
@@ -449,6 +462,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // the model prompt below; disabled agents never route.
         val agentPlan = com.newax.aegis.agents.AgentOrchestrator.planFor(text)
         runCatching { com.newax.aegis.agents.AgentOrchestrator.assemble(agentPlan) }
+        // RLAIF-E critic protocol (docs/AGENTS_DESIGN.md §evolution): an
+        // explicit correction registers a Negative Reward Signal and stages a
+        // knowledge update behind the gate ("Based on your correction earlier…").
+        if (correctionMarkers.any { lower.contains(it) }) {
+            val target = agentPlan.steps.firstOrNull()?.dominant?.agentId ?: "assistant"
+            runCatching { com.newax.aegis.agents.LearningEngine.ingestUserFeedback(target, "", text, negative = true) }
+        }
         if (!engine.canHandle(text) && !text.contains(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE))) {
             val provider = modelProvider
             if (provider == null || provider.state.value != ModelState.READY) {
@@ -459,6 +479,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // agent of step 1 runs this request through the standard controller
             // — run() → live phases → strict result/error block in the ledger.
             val dominantAgent = agentPlan.steps.firstOrNull()?.dominant
+            // RLAIF-E (docs/AGENTS_DESIGN.md §evolution, skill.sys.self_learn):
+            // pick the method variant this run exploits/explores — the ledger
+            // seeds a baseline per agent pseudo-skill; exploration trades
+            // confidence for variety; the outcome feeds back below.
+            val learnKey = dominantAgent?.let { "agent:${it.agentId}" }
+            val learnStartedAt = System.currentTimeMillis()
+            val learnMethod = learnKey?.let { k ->
+                runCatching { com.newax.aegis.agents.LearningEngine.chooseMethod(k) }.getOrNull()
+            }
             val sessionId = dominantAgent?.let { agent ->
                 val ctx = com.newax.aegis.agents.AgentContext(
                     taskPrompt = text.take(2000),
@@ -473,6 +502,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             modelBusy = true
             viewModelScope.launch {
+                // One outcome per run — the reinforcement step of RLAIF-E.
+                fun recordLearnOutcome(success: Boolean, error: String = "") {
+                    val key = learnKey ?: return
+                    val method = learnMethod ?: return
+                    runCatching {
+                        com.newax.aegis.agents.LearningEngine.recordExecution(
+                            key, method.methodId, success,
+                            System.currentTimeMillis() - learnStartedAt, error
+                        )
+                    }
+                }
                 try {
                     // ── Deterministic retrieval before LLM ────────────────────
                     val plan   = QueryPlanner.plan(text)
@@ -482,6 +522,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (!merged.requiresLlm && merged.topFacts.isNotEmpty()) {
                         sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, merged.summary) }
+                        recordLearnOutcome(success = true)
                         messages += ChatMessage(merged.summary, false)
                         modelBusy = false
                         return@launch
@@ -508,6 +549,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val prompt = buildString {
                             val agentContext = com.newax.aegis.agents.AgentOrchestrator.contextFor(agentPlan)
                             if (agentContext.isNotBlank()) append("$agentContext\n")
+                            // RLAIF-E: the selected method variant's guidance rides
+                            // into the prompt — exploitation runs the best-known
+                            // configuration, exploration tests a variation, and
+                            // the outcome updates that method's confidence.
+                            learnMethod?.payloadJson?.takeIf { it.isNotBlank() && it != "{}" }?.let { payload ->
+                                val guidance = runCatching { org.json.JSONObject(payload).optString("method_guidance") }.getOrDefault("")
+                                if (guidance.isNotBlank()) {
+                                    append("[Execution method ${learnMethod.methodId} — self-learned variant]: $guidance\n")
+                                }
+                            }
                             // Function-calling readiness (docs/AGENTS_DESIGN.md §runtime):
                             // the active agent's permitted tool schemas ride in the
                             // prompt so the model can invoke them with exact parameters;
@@ -570,9 +621,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         messages += ChatMessage(if (explanation.isNotBlank()) explanation else commandReply.text, false)
                         commandReply.proposedAction?.let { processAction(it) }
                         sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, explanation.ifBlank { commandReply.text }) }
+                        recordLearnOutcome(success = true)
                     } else {
                         messages += ChatMessage(replyText, false)
                         sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, replyText) }
+                        recordLearnOutcome(success = true)
                     }
                     if (isBackground && text.contains("[Live Call]")) {
                         tts?.speak(replyText, TextToSpeech.QUEUE_FLUSH, null, null)
@@ -585,6 +638,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             error.message ?: error.javaClass.simpleName
                         )
                     }
+                    recordLearnOutcome(success = false, error = error.message ?: error.javaClass.simpleName)
                     messages += ChatMessage("Offline model error: ${error.message ?: error.javaClass.simpleName}", false)
                 } finally { modelBusy = false }
             }
@@ -666,6 +720,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val ok = withContext(Dispatchers.IO) { runAction(action) }
             if (ghostModeActive) getApplication<Application>().stopService(ghostIntent)
             messages += ChatMessage(if (ok) "Action completed." else "Action failed. Check the active app and Accessibility access.", false)
+            // RLAIF-E feedback: the user's approve/deny of an executed action is
+            // a reward signal for the assistant (no memory rule staged).
+            runCatching {
+                com.newax.aegis.agents.LearningEngine.ingestUserFeedback(
+                    "assistant", "",
+                    if (ok) "Approved action completed successfully" else "Approved action failed to execute",
+                    negative = !ok, stageMemoryRule = false
+                )
+            }
             pendingAction = if (ok) queuedActions.removeFirstOrNull() else null
             if (!ok) queuedActions.clear()
             biometricAuthRequested = false
@@ -1125,6 +1188,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun reject() {
         pendingAction = null
         queuedActions.clear()
+        // RLAIF-E: a rejected action plan is a negative reward signal.
+        runCatching {
+            com.newax.aegis.agents.LearningEngine.ingestUserFeedback(
+                "assistant", "", "User rejected the proposed action plan", negative = true, stageMemoryRule = false
+            )
+        }
         messages += ChatMessage("Action plan cancelled.", false)
     }
 

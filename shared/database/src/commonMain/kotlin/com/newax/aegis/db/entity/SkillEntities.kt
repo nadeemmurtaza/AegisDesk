@@ -55,6 +55,18 @@ data class SkillEntity(
      */
     @ColumnInfo(defaultValue = "'agent'")
     val scope: String = "agent",
+    /**
+     * The per-skill Learning Specification Interface (docs/AGENTS_DESIGN.md
+     * §evolution — RLAIF-E). JSON: { protocol, mistake_definition,
+     * test_strategy, exploration_hint }. Each skill declares HOW it wants to
+     * learn (DETERMINISTIC / CRITIC / CROSS_AGENT), what counts as a mistake,
+     * and how it runs tests before sending a mutation to the user gate — the
+     * kernel never forces one loop onto every tool. Backfilled with a
+     * category-derived default at seed time; parsed from the `learning`
+     * object of an imported skill.json manifest.
+     */
+    @ColumnInfo(defaultValue = "'{}'")
+    val learningSpec: String = "{}",
     @ColumnInfo(defaultValue = "1")
     val enabled: Boolean = true,
     /** "builtin" or "zip:<packageName>". */

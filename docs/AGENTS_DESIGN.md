@@ -1,4 +1,4 @@
-# Multi-Agent Management System (schema v18)
+# Multi-Agent Management System (schema v19)
 
 The agent registry + routing + orchestration layer that makes the assistant a
 swarm: import agent packages, enable/disable/upgrade/uninstall them, and have
@@ -228,3 +228,97 @@ binds the same schemas. One source of truth for tools.
   live routing preview, and the runtime panel — live sessions with
   Abort/Freeze, the health ledger with Check/Restore, Thaw + Continue for
   frozen state, and the MCP stream feed.
+
+## Self-learning — the RLAIF-E engine (schema v19)
+
+Skills are not static files: they are **dynamic mutations**, tracked over time
+and scored like a genetic algorithm. The engine is **Reinforcement Learning
+from AI Feedback & Execution** — every execution (or user correction, or
+agent-to-agent misalignment) feeds a signed reward into the ledger, and the
+runtime picks the best-known method or explores a variation. Nothing learned
+**ever** touches the live environment without a human-in-the-loop gate.
+
+### The Evolution Ledger — `skill_evolution`
+
+One row per **method variant** of a skill (baseline + every explored/fuzzed
+alternative), with execution telemetry (counts, latency) and a **Bayesian
+confidence score** (posterior mean with a Beta(1,1) prior: observed success
+rate pulled toward 0.5 while evidence is thin). Lineage is tracked through
+`parentMethodId` — the mutation tree. `agent:<id>` pseudo-skills get ledgers
+too, so orchestration runs learn which role configuration works for the user.
+
+### Exploitation vs Exploration (the reinforcement loop)
+
+`LearningEngine.chooseMethod(skillId)` (skill.sys.self_learn) picks the next
+method: with probability (1 − exploration rate, default 20%) it **exploits**
+the UCB score (`confidence + c·√(ln N/n)` — an under-sampled method is never
+starved); otherwise it **explores** a variation. The chosen method's guidance
+rides into the model prompt; on completion, `recordExecution` folds the
+outcome back (counters, latency, confidence) and emits a signed signal. That
+closed loop IS the RLAIF.
+
+### The human-in-the-loop staging gatekeeper
+
+`stageMutation` writes the candidate payload to the isolated
+`filesDir/staging/` and logs a `PENDING_USER_APPROVAL` row in
+`staging_records`. The UI gate is the **Pending System Updates** tab (nav
+badge + live pop-up banner the minute a patch is staged):
+
+- cards grouped by **urgency/risk** (CRITICAL bug fixes on top, LOW
+  stylistic proposals at the bottom),
+- a plain-English explanation card (what it does, why the agent built it,
+  which protocol produced it),
+- a color-coded **diff screen** (before red / after green) per mutation,
+- **Approve** → `deploy` (files into the active skills dir zip-slip-safe;
+  MEMORY_RULEs promote straight into the ACTIVE shared library; NEW_SKILLs
+  install a full package) — the ledger row goes ACTIVE and its parent is
+  superseded,
+- **Deny** → staging file dropped, ledger row REJECTED (a failed route that
+  is never picked again), and the denial is journaled into episodic memory
+  with the lesson — "agent memory notified".
+
+### Three per-skill learning protocols
+
+Every skill carries its own **Learning Specification Interface**
+(`skills.learningSpec`, parsed from the `learning` object of a skill.json
+manifest: protocol, mistake definition, test strategy, exploration hint).
+The kernel never forces one loop onto every tool:
+
+1. **DETERMINISTIC** (code/automation) — hard execution data. `recordExecution`
+   failures cross a threshold → a fix candidate is staged. The host sandbox
+   that runs actual patches is the desktop executor's job (Track M); on this
+   engine the candidate is a tracked method variant with recovery guidance.
+2. **CRITIC** (content/research/analysis) — semantic learning from human
+   corrections. `ingestUserFeedback` registers a Negative Reward Signal on an
+   explicit correction ("that report is completely wrong…") and stages a
+   knowledge rule: "Based on your correction earlier… Click Approve to lock in
+   this memory update."
+3. **CROSS_AGENT** (swarm skills) — handoff misalignments
+   (`recordHandoffFailure`): after N rejections between a pair, a shared
+   workflow contract is staged for approval.
+
+### The Continuous Fuzzing Engine — `skill.sys.background_fuzzer`
+
+A periodic idle-time worker (device idle + charging): for each skill with
+enough execution data and no candidate already pending, it proposes an
+alternative approach, records the **observed** benchmark (real success
+rate / latency of the current best — never fabricated), and stages the
+candidate. It never deploys and never claims a candidate is faster; the
+candidate's own tracked execution history proves or refutes it after the user
+approves.
+
+### Wiring
+
+- `LearningEngine.init` runs at app start (after SkillManager) — seeds
+  baseline ledger rows; `EvolutionWorker` schedules the fuzzer.
+- `MainViewModel.submit` picks the method variant per run, injects its
+  guidance into the prompt, and records the outcome on complete/fail; an
+  explicit user correction triggers the CRITIC protocol; approve/reject of
+  an action plan emit reward signals.
+- Updates screen: pending queue grouped by risk with diff cards + the gate,
+  evolution controls (exploration rate, fuzzer, run-now), recent decisions,
+  and the reward-signal feed. Skills screen: per-skill Evolution tab
+  (confidence bars, telemetry, lineage).
+- Schema v19 tables (`skill_evolution`, `staging_records`,
+  `learning_signals`) are device-local like agents/skills — no sync columns;
+  the mesh carries the episodes and library entries the learnings produce.

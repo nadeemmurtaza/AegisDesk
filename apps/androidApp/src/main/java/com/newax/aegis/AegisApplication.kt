@@ -83,6 +83,11 @@ class AegisApplication : Application() {
         // surface (run/abort/status/health_check), the run ledger + health
         // audit, and the State Archiver for freeze/thaw.
         com.newax.aegis.agents.AgentRuntimeEngine.init(this)
+        // RLAIF-E self-learning (docs/AGENTS_DESIGN.md §evolution): the
+        // evolution ledger (baseline methods seeded for every skill + agent
+        // pseudo-skill), the HITL staging gatekeeper, and the critic/
+        // cross-agent protocols. The idle-time fuzzer is scheduled below.
+        com.newax.aegis.agents.LearningEngine.init(this)
         // Goals survive restarts (Track A5): every planner mutation persists a JSON
         // snapshot to the existing kv_store table (no schema change), and restore
         // rehydrates the planner before any screen or executor reads it.
@@ -128,6 +133,10 @@ class AegisApplication : Application() {
         scheduleNightlyWork()
         IntelligenceWorker.schedule(this)
         scheduleSyncWork()
+        // RLAIF-E continuous fuzzing (skill.sys.background_fuzzer): propose
+        // alternative methods when the device is idle + charging; everything
+        // pauses at the Updates screen's user gate before deploying.
+        com.newax.aegis.engine.learning.EvolutionWorker.schedule(this)
         // Item 7 — continuous listening: the foreground service keeps the sync
         // transport up between worker windows so a paired peer can reach this
         // device at any moment (auto-sync default on; the Sync screen toggles

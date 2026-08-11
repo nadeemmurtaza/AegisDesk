@@ -54,9 +54,12 @@ import androidx.sqlite.execSQL
         SkillSetMember::class,
         SkillApproval::class,
         AgentSessionEntity::class,
-        AgentHealthEntity::class
+        AgentHealthEntity::class,
+        SkillEvolution::class,
+        StagingRecord::class,
+        LearningSignal::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = true
 )
 @ConstructedBy(AegisDatabaseConstructor::class)
@@ -81,6 +84,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun agentRegistryDao(): AgentRegistryDao
     abstract fun skillManagerDao(): SkillManagerDao
     abstract fun agentRuntimeDao(): AgentRuntimeDao
+    abstract fun evolutionDao(): EvolutionDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -502,6 +506,90 @@ abstract class AegisDatabase : RoomDatabase() {
                     )
                 """)
                 connection.execSQL("ALTER TABLE skills ADD COLUMN scope TEXT NOT NULL DEFAULT 'agent'")
+            }
+        }
+
+        /**
+         * v19 — the RLAIF-E self-learning layer (docs/AGENTS_DESIGN.md
+         * §evolution): `skill_evolution` (the Evolution Ledger — one row per
+         * method variant with execution telemetry + Bayesian confidence),
+         * `staging_records` (the Staging Registry Database behind the HITL
+         * gate), `learning_signals` (the signed-reward pipeline), and the
+         * per-skill Learning Specification Interface on `skills.learningSpec`.
+         * Device-local like agents/skills/sessions — no sync columns.
+         */
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS skill_evolution (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        skillId TEXT NOT NULL,
+                        methodId TEXT NOT NULL,
+                        parentMethodId TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        protocol TEXT NOT NULL,
+                        version INTEGER NOT NULL,
+                        codePath TEXT NOT NULL,
+                        payloadJson TEXT NOT NULL,
+                        executionCount INTEGER NOT NULL,
+                        successCount INTEGER NOT NULL,
+                        failureCount INTEGER NOT NULL,
+                        totalLatencyMs INTEGER NOT NULL,
+                        avgLatencyMs INTEGER NOT NULL,
+                        confidence REAL NOT NULL,
+                        status TEXT NOT NULL,
+                        lastOutcome TEXT NOT NULL,
+                        lastError TEXT NOT NULL,
+                        createdAtMs INTEGER NOT NULL DEFAULT 0,
+                        updatedAtMs INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_skill_evolution_skillId ON skill_evolution(skillId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_skill_evolution_skillId_methodId ON skill_evolution(skillId, methodId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_skill_evolution_status ON skill_evolution(status)")
+
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS staging_records (
+                        stagingId TEXT NOT NULL,
+                        skillId TEXT NOT NULL,
+                        agentId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        changeType TEXT NOT NULL,
+                        protocol TEXT NOT NULL,
+                        riskLevel TEXT NOT NULL,
+                        diffBefore TEXT NOT NULL,
+                        diffAfter TEXT NOT NULL,
+                        payloadJson TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        createdAtMs INTEGER NOT NULL DEFAULT 0,
+                        decidedAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (stagingId)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_staging_records_skillId ON staging_records(skillId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_staging_records_status ON staging_records(status)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_staging_records_riskLevel ON staging_records(riskLevel)")
+
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS learning_signals (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        skillId TEXT NOT NULL,
+                        agentId TEXT NOT NULL,
+                        protocol TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        reward REAL NOT NULL,
+                        summary TEXT NOT NULL,
+                        contextJson TEXT NOT NULL,
+                        consumed INTEGER NOT NULL,
+                        createdAtMs INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_learning_signals_skillId ON learning_signals(skillId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_learning_signals_source ON learning_signals(source)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_learning_signals_consumed ON learning_signals(consumed)")
+
+                connection.execSQL("ALTER TABLE skills ADD COLUMN learningSpec TEXT NOT NULL DEFAULT '{}'")
             }
         }
 
