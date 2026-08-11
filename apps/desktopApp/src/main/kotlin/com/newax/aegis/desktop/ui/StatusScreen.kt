@@ -105,6 +105,33 @@ fun StatusScreen(state: StatusScreenState) {
         // ── Model provider card ─────────────────────────────────────────────
         item { ModelProviderCard(modelState, descriptor) }
 
+        // ── Automatic sync card ─────────────────────────────────────────────
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                border = BorderStroke(1.dp, BorderColor),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StateDot(if (state.syncedMemoryCategories > 0) ReadyColor else TextTertiaryColor)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Automatic sync", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPrimaryColor)
+                            Text("LAN transport · Room-backed journal", fontSize = 11.sp, color = TextTertiaryColor, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(state.syncStatus, fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp)
+                    if (state.syncedMemoryCategories > 0) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("${state.syncedMemoryCategories} memory ${if (state.syncedMemoryCategories == 1) "category" else "categories"} synced from paired devices", fontSize = 12.sp, color = TextSecondaryColor)
+                    }
+                }
+            }
+        }
+
         // ── States ─────────────────────────────────────────────────────────
         when {
             rows == null -> item {

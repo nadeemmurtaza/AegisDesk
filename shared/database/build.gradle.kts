@@ -20,6 +20,11 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":shared:core"))
+            // The sync engine's types (SyncEntry, Hlc, JournalStore) — the
+            // RoomJournalStore wiring slice maps them onto the DAOs. sync does
+            // NOT depend on database (Track I can't use Room), so this is the
+            // one-directional edge the design doc's "wiring slice" describes.
+            implementation(project(":shared:sync"))
             api("androidx.room:room-runtime:2.7.0-alpha13")
             api("androidx.sqlite:sqlite-bundled:2.5.0-alpha13")
             // required for coroutines Flow, etc in KMP

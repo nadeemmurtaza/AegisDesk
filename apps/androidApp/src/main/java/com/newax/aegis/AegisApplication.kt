@@ -7,6 +7,7 @@ import android.content.res.Configuration
 import kotlinx.coroutines.runBlocking
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.newax.aegis.db.AegisDatabase
@@ -56,6 +57,8 @@ class AegisApplication : Application() {
         // TEE-wrapped identity store) read their Context from here — must be
         // set before any sync API is touched.
         AndroidSyncContext.init(this)
+        // Sync identity + memory target (the auto-sync loop, SyncWorker).
+        SyncRuntime.init(this)
         // Initialize encrypted DB before any workers or viewmodels access it
         val memory = EncryptedMemory(this)
         SecureKeyVault.init(this)
@@ -112,6 +115,25 @@ class AegisApplication : Application() {
         }
         scheduleNightlyWork()
         IntelligenceWorker.schedule(this)
+        scheduleSyncWork()
+    }
+
+    /**
+     * The automatic sync loop (docs/SYNC_DESIGN.md §4.2): periodic, network-
+     * constrained, 15-min cadence. No-op until a peer is paired; pairing is
+     * explicit in the Sync screen.
+     */
+    private fun scheduleSyncWork() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "aegis-sync",
+            ExistingPeriodicWorkPolicy.KEEP,
+            PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+                .setConstraints(constraints)
+                .build()
+        )
     }
 
     private fun scheduleNightlyWork() {

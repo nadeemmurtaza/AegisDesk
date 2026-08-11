@@ -55,6 +55,9 @@ class JvmLanTransport(
     private var mdns: JmDNS? = null
     @Volatile
     private var listener: TransportListener? = null
+    /** Held for the lifetime of mDNS on Android (no-op handle on desktop). */
+    @Volatile
+    private var multicastLock: MulticastLockHandle? = null
 
     /** Non-null when mDNS could not start — discovery is off, direct connect still works. */
     @Volatile
@@ -89,6 +92,8 @@ class JvmLanTransport(
             mdns?.close()
         } catch (_: Exception) {
         }
+        multicastLock?.release()
+        multicastLock = null
         activeConnections.forEach { it.close() }
         activeConnections.clear()
         discovered.clear()
@@ -145,6 +150,7 @@ class JvmLanTransport(
     // ── mDNS ──────────────────────────────────────────────────────────────────
 
     private fun startMdns() {
+        multicastLock = acquireMulticastLock()
         try {
             val mdns = JmDNS.create()
             this.mdns = mdns

@@ -31,6 +31,7 @@ class EncryptedMemory(context: Context) {
             if (facts.none { it.equals(fact, true) }) {
                 facts += fact.trim()
                 prefs.edit().putStringSet(key, facts.toSet()).apply()
+                captureProfile(category)
             }
         }
     }
@@ -42,7 +43,10 @@ class EncryptedMemory(context: Context) {
             val key = "$CATEGORY_PREFIX${category.lowercase()}"
             val facts = getCategory(category).toMutableList()
             val removed = facts.removeAll { it.equals(fact.trim(), ignoreCase = true) }
-            if (removed) prefs.edit().putStringSet(key, facts.toSet()).apply()
+            if (removed) {
+                prefs.edit().putStringSet(key, facts.toSet()).apply()
+                captureProfile(category)
+            }
         }
     }
 
@@ -51,6 +55,7 @@ class EncryptedMemory(context: Context) {
 
     fun setCategory(category: String, facts: List<String>) = synchronized(lock) {
         prefs.edit().putStringSet("$CATEGORY_PREFIX${category.lowercase()}", facts.toSet()).apply()
+        captureProfile(category)
     }
 
     /** Returns all categories that have at least one fact, including dynamically created ones. */
@@ -63,9 +68,13 @@ class EncryptedMemory(context: Context) {
     }
 
     fun forgetAll() = synchronized(lock) {
+        // Journal the pre-clear categories as empty so remote devices converge
+        // on the cleared state (LWW by hlc — the clear is the newest write).
+        val cleared = getAllCategories().keys
         val editor = prefs.edit()
         prefs.all.keys.filter { it.startsWith(CATEGORY_PREFIX) }.forEach { editor.remove(it) }
         editor.apply()
+        cleared.forEach { captureProfile(it) }
     }
 
     /**
@@ -92,6 +101,27 @@ class EncryptedMemory(context: Context) {
         strings.filterKeys { !SYSTEM_KEYS.contains(it) }.forEach { (k, v) -> editor.putString(k, v) }
         stringSets.filterKeys { !SYSTEM_KEYS.contains(it) }.forEach { (k, v) -> editor.putStringSet(k, v) }
         editor.apply()
+    }
+
+    /**
+     * Apply a state received from a paired device (sync materialization)
+     * WITHOUT journaling it — the journal already carries this state; a
+     * re-capture would bounce the entry back and forth (newer HLC each hop).
+     */
+    fun applyRemoteCategory(category: String, facts: List<String>) = synchronized(lock) {
+        prefs.edit().putStringSet("$CATEGORY_PREFIX${category.lowercase()}", facts.toSet()).apply()
+    }
+
+    /**
+     * Journal the current state of one category for cross-device sync
+     * (best-effort — sync must never break the memory write).
+     */
+    private fun captureProfile(category: String) {
+        try {
+            com.newax.aegis.SyncRuntime.captureMemoryProfile(category, getCategory(category))
+        } catch (_: Exception) {
+            // Sync not initialized / DB not ready — memory still saved locally.
+        }
     }
 
     fun storeRaw(key: String, value: String) = synchronized(lock) {

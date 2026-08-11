@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -100,6 +101,7 @@ sealed class Screen(val label: String) {
     object Capabilities : Screen("Capabilities")
     object Goals : Screen("Goals")
     object Nearby : Screen("Nearby")
+    object Sync : Screen("Sync")
     object PolicyHistory : Screen("Policy History")
 }
 
@@ -191,7 +193,8 @@ fun AegisApp(
                         NavEntry(Screen.Settings, Icons.Outlined.Settings,          "Settings"),
                         NavEntry(Screen.Goals, Icons.Rounded.CheckCircle,            "Goals"),
                         NavEntry(Screen.Capabilities, Icons.Rounded.Shield,         "Capabilities"),
-                        NavEntry(Screen.Nearby, Icons.Outlined.NearMe,              "Nearby")
+                        NavEntry(Screen.Nearby, Icons.Outlined.NearMe,              "Nearby"),
+                        NavEntry(Screen.Sync, Icons.Rounded.Sync,                  "Sync")
                     ).forEach { entry ->
                         NavigationDrawerItem(
                             label  = {
@@ -255,6 +258,7 @@ fun AegisApp(
                                         Screen.Capabilities -> "Capabilities"
                                         Screen.Goals -> "Goals"
                                         Screen.Nearby -> "Nearby Share"
+                                        Screen.Sync -> "Sync"
                                         Screen.PolicyHistory -> "Policy History"
                                     },
                                     fontWeight = FontWeight.SemiBold,
@@ -306,8 +310,9 @@ fun AegisApp(
                             screen = Screen.Capabilities
                         }
                     )
-                    Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions })
+                    Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions }, onNavigateToSync = { screen = Screen.Sync })
                     Screen.Nearby -> NearbyShareScreen(padding)
+                    Screen.Sync -> SyncScreen(padding)
                 }
             }
             BiometricOverlay(vm)
@@ -910,7 +915,8 @@ fun SettingsScreen(
     onNotifications: () -> Unit,
     onNavigateToBackup: () -> Unit = {},
     onNavigateToPeople: () -> Unit = {},
-    onNavigateToAppPermissions: () -> Unit = {}
+    onNavigateToAppPermissions: () -> Unit = {},
+    onNavigateToSync: () -> Unit = {}
 ) {
     LazyColumn(
         Modifier
@@ -1035,6 +1041,39 @@ fun SettingsScreen(
                         Text("People", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPri)
                         Spacer(Modifier.height(2.dp))
                         Text("Browse tracked contacts and their learned facts", fontSize = 12.sp, color = TextSec)
+                    }
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = TextTer, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+
+        item { Spacer(Modifier.height(4.dp)) }
+        item { SectionLabel("Device Sync") }
+        item {
+            Card(
+                shape  = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onNavigateToSync)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFFDCFCE7)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Sync, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Device Sync", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                        Spacer(Modifier.height(2.dp))
+                        Text("Automatic encrypted sync across your devices", fontSize = 12.sp, color = TextSec)
                     }
                     Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = TextTer, modifier = Modifier.size(18.dp))
                 }

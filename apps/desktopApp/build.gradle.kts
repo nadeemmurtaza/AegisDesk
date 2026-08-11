@@ -30,6 +30,11 @@ dependencies {
     // channel, the encrypted Quick Share protocol — P2 desktop listener).
     implementation(project(":shared:sync"))
 
+    // The Room-backed journal store for automatic sync (RoomJournalStore) —
+    // the desktop DB lives at ~/.aegis/sync.db (bundled sqlite, no SQLCipher
+    // on the JVM yet).
+    implementation(project(":shared:database"))
+
     // Coroutines for the interactive prompt loop (runBlocking) and the UI state
     // holders (the window's app scope).
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")

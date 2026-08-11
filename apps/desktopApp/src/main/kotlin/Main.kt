@@ -85,6 +85,9 @@ fun main(args: Array<String>) {
  */
 private fun windowMain() {
     DesktopCapabilitiesHolder.init()
+    // Automatic encrypted sync with paired devices (docs/SYNC_DESIGN.md §4.2):
+    // the Room-backed journal + LAN transport run behind the window.
+    SyncAutoRunner.start()
     val goalsStore = FileGoalsStore()
     restorePersistedState(goalsStore)
     val appIndex = WindowsAppIndex()
@@ -151,6 +154,7 @@ private suspend fun cliMain(args: Array<String>) {
 
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
     DesktopCapabilitiesHolder.init()
+    SyncAutoRunner.start()
     val goalsStore = FileGoalsStore()
     restorePersistedState(goalsStore)
     val appIndex = WindowsAppIndex()
@@ -246,6 +250,10 @@ private suspend fun cliMain(args: Array<String>) {
                 printAudit(if (prompt.length > 5) prompt.substring(5) else "")
                 continue
             }
+            if (prompt.equals("sync", ignoreCase = true)) {
+                printSyncStatus()
+                continue
+            }
             if (prompt.startsWith("run ", ignoreCase = true)) {
                 printRunGoal(prompt.substring(4).trim(), appIndex)
                 goalsStore.save(DesktopGoalPlanner.snapshot())
@@ -309,6 +317,24 @@ private fun printStatusBlock() {
     println("  ── Model ───────────────────────────────────────────────")
     println("    ${model.descriptor.modelName}  [${model.descriptor.format}]")
     println("    state: ${model.state.value}  ·  sha256: ${model.descriptor.sha256.take(16)}…")
+    println()
+}
+
+/**
+ * The automatic-sync status — the CLI twin of the window's Status card
+ * (docs/SYNC_DESIGN.md §4.2): device identity, paired peers, the live loop
+ * status, journal size, and the memory profile categories received from
+ * paired devices (materialized to ~/.aegis/memory.json).
+ */
+private fun printSyncStatus() {
+    println()
+    println("  ── Sync ────────────────────────────────────────────────")
+    println("    device : ${SyncAutoRunner.displayName()} (${SyncAutoRunner.deviceId()})")
+    println("    peers  : ${SyncAutoRunner.peers()}")
+    println("    status : ${SyncAutoRunner.status()}")
+    val categories = SyncAutoRunner.memoryCategories()
+    println("    memory : ${categories.size} ${if (categories.size == 1) "category" else "categories"} synced")
+    categories.take(5).forEach { println("        · $it") }
     println()
 }
 

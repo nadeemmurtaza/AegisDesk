@@ -16,3 +16,6 @@ actual fun platformKeyStore(): KeyStore {
     val home = System.getProperty("user.home") ?: "."
     return FileKeyStore(File(home, ".aegis/keys"))
 }
+
+/** Desktop mDNS needs no multicast lock — plain sockets work out of the box. */
+actual fun acquireMulticastLock(): MulticastLockHandle? = null
