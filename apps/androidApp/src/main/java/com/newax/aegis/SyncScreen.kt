@@ -79,6 +79,8 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
     var addressInput by remember { mutableStateOf("") }
     var verifiedSas by remember { mutableStateOf<String?>(null) }
     var pairMessage by remember { mutableStateOf<String?>(null) }
+    var relayInput by remember { mutableStateOf(SyncRuntime.relayUrl()) }
+    var relayMessage by remember { mutableStateOf<String?>(null) }
 
     val pairingCode = remember { SyncRuntime.pairingCode() }
 
@@ -133,6 +135,54 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(statusText, fontSize = 13.sp, color = TextSec, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+
+        // ── Internet relay (WAN) ────────────────────────────────────────
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Internet relay (optional)", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "Lets paired devices sync over the internet when they aren't on the same network.",
+                        fontSize = 13.sp, color = TextSec
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = relayInput,
+                        onValueChange = {
+                            relayInput = it
+                            relayMessage = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Relay URL (ws://host:port or wss://…)", color = TextTer, fontSize = 12.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Primary,
+                            unfocusedBorderColor = Border
+                        ),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = TextPri, fontFamily = FontFamily.Monospace),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            SyncRuntime.setRelayUrl(relayInput)
+                            relayMessage = if (relayInput.isBlank()) "Relay disabled — LAN only" else "Relay URL saved"
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) { Text("Save relay URL", fontSize = 13.sp) }
+                    relayMessage?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, fontSize = 13.sp, color = TextSec)
                     }
                 }
             }

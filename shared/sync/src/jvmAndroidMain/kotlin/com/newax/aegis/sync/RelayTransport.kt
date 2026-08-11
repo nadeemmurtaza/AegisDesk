@@ -1,12 +1,6 @@
 package com.newax.aegis.sync
 
 import java.io.ByteArrayOutputStream
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.WebSocket
-import java.nio.ByteBuffer
-import java.time.Duration
-import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.LinkedBlockingQueue
@@ -42,8 +36,6 @@ class RelayTransport(
         const val DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000L
     }
 
-    private val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
-
     /** Peer → its inbound frame channel (established sessions and in-flight accepts). */
     private val channels = ConcurrentHashMap<String, RelayFrameChannel>()
     private val active = ConcurrentHashMap<String, SealedConnection>()
@@ -53,7 +45,7 @@ class RelayTransport(
     private val initiating = ConcurrentHashMap.newKeySet<String>()
 
     @Volatile
-    private var ws: WebSocket? = null
+    private var ws: WsConnection? = null
     @Volatile
     private var listener: TransportListener? = null
 
@@ -62,14 +54,10 @@ class RelayTransport(
         if (!relayUrl.startsWith("ws://") && !relayUrl.startsWith("wss://")) {
             throw IllegalArgumentException("relayUrl must be ws:// or wss://, got: $relayUrl")
         }
-        val socket = try {
-            client.newWebSocketBuilder()
-                .buildAsync(URI.create(relayUrl), WsListener())
-                .get(10, TimeUnit.SECONDS)
-        } catch (e: Exception) {
-            throw IllegalStateException("relay unreachable: $relayUrl (${e.message})", e)
-        }
-        ws = socket
+        // WebSocket stack is platform-specific (java.net.http on JVM, OkHttp on
+        // Android) — behind the [WsClient] seam so this file compiles for both.
+        ws = platformWsClient().connect(relayUrl, RelayWsListener())
+            ?: throw IllegalStateException("relay unreachable: $relayUrl")
         // Register this device, then grant every paired peer the right to send to us.
         sendControl(RelayEnvelope.TYPE_REG, identity.identity.deviceId, ByteArray(0))
         keyStore.pairedPeers().forEach { peer ->
@@ -80,7 +68,7 @@ class RelayTransport(
     override fun stop() {
         closeRelay()
         try {
-            ws?.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown")
+            ws?.close()
         } catch (_: Exception) {
         }
         ws = null
@@ -207,44 +195,34 @@ class RelayTransport(
 
     private fun sendControl(type: Byte, deviceId: String, payload: ByteArray): Boolean {
         val socket = ws ?: return false
-        return try {
-            val envelope = RelayEnvelope.build(type, deviceId, payload)
-            synchronized(socket) {
-                socket.sendBinary(ByteBuffer.wrap(envelope), true).get(10, TimeUnit.SECONDS)
-            }
-            true
-        } catch (_: Exception) {
-            false
-        }
+        return socket.sendBinary(RelayEnvelope.build(type, deviceId, payload))
     }
 
-    private inner class WsListener : WebSocket.Listener {
+    /**
+     * Assembles possibly-fragmented binary messages (java.net.http delivers
+     * fragments with FIN; OkHttp delivers whole messages) and feeds each
+     * complete relay envelope into the demux.
+     */
+    private inner class RelayWsListener : WsListener {
         private val fragment = ByteArrayOutputStream()
 
-        override fun onOpen(webSocket: WebSocket) {
-            webSocket.request(1)
-        }
+        override fun onOpen() = Unit
 
-        override fun onBinary(webSocket: WebSocket, data: ByteBuffer, last: Boolean): CompletionStage<*>? {
-            val bytes = ByteArray(data.remaining())
-            data.get(bytes)
+        override fun onBinary(bytes: ByteArray, last: Boolean) {
             fragment.write(bytes)
             if (last) {
                 val message = fragment.toByteArray()
                 fragment.reset()
                 handleMessage(message)
             }
-            webSocket.request(1)
-            return null
         }
 
-        override fun onError(webSocket: WebSocket, error: Throwable) {
+        override fun onError(error: Throwable) {
             closeRelay()
         }
 
-        override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
+        override fun onClose() {
             closeRelay()
-            return null
         }
     }
 }

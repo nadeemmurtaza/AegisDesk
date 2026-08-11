@@ -8,6 +8,7 @@ import com.newax.aegis.db.sync.RoomJournalStore
 import com.newax.aegis.sync.AntiEntropyRunner
 import com.newax.aegis.sync.JvmLanTransport
 import com.newax.aegis.sync.PeerEndpoint
+import com.newax.aegis.sync.RelayTransport
 import com.newax.aegis.sync.TransportConnection
 import com.newax.aegis.sync.TransportListener
 import kotlinx.coroutines.Dispatchers
@@ -47,30 +48,68 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                         }
                     }
                 })
+                var lanPeers = 0
+                var relayPeers = 0
+                var entriesApplied = 0
                 try {
                     // mDNS needs a few seconds to resolve; inbound rounds run meanwhile.
                     delay(DISCOVERY_WAIT_MS)
                     val targets = (transport.discoveredPeers() + SyncRuntime.manualEndpoints())
                         .distinctBy { it.deviceId }
-                    var peersSynced = 0
-                    var entriesApplied = 0
                     for (endpoint in targets) {
                         val connection = transport.connect(endpoint) ?: continue
                         try {
                             entriesApplied += syncRound(store, connection)
-                            peersSynced++
+                            lanPeers++
                         } finally {
                             connection.close()
                         }
                     }
-                    SyncRuntime.recordStatus(
-                        if (peersSynced == 0) "Scan complete — no peers found"
-                        else "Synced $peersSynced peer(s) · $entriesApplied new " +
-                            (if (entriesApplied == 1) "entry" else "entries")
-                    )
                 } finally {
                     transport.stop()
                 }
+                // ── relay phase (WAN, docs/SYNC_DESIGN.md §10) — only when a
+                // relay URL is configured; LAN failures never block it.
+                val relayUrl = SyncRuntime.relayUrl()
+                if (relayUrl.isNotBlank()) {
+                    try {
+                        val relay = RelayTransport(identity, SyncRuntime.keyStore(), SyncRuntime.crypto(), relayUrl)
+                        relay.start(object : TransportListener {
+                            override fun onPeerDiscovered(endpoint: PeerEndpoint) = Unit
+                            override fun onPeerConnected(connection: TransportConnection) {
+                                runCatching {
+                                    entriesApplied += syncRound(store, connection)
+                                    connection.close()
+                                }
+                            }
+                        })
+                        try {
+                            // Presence fan-out needs a moment; inbound rounds run meanwhile.
+                            delay(RELAY_WAIT_MS)
+                            for (endpoint in relay.discoveredPeers().distinctBy { it.deviceId }) {
+                                val connection = relay.connect(endpoint) ?: continue
+                                try {
+                                    entriesApplied += syncRound(store, connection)
+                                    relayPeers++
+                                } finally {
+                                    connection.close()
+                                }
+                            }
+                        } finally {
+                            relay.stop()
+                        }
+                    } catch (e: Exception) {
+                        SyncRuntime.recordStatus("Relay error: ${e.message ?: e.javaClass.simpleName}")
+                    }
+                }
+                SyncRuntime.recordStatus(
+                    when {
+                        lanPeers == 0 && relayPeers == 0 ->
+                            "Scan complete — no peers found (LAN + relay)"
+                        else -> "Synced $lanPeers LAN + $relayPeers relay peer(s) · $entriesApplied new " +
+                            (if (entriesApplied == 1) "entry" else "entries")
+                    }
+                )
                 Result.success()
             } catch (e: Exception) {
                 SyncRuntime.recordStatus("Sync error: ${e.message ?: e.javaClass.simpleName}")
@@ -90,5 +129,6 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
     private companion object {
         const val DISCOVERY_WAIT_MS = 8_000L
+        const val RELAY_WAIT_MS = 3_000L
     }
 }

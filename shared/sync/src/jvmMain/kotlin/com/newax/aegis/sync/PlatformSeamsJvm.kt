@@ -12,6 +12,8 @@ import java.io.File
  */
 actual fun proximityDiscovery(): ProximityDiscovery = LanProximityDiscovery()
 
+actual fun platformWsClient(): WsClient = JvmWsClient()
+
 actual fun platformKeyStore(): KeyStore {
     val home = System.getProperty("user.home") ?: "."
     return FileKeyStore(File(home, ".aegis/keys"))

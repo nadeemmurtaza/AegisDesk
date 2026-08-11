@@ -45,6 +45,11 @@ kotlin {
         }
         val androidMain by getting {
             dependsOn(jvmAndroidMain)
+            dependencies {
+                // The relay path's WebSocket client — java.net.http does not
+                // exist on Android, OkHttp is the platform-standard client.
+                implementation("com.squareup.okhttp3:okhttp:4.12.0")
+            }
         }
         val jvmTest by getting {
             dependencies {

@@ -58,6 +58,7 @@ object SyncRuntime {
     /** Local-only kv_store keys (NOT under `syncable:` — they never sync). */
     private const val KEY_ENABLED = "sync:enabled"
     private const val KEY_STATUS = "sync:status"
+    private const val KEY_RELAY = "sync:relay"
     private const val ADDR_PREFIX = "sync:addr:"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -111,6 +112,17 @@ object SyncRuntime {
     fun unpair(deviceId: String) {
         keyStoreHolder.removePeer(deviceId)
         kvDelete(ADDR_PREFIX + deviceId)
+    }
+
+    /**
+     * The relay server URL (`ws://host:port` or `wss://...`) for WAN sync
+     * (docs/SYNC_DESIGN.md §10). Empty/blank = relay off — LAN only. Local
+     * config like the auto toggle, never synced.
+     */
+    fun relayUrl(): String = kvGet(KEY_RELAY)?.trim().orEmpty()
+
+    fun setRelayUrl(url: String) {
+        if (url.isBlank()) kvDelete(KEY_RELAY) else kvPut(KEY_RELAY, url.trim())
     }
 
     /** Manually-entered `host:port` for a paired peer (mDNS-free bootstrap). */
