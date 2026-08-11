@@ -55,9 +55,29 @@ agents via prompt profiles) — the system manages lifecycle, routing,
 orchestration, and memory; the per-agent "brain" is the role context + the
 shared memory layers.
 
+## Skills management (schema v16)
+
+One layer below the agents registry:
+
+- **Skills are shared** — a skill is a capability package (`run_shell`,
+  `open_app`, `system_query`, …), importable from a zip (`skill.json`) with
+  the same zip-slip-safe extractor (`ZipPackages`), enable/disable, uninstall
+  (imported only), upgrade-in-place. Seven built-ins seed at startup and the
+  legacy `agents.skills` comma column is migrated into real grant rows.
+- **Permissions = grant rows** — `agent_skills` is the many-to-many join AND
+  the permission table: an agent may use a skill iff a grant row exists AND
+  the skill is enabled (`SkillManager.canUse`). Revoke the row → denied.
+- **Skill sets** — `skill_sets` + `skill_set_members`: named bundles
+  (`automation`, `knowledge`, `communication`, `files`) for granting/revoking
+  in groups.
+- **Enforcement** — `AgentOrchestrator.contextFor` advertises ONLY the
+  dominant agent's permitted skills in the model prompt (permission checked
+  at assembly time); the same `canUse` primitive is what executors consult
+  (desktop executor wiring lands with Track M).
+
 ## Wiring
 
-- `AgentRegistry.init` runs at app start (seeds built-ins after DB init).
+- `AgentRegistry.init` + `SkillManager.init` run at app start (seeds built-ins after DB init).
 - `MainViewModel.submit` plans every request, runs `assemble` (episodes +
   handoffs), injects the active-agent block into the LLM prompt, and passes
   the step's dominant-agent context into each part of a multi-step command.

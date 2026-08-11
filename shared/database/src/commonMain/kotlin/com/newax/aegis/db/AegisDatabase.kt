@@ -47,9 +47,13 @@ import androidx.sqlite.execSQL
         HandoffEntry::class,
         WorkLogEntry::class,
         LibraryEntry::class,
-        AgentEntity::class
+        AgentEntity::class,
+        SkillEntity::class,
+        AgentSkill::class,
+        SkillSet::class,
+        SkillSetMember::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 @ConstructedBy(AegisDatabaseConstructor::class)
@@ -72,6 +76,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun syncVectorDao(): SyncVectorDao
     abstract fun agentMemoryDao(): AgentMemoryDao
     abstract fun agentRegistryDao(): AgentRegistryDao
+    abstract fun skillManagerDao(): SkillManagerDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -365,6 +370,57 @@ abstract class AegisDatabase : RoomDatabase() {
                         PRIMARY KEY (agentId)
                     )
                 """)
+            }
+        }
+
+        /**
+         * v16 — the skills management system (docs/AGENTS_DESIGN.md §skills):
+         * `skills` (capability packages), `agent_skills` (the PERMISSION join —
+         * which agent may use which skill), `skill_sets` + `skill_set_members`
+         * (named bundles). Device-local, same as `agents`.
+         */
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS skills (
+                        skillId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        version TEXT NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        source TEXT NOT NULL,
+                        packageDir TEXT NOT NULL,
+                        installedAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (skillId)
+                    )
+                """)
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS agent_skills (
+                        agentId TEXT NOT NULL,
+                        skillId TEXT NOT NULL,
+                        grantedAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (agentId, skillId)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_agent_skills_skillId ON agent_skills(skillId)")
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS skill_sets (
+                        setId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        createdAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (setId)
+                    )
+                """)
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS skill_set_members (
+                        setId TEXT NOT NULL,
+                        skillId TEXT NOT NULL,
+                        PRIMARY KEY (setId, skillId)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_skill_set_members_skillId ON skill_set_members(skillId)")
             }
         }
 

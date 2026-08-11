@@ -75,6 +75,10 @@ class AegisApplication : Application() {
         // agents (coding/planning/research/organizer) so routing works out of
         // the box before any package import.
         com.newax.aegis.agents.AgentRegistry.init(this)
+        // Skills management (docs/AGENTS_DESIGN.md §skills): seeds the shared
+        // skills + default per-agent grants + named sets; migrates the legacy
+        // agents.skills column into grant rows.
+        com.newax.aegis.agents.SkillManager.init(this)
         // Goals survive restarts (Track A5): every planner mutation persists a JSON
         // snapshot to the existing kv_store table (no schema change), and restore
         // rehydrates the planner before any screen or executor reads it.

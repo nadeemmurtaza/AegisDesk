@@ -7,8 +7,6 @@ import com.newax.aegis.db.entity.AgentEntity
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import java.io.File
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 
 /**
  * The multi-agent management registry (docs/AGENTS_DESIGN.md): import agent
@@ -209,62 +207,31 @@ object AgentRegistry {
     }
 
     /**
-     * Read the zip from the SAF stream, validate every entry name (zip-slip
-     * guard), extract into a fresh package dir, and return the manifest +
-     * dir. Null on any security violation or a missing/invalid manifest.
+     * Read the zip via the shared zip-slip-safe extractor, parse the
+     * manifest, and move the validated package into its permanent home.
+     * Null on any security violation or a missing/invalid manifest.
      */
     private fun extractZip(context: Context, uri: Uri): Pair<AgentManifest, File>? {
-        val input = runCatching { context.contentResolver.openInputStream(uri) }.getOrNull() ?: return null
-        val root = File(agentsRoot(), "import-tmp-${System.currentTimeMillis()}").apply { mkdirs() }
-        var manifest: AgentManifest? = null
-        try {
-            ZipInputStream(input).use { zis ->
-                var entry: ZipEntry? = zis.nextEntry
-                while (entry != null) {
-                    if (!entry.isDirectory) {
-                        val name = entry.name
-                        // R12 — zip-slip guard: reject absolute paths, drive
-                        // letters, backslashes, and any .. segment.
-                        val normalized = name.replace('\\', '/')
-                        if (normalized.startsWith("/") || normalized.contains(":") ||
-                            normalized.split('/').any { it == ".." }
-                        ) {
-                            return null
-                        }
-                        val target = File(root, normalized)
-                        val targetPath = target.canonicalPath
-                        val rootPath = root.canonicalPath
-                        if (!targetPath.startsWith(rootPath)) return null
+        val entries = ZipPackages.extractValidated(context, uri) ?: return null
+        val manifest = entries.firstOrNull { it.first == MANIFEST_FILE }
+            ?.let { parseManifest(String(it.second, Charsets.UTF_8)) }
+            ?: return null
 
-                        target.parentFile?.mkdirs()
-                        val bytes = zis.readBytes()
-                        if (name == MANIFEST_FILE) {
-                            manifest = parseManifest(String(bytes, Charsets.UTF_8))
-                            if (manifest == null) return null
-                        } else {
-                            target.writeBytes(bytes)
-                        }
-                    }
-                    zis.closeEntry()
-                    entry = zis.nextEntry
-                }
-            }
-        } catch (_: Exception) {
-            root.deleteRecursively()
-            return null
-        } finally {
-            runCatching { input.close() }
+        val root = File(agentsRoot(), "import-tmp-${System.currentTimeMillis()}").apply { mkdirs() }
+        entries.filter { it.first != MANIFEST_FILE }.forEach { (name, bytes) ->
+            val target = File(root, name)
+            target.parentFile?.mkdirs()
+            target.writeBytes(bytes)
         }
-        val m = manifest ?: run { root.deleteRecursively(); return null }
 
         // Move the validated package into its permanent home.
-        val dest = File(agentsRoot(), m.id)
+        val dest = File(agentsRoot(), manifest.id)
         runCatching { dest.deleteRecursively() }
         if (!root.renameTo(dest)) {
             // renameTo can fail across some FS setups — fall back to copy.
             root.copyRecursively(dest, overwrite = true)
             root.deleteRecursively()
         }
-        return m to dest
+        return manifest to dest
     }
 }

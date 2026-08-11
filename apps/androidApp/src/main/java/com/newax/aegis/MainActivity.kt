@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Groups
@@ -107,6 +108,7 @@ sealed class Screen(val label: String) {
     object PolicyHistory : Screen("Policy History")
     object AgentMemory : Screen("Agent Memory")
     object Agents : Screen("Agents")
+    object Skills : Screen("Skills")
 }
 
 class MainActivity : FragmentActivity() {
@@ -200,7 +202,8 @@ fun AegisApp(
                         NavEntry(Screen.Nearby, Icons.Outlined.NearMe,              "Nearby"),
                         NavEntry(Screen.Sync, Icons.Rounded.Sync,                  "Sync"),
                         NavEntry(Screen.AgentMemory, Icons.Outlined.Memory,         "Agent Memory"),
-                        NavEntry(Screen.Agents, Icons.Outlined.SmartToy,            "Agents")
+                        NavEntry(Screen.Agents, Icons.Outlined.SmartToy,            "Agents"),
+                        NavEntry(Screen.Skills, Icons.Outlined.Build,               "Skills")
                     ).forEach { entry ->
                         NavigationDrawerItem(
                             label  = {
@@ -265,6 +268,7 @@ fun AegisApp(
                                         Screen.Goals -> "Goals"
                                         Screen.AgentMemory -> "Agent Memory"
                                         Screen.Agents -> "Agents"
+                                        Screen.Skills -> "Skills"
                                         Screen.Nearby -> "Nearby Share"
                                         Screen.Sync -> "Sync"
                                         Screen.PolicyHistory -> "Policy History"
@@ -329,6 +333,7 @@ fun AegisApp(
                     Screen.Sync -> SyncScreen(padding)
                     Screen.AgentMemory -> AgentMemoryScreen(padding)
                     Screen.Agents -> AgentsScreen(padding)
+                    Screen.Skills -> SkillsScreen(padding)
                 }
             }
             BiometricOverlay(vm)

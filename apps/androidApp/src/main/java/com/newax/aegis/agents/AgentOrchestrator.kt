@@ -81,7 +81,13 @@ object AgentOrchestrator {
         return handoffs
     }
 
-    /** The active-agent block injected into the model prompt. */
+    /**
+     * The active-agent block injected into the model prompt. Includes the
+     * PERMITTED skills of each dominant agent (SkillManager.canUse) — the
+     * permission system is enforced at assembly time: an agent can only act
+     * with the skills it is granted, and the prompt never advertises skills
+     * the agent may not use.
+     */
     fun contextFor(plan: OrchestrationPlan): String {
         if (!plan.anyAgentActive) return ""
         return buildString {
@@ -89,12 +95,19 @@ object AgentOrchestrator {
             plan.steps.forEachIndexed { index, step ->
                 val d = step.dominant ?: return@forEachIndexed
                 append("- Step ${index + 1}: ${d.name} (${d.category}) — ${d.description}")
+                val permitted = runCatching { SkillManager.skillsForAgent(d.agentId) }.getOrDefault(emptyList())
+                    .map { it.name }
+                if (permitted.isNotEmpty()) {
+                    append("  Permitted skills: ${permitted.joinToString(", ")}")
+                } else {
+                    append("  Permitted skills: none")
+                }
                 if (step.supporters.isNotEmpty()) {
                     append("  Supports: ${step.supporters.joinToString(", ") { it.name }}")
                 }
                 append('\n')
             }
-            append("Respond as the dominant agent(s) for each step; if a step needs an action, propose it as the dominant agent would.\n")
+            append("Respond as the dominant agent(s) for each step, using only the permitted skills; if a step needs an action, propose it as the dominant agent would.\n")
         }
     }
 }
