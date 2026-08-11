@@ -56,6 +56,7 @@ import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.SkillRegistry
 import com.newax.aegis.desktop.planner.TaskStatus
 import com.newax.aegis.desktop.ui.AegisDesktopApp
+import com.newax.aegis.desktopsync.DesktopSync
 import com.newax.aegis.model.ModelRequest
 import com.newax.aegis.platform.windows.GgufHeaderParser
 import com.newax.aegis.platform.windows.GgufModelProvider
@@ -86,8 +87,9 @@ fun main(args: Array<String>) {
 private fun windowMain() {
     DesktopCapabilitiesHolder.init()
     // Automatic encrypted sync with paired devices (docs/SYNC_DESIGN.md §4.2):
-    // the Room-backed journal + LAN transport run behind the window.
-    SyncAutoRunner.start()
+    // the shared desktop engine (Room-backed journal + LAN transport) runs
+    // behind the window — `sync` commands in CLI mode drive it too.
+    DesktopSync.start()
     val goalsStore = FileGoalsStore()
     restorePersistedState(goalsStore)
     val appIndex = WindowsAppIndex()
@@ -154,7 +156,7 @@ private suspend fun cliMain(args: Array<String>) {
 
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
     DesktopCapabilitiesHolder.init()
-    SyncAutoRunner.start()
+    DesktopSync.start()
     val goalsStore = FileGoalsStore()
     restorePersistedState(goalsStore)
     val appIndex = WindowsAppIndex()
@@ -250,8 +252,8 @@ private suspend fun cliMain(args: Array<String>) {
                 printAudit(if (prompt.length > 5) prompt.substring(5) else "")
                 continue
             }
-            if (prompt.equals("sync", ignoreCase = true)) {
-                printSyncStatus()
+            if (prompt.equals("sync", ignoreCase = true) || prompt.startsWith("sync ", ignoreCase = true)) {
+                printSyncCommand(if (prompt.length > 4) prompt.substring(4).trim() else "")
                 continue
             }
             if (prompt.startsWith("run ", ignoreCase = true)) {
@@ -321,20 +323,72 @@ private fun printStatusBlock() {
 }
 
 /**
- * The automatic-sync status — the CLI twin of the window's Status card
- * (docs/SYNC_DESIGN.md §4.2): device identity, paired peers, the live loop
- * status, journal size, and the memory profile categories received from
- * paired devices (materialized to ~/.aegis/memory.json).
+ * The `sync` CLI surface — the twin of the window's Status card
+ * (docs/SYNC_DESIGN.md §4.2), backed by the shared [DesktopSync] engine:
+ * status, this device's pairing code, SAS-confirmed pairing, unpair, direct
+ * `host:port` bootstrap, and the synced memory profile.
  */
-private fun printSyncStatus() {
+private fun printSyncCommand(arg: String) {
     println()
     println("  ── Sync ────────────────────────────────────────────────")
-    println("    device : ${SyncAutoRunner.displayName()} (${SyncAutoRunner.deviceId()})")
-    println("    peers  : ${SyncAutoRunner.peers()}")
-    println("    status : ${SyncAutoRunner.status()}")
-    val categories = SyncAutoRunner.memoryCategories()
-    println("    memory : ${categories.size} ${if (categories.size == 1) "category" else "categories"} synced")
-    categories.take(5).forEach { println("        · $it") }
+    when {
+        arg.isEmpty() || arg.equals("status", ignoreCase = true) -> {
+            println("    device : ${DesktopSync.displayName()} (${DesktopSync.deviceId()})")
+            println("    peers  : ${DesktopSync.peers().size}")
+            println("    status : ${DesktopSync.status()}")
+            println("    memory : ${DesktopSync.memoryCategories().size} category(ies) synced")
+        }
+        arg.equals("code", ignoreCase = true) -> {
+            println("    This device's pairing code — paste it into the other device's pair field:")
+            println("    ${DesktopSync.pairingCode()}")
+        }
+        arg.startsWith("pair ", ignoreCase = true) -> {
+            val code = arg.substring(5).trim()
+            if (code.isEmpty()) {
+                println("    usage: sync pair <their-code>")
+            } else {
+                val sas = DesktopSync.sasFor(DesktopSync.pairingCode(), code)
+                if (sas == null) {
+                    println("    ✗ That doesn't look like a valid pairing code.")
+                } else {
+                    print("    Both devices show SAS $sas — confirm it matches (y/N): ")
+                    System.out.flush()
+                    if (readLine()?.trim()?.equals("y", ignoreCase = true) == true) {
+                        val peer = DesktopSync.pairWith(code)
+                        if (peer == null) println("    ✗ Pairing failed (invalid code or self-pair).")
+                        else println("    ✓ Paired with ${peer.displayName} (${peer.deviceId})")
+                    } else {
+                        println("    cancelled")
+                    }
+                }
+            }
+        }
+        arg.startsWith("unpair ", ignoreCase = true) -> {
+            DesktopSync.unpair(arg.substring(7).trim())
+            println("    ✓ removed")
+        }
+        arg.startsWith("peer ", ignoreCase = true) -> {
+            val parts = arg.substring(5).trim().split(Regex("\\s+"))
+            if (parts.size != 2) {
+                println("    usage: sync peer <deviceId> <host:port>")
+            } else {
+                DesktopSync.setPeerAddress(parts[0], parts[1])
+                println("    ✓ direct address stored for ${parts[0]}")
+            }
+        }
+        arg.startsWith("memory", ignoreCase = true) -> {
+            val memory = DesktopSync.memory()
+            if (memory.isEmpty()) {
+                println("    No synced memory yet — pair a device and wait for a sync round.")
+            } else {
+                memory.toSortedMap().forEach { (category, facts) ->
+                    println("    · $category")
+                    facts.forEach { println("        - $it") }
+                }
+            }
+        }
+        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory")
+    }
     println()
 }
 

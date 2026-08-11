@@ -63,11 +63,11 @@ class StatusScreenState(
     /** Static facts about the active pack (UNKNOWN/empty for the fallback). */
     val modelDescriptor: ModelDescriptor get() = model().descriptor
 
-    /** One-line automatic-sync status (the runner's live loop state). */
+    /** One-line automatic-sync status (the shared desktop engine's loop state). */
     val syncStatus: String
-        get() = com.newax.aegis.desktop.SyncAutoRunner.status()
+        get() = com.newax.aegis.desktopsync.DesktopSync.status()
 
     /** Number of memory-profile categories received from paired devices. */
     val syncedMemoryCategories: Int
-        get() = com.newax.aegis.desktop.SyncAutoRunner.memoryCategories().size
+        get() = com.newax.aegis.desktopsync.DesktopSync.memoryCategories().size
 }

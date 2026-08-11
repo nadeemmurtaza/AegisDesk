@@ -30,10 +30,10 @@ dependencies {
     // channel, the encrypted Quick Share protocol — P2 desktop listener).
     implementation(project(":shared:sync"))
 
-    // The Room-backed journal store for automatic sync (RoomJournalStore) —
-    // the desktop DB lives at ~/.aegis/sync.db (bundled sqlite, no SQLCipher
-    // on the JVM yet).
-    implementation(project(":shared:database"))
+    // The shared desktop sync engine (identity, LAN transport loop, Room
+    // journal at ~/.aegis/sync.db, memory materialization, pairing) — one
+    // implementation for both the Windows and macOS desktop bodies.
+    implementation(project(":shared:desktop-sync"))
 
     // Coroutines for the interactive prompt loop (runBlocking) and the UI state
     // holders (the window's app scope).
