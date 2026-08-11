@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.desktop.ExecutionAuditEntry
+import com.newax.aegis.desktop.TaskFailureKind
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.TaskStatus
 import com.newax.aegis.desktop.ui.state.GoalTaskUi
@@ -69,7 +70,11 @@ import java.time.format.DateTimeFormatter
  * capabilities live when Run is pressed.
  */
 @Composable
-fun GoalsScreen(state: GoalsScreenState) {
+fun GoalsScreen(
+    state: GoalsScreenState,
+    /** Jump to the Policy tab — the "Change mode" action on a policy-blocked task. */
+    onOpenPolicy: () -> Unit = {},
+) {
     val model by state.model.collectAsState()
     val runningGoalId by state.runningGoalId.collectAsState()
     val runProgress by state.runProgress.collectAsState()
@@ -125,6 +130,7 @@ fun GoalsScreen(state: GoalsScreenState) {
                             isRunning = runningGoalId == row.goal.id,
                             onRun = { state.run(row.goal.id) },
                             onAbandon = { state.abandon(row.goal.id) },
+                            onOpenPolicy = onOpenPolicy,
                         )
                     }
                 }
@@ -235,6 +241,7 @@ private fun GoalCard(
     isRunning: Boolean,
     onRun: () -> Unit,
     onAbandon: () -> Unit,
+    onOpenPolicy: () -> Unit,
 ) {
     val blocked = !row.feasible
     Card(
@@ -340,7 +347,7 @@ private fun GoalCard(
             if (row.tasks.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    row.tasks.forEach { task -> TaskLine(task) }
+                    row.tasks.forEach { task -> TaskLine(task, onOpenPolicy) }
                 }
             }
 
@@ -385,7 +392,7 @@ private fun GoalCard(
 }
 
 @Composable
-private fun TaskLine(task: GoalTaskUi) {
+private fun TaskLine(task: GoalTaskUi, onOpenPolicy: () -> Unit) {
     val color = when (task.status) {
         TaskStatus.COMPLETED -> ReadyColor
         TaskStatus.SKIPPED -> MutedColor
@@ -393,8 +400,9 @@ private fun TaskLine(task: GoalTaskUi) {
         TaskStatus.RUNNING -> WarningColor
         TaskStatus.PENDING -> TextTertiaryColor
     }
+    val policyBlocked = task.status == TaskStatus.FAILED && task.failureKind == TaskFailureKind.POLICY
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(6.dp).clip(CircleShape).background(color))
+        Box(Modifier.size(6.dp).clip(CircleShape).background(if (policyBlocked) WarningColor else color))
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -405,11 +413,29 @@ private fun TaskLine(task: GoalTaskUi) {
             )
             task.result?.let { result ->
                 Spacer(Modifier.height(2.dp))
-                Text(result, fontSize = 11.5.sp, color = TextTertiaryColor, lineHeight = 16.sp)
+                Text(
+                    result,
+                    fontSize = 11.5.sp,
+                    color = if (policyBlocked) WarningColor else TextTertiaryColor,
+                    lineHeight = 16.sp
+                )
             }
         }
-        Spacer(Modifier.width(8.dp))
-        Text(task.status.name.lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp, color = color)
+        if (policyBlocked) {
+            Spacer(Modifier.width(8.dp))
+            Tag("policy", WarningColor)
+            Spacer(Modifier.width(4.dp))
+            TextButton(
+                onClick = onOpenPolicy,
+                colors = ButtonDefaults.textButtonColors(contentColor = WarningColor),
+                modifier = Modifier.clip(RoundedCornerShape(8.dp))
+            ) {
+                Text("Change mode", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        } else {
+            Spacer(Modifier.width(8.dp))
+            Text(task.status.name.lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp, color = color)
+        }
     }
 }
 

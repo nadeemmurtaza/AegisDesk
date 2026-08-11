@@ -35,7 +35,11 @@
  *      listen" / "proximity send <file> <deviceId>" / "proximity nearby" drive
  *      the encrypted Quick Share (P2): mDNS discovery, direct TCP, ECDH key
  *      exchange + ProximityTransfer sealing (receive confirms per transfer;
- *      files land in ~/.aegis/shared/)
+ *      files land in ~/.aegis/shared/). "policy" prints the per-class effective
+ *      policy modes and the decision trail; "policy set <Class> <MODE>",
+ *      "policy deny/allow <Class>", "policy reset <Class>", "policy clear",
+ *      and "policy export" (writes the trail to ~/.aegis/policy-audit-<timestamp>.csv)
+ *      drive the same one engine the Policy tab uses (persisted under ~/.aegis/)
  *   7. On empty input, "exit", or Ctrl+D the model is closed, the holder returns
  *      to the fallback, and the app exits
  *
@@ -49,6 +53,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.newax.aegis.assistant.ProposedAction
+import com.newax.aegis.assistant.riskLevel
+import com.newax.aegis.authority.PolicyEngine
+import com.newax.aegis.authority.PolicyMode
 import com.newax.aegis.desktop.execution.DesktopGoalExecutor
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.Goal
@@ -86,6 +94,7 @@ fun main(args: Array<String>) {
  */
 private fun windowMain() {
     DesktopCapabilitiesHolder.init()
+    DesktopPolicyHolder.init()
     // Automatic encrypted sync with paired devices (docs/SYNC_DESIGN.md §4.2):
     // the shared desktop engine (Room-backed journal + LAN transport) runs
     // behind the window — `sync` commands in CLI mode drive it too.
@@ -156,6 +165,7 @@ private suspend fun cliMain(args: Array<String>) {
 
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
     DesktopCapabilitiesHolder.init()
+    DesktopPolicyHolder.init()
     DesktopSync.start()
     val goalsStore = FileGoalsStore()
     restorePersistedState(goalsStore)
@@ -254,6 +264,10 @@ private suspend fun cliMain(args: Array<String>) {
             }
             if (prompt.equals("sync", ignoreCase = true) || prompt.startsWith("sync ", ignoreCase = true)) {
                 printSyncCommand(if (prompt.length > 4) prompt.substring(4).trim() else "")
+                continue
+            }
+            if (prompt.equals("policy", ignoreCase = true) || prompt.startsWith("policy ", ignoreCase = true)) {
+                printPolicy(if (prompt.length > 6) prompt.substring(6).trim() else "")
                 continue
             }
             if (prompt.startsWith("run ", ignoreCase = true)) {
@@ -694,6 +708,149 @@ private fun printAudit(command: String) {
     }
     println()
 }
+
+/**
+ * The `policy` CLI family — the desktop twin of the Policy tab and of Android's
+ * policy settings: list effective modes + the decision trail ("policy"), set a
+ * mode override ("policy set <Class> <MODE>"), hard-deny ("policy deny <Class>"),
+ * lift a deny ("policy allow <Class>"), reset to defaults ("policy reset <Class>"),
+ * clear the decision history ("policy clear"), and export the trail to CSV
+ * ("policy export" → ~/.aegis/policy-audit-<timestamp>.csv). Everything routes
+ * through the one process engine ([DesktopPolicyHolder]) — the same store the
+ * window uses.
+ */
+private fun printPolicy(command: String) {
+    val engine = DesktopPolicyHolder.engineOrNull()
+    if (engine == null) {
+        println("  ✗ Policy holder not initialized.")
+        return
+    }
+
+    if (command.isNotBlank()) {
+        val parts = command.split(" ")
+        when (parts[0].lowercase()) {
+            "set" -> {
+                val cls = parts.getOrNull(1) ?: return println("  usage: policy set <ActionClass> <AUTO|CONFIGURABLE|APPROVAL|STRONG_CONFIRMATION>")
+                val mode = PolicyMode.entries.firstOrNull { it.name.equals(parts.getOrNull(2), ignoreCase = true) }
+                if (mode == null) {
+                    println("  ✗ Unknown mode '${parts.getOrNull(2)}' — use AUTO, CONFIGURABLE, APPROVAL, or STRONG_CONFIRMATION.")
+                    return
+                }
+                engine.setModeOverride(cls, mode)
+                println("  ✓ $cls → ${mode.name} (persisted under ~/.aegis/policy-settings.json)")
+                return
+            }
+            "deny" -> {
+                val cls = parts.getOrNull(1) ?: return println("  usage: policy deny <ActionClass>")
+                engine.setDenied(cls, true)
+                println("  ✓ $cls hard-denied — every evaluation now refuses.")
+                return
+            }
+            "allow" -> {
+                val cls = parts.getOrNull(1) ?: return println("  usage: policy allow <ActionClass>")
+                engine.setDenied(cls, false)
+                println("  ✓ $cls deny lifted.")
+                return
+            }
+            "reset" -> {
+                val cls = parts.getOrNull(1) ?: return println("  usage: policy reset <ActionClass>")
+                engine.clearModeOverride(cls)
+                engine.setDenied(cls, false)
+                println("  ✓ $cls back to its risk-based default mode.")
+                return
+            }
+            "clear" -> {
+                DesktopPolicyHolder.clearAuditHistory()
+                println("  ✓ Policy-decision history cleared (memory + ~/.aegis/policy-audit.json).")
+                return
+            }
+            "export" -> {
+                val history = DesktopPolicyHolder.auditHistory().sortedByDescending { it.auditedAtMs }
+                if (history.isEmpty()) {
+                    println("  ✗ Nothing to export — no policy decisions recorded yet.")
+                    return
+                }
+                PolicyExporter.exportCsv(history).fold(
+                    onSuccess = { file ->
+                        println(
+                            "  ✓ Exported ${history.size} ${if (history.size == 1) "decision" else "decisions"} → $file"
+                        )
+                    },
+                    onFailure = { e ->
+                        println("  ✗ Export failed: ${e.message ?: e.javaClass.simpleName}")
+                    },
+                )
+                return
+            }
+            else -> {
+                println("  ✗ Unknown policy command '${parts[0]}' — try: set, deny, allow, reset, export, clear.")
+                return
+            }
+        }
+    }
+
+    // ── policy (no subcommand): modes + decision summary ──────────────────
+    println()
+    println("  ── Policy ────────────────────────────────────────────")
+    println("    Per-class effective modes (override → risk-based default):")
+    POLICY_CLASSES.forEach { cls ->
+        val sample = policySampleFor(cls)
+        val default = PolicyEngine.defaultModeFor(sample.riskLevel)
+        val effective = engine.effectiveMode(sample)
+        val custom = engine.hasModeOverride(cls)
+        val denied = engine.isDenied(cls)
+        val label = when {
+            denied -> "DENIED"
+            custom -> "${effective.name} (custom)"
+            else -> "${effective.name} (default ${default.name})"
+        }
+        println("    ${cls.padEnd(20)} $label")
+    }
+    val history = DesktopPolicyHolder.auditHistory()
+    if (history.isEmpty()) {
+        println("    No policy decisions recorded yet — \"policy set/deny\" above or run a goal to start the trail.")
+    } else {
+        println()
+        println("    ${history.size} ${if (history.size == 1) "decision" else "decisions"} recorded:")
+        history.sortedByDescending { it.auditedAtMs }.forEach { r ->
+            println(
+                "    ${r.decision.name.lowercase().replaceFirstChar { it.uppercase() }}  ${r.actionClass}" +
+                    "  · ${r.actionSummary}  · ${r.mode.name} · ${r.origin.name.lowercase()}  ${policyTime(r.auditedAtMs)}"
+            )
+        }
+    }
+    println()
+}
+
+/** The curated policy rows, shared with the window's Policy tab (mirror of Android). */
+private val POLICY_CLASSES = listOf(
+    "OpenApp", "Send", "SendImage", "DeleteFile", "DeleteContact", "DeleteProject",
+    "ForgetFact", "RunScript", "PostSocialMedia", "CreateEvent", "ReplyNotification", "UpdateMemory",
+)
+
+/** A sample action for a class so its risk-based default mode can be read (desktop mirror). */
+private fun policySampleFor(actionClass: String): ProposedAction = when (actionClass) {
+    "Send" -> ProposedAction.Send("")
+    "SendImage" -> ProposedAction.SendImage("")
+    "DeleteFile" -> ProposedAction.DeleteFile("")
+    "DeleteContact" -> ProposedAction.DeleteContact("")
+    "DeleteProject" -> ProposedAction.DeleteProject("")
+    "ForgetFact" -> ProposedAction.ForgetFact("", "")
+    "RunScript" -> ProposedAction.RunScript("")
+    "PostSocialMedia" -> ProposedAction.PostSocialMedia("", "", "", "")
+    "CreateEvent" -> ProposedAction.CreateEvent("", "")
+    "ReplyNotification" -> ProposedAction.ReplyNotification("", "")
+    "UpdateMemory" -> ProposedAction.UpdateMemory("", "")
+    "OpenApp" -> ProposedAction.OpenApp("")
+    else -> ProposedAction.Tap("")
+}
+
+private val POLICY_TIME_FORMATTER_CLI: java.time.format.DateTimeFormatter =
+    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+
+private fun policyTime(epochMs: Long): String =
+    java.time.Instant.ofEpochMilli(epochMs).atZone(java.time.ZoneId.systemDefault())
+        .format(POLICY_TIME_FORMATTER_CLI)
 
 /** Goals in board order (priority desc — the order the board numbers them). */
 private fun sortedGoals(): List<Goal> =

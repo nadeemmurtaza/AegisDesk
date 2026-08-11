@@ -1,5 +1,6 @@
 package com.newax.aegis.desktop.planner
 
+import com.newax.aegis.assistant.ProposedAction
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -50,6 +51,19 @@ object SkillRegistry {
 
     fun allSkills(): List<SkillDefinition> =
         definitions.values.sortedBy { it.name }
+
+    /**
+     * The policy action a privileged skill maps to — the same mapping Android's
+     * SkillRegistry uses, so plans evaluate through the shared PolicyEngine
+     * identically on both bodies. Skills without a policy action (null) are not
+     * policy-gated and run as before.
+     */
+    fun policyActionFor(skillId: String): ProposedAction? = when (skillId) {
+        "send_message" -> ProposedAction.Send("")
+        "set_reminder" -> ProposedAction.CreateEvent("", "")
+        "launch_app", "play_media" -> ProposedAction.OpenApp("")
+        else -> null
+    }
 
     private fun registerBuiltins() {
         register(

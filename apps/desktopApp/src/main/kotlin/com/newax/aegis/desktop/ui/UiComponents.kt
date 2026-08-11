@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.desktop.planner.GoalState
+import com.newax.aegis.desktop.ui.state.ExportState
 import com.newax.aegis.model.ModelFormat
 import com.newax.aegis.model.ModelState
 import com.newax.aegis.platform.CapabilityStatus
@@ -186,5 +187,32 @@ fun EmptyState(title: String, hint: String?, iconColor: Color = TextTertiaryColo
                 )
             }
         }
+    }
+}
+
+/** Outcome of the last CSV export — shared by the Audit and Policy tabs (idle, written path, or honest failure). */
+@Composable
+fun ExportStatusLine(state: ExportState, idleHint: String = "Exports land in ~/.aegis/ as CSV") {
+    when (state) {
+        is ExportState.Idle -> Text(
+            idleHint,
+            fontSize = 12.sp,
+            color = TextTertiaryColor
+        )
+        is ExportState.Done -> Text(
+            "Exported → $state.path",
+            fontSize = 12.sp,
+            color = ReadyColor,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        is ExportState.Failed -> Text(
+            state.message,
+            fontSize = 12.sp,
+            color = ErrorColor,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

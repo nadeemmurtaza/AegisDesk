@@ -305,8 +305,14 @@ fun AegisApp(
                     )
                     Screen.Goals -> GoalsScreen(
                         padding,
-                        onOpenPolicyModes = {
-                            policyScrollSignal++
+                        onOpenPolicyModes = { actionClass ->
+                            // Known class: scroll to + highlight that policy row.
+                            // Unknown: scroll to the Policy modes section top.
+                            if (actionClass != null) {
+                                policyScrollTarget = actionClass
+                            } else {
+                                policyScrollSignal++
+                            }
                             screen = Screen.Capabilities
                         }
                     )

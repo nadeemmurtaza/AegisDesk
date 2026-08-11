@@ -1,7 +1,10 @@
 package com.newax.aegis.desktop.execution
 
 import com.newax.aegis.assistant.ActionOrigin
+import com.newax.aegis.authority.PolicyMode
+import com.newax.aegis.desktop.DesktopPolicyHolder
 import com.newax.aegis.desktop.ExecutionAudit
+import com.newax.aegis.desktop.TaskFailureKind
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.TaskStatus
@@ -26,6 +29,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
 
 /**
  * Phase 5h — desktop GoalExecutor + ExecutionRouter ladder, mirroring Android's
@@ -96,6 +100,52 @@ class DesktopExecutorTest {
         val launchTask = graph.tasks.first { it.skillId == "launch_app" }
         assertEquals(TaskStatus.FAILED, launchTask.status)
         assertTrue("names the blocker", launchTask.result!!.contains("OPEN_APP"))
+    }
+
+    @Test
+    fun `policy gate refuses a privileged skill when its mode is not AUTO`() {
+        val policyFile = Files.createTempFile("exec-policy", ".json").also { Files.deleteIfExists(it) }
+        val auditFile = Files.createTempFile("exec-audit", ".json").also { Files.deleteIfExists(it) }
+        DesktopPolicyHolder.resetForTest()
+        try {
+            DesktopPolicyHolder.init(policyFile, auditFile)
+            // launch_app maps to OpenApp; APPROVAL (non-AUTO) must refuse execution.
+            DesktopPolicyHolder.engine().setModeOverride("OpenApp", PolicyMode.APPROVAL)
+            val registry = registryWith(FakeDesktopCapability(CapabilityStatus.READY))
+            val plan = DesktopGoalPlanner.plan("open spotify", registry)
+
+            val result = runBlocking { DesktopGoalExecutor.run(plan.goal.id, registry) }
+
+            assertFalse("expected failure", result.isSuccess)
+            assertEquals(GoalState.BLOCKED, DesktopGoalPlanner.getState(plan.goal.id))
+            val launchTask = DesktopGoalPlanner.getGraph(plan.goal.id)!!.tasks
+                .first { it.skillId == "launch_app" }
+            assertEquals(TaskStatus.FAILED, launchTask.status)
+            assertEquals(
+                "policy refusal carries the POLICY kind for the amber tag",
+                TaskFailureKind.POLICY, launchTask.failureKind
+            )
+            assertTrue("names the policy reason", launchTask.result!!.contains("policy"))
+            // The refusal is also in the policy audit trail (RULE 8).
+            assertTrue(DesktopPolicyHolder.auditHistory().any { it.actionClass == "OpenApp" })
+        } finally {
+            DesktopPolicyHolder.resetForTest()
+        }
+    }
+
+    @Test
+    fun `policy gate passes when the holder is not initialized - execution degrades as before`() {
+        DesktopPolicyHolder.resetForTest()
+        val registry = registryWith(FakeDesktopCapability(CapabilityStatus.READY))
+        val plan = DesktopGoalPlanner.plan("open spotify", registry)
+        val launched = mutableListOf<String>()
+        val router = DesktopExecutionRouter(launchProcess = { name -> launched.add(name); true })
+
+        val result = runBlocking { DesktopGoalExecutor.run(plan.goal.id, registry, router) }
+
+        assertTrue("expected success without a policy layer", result.isSuccess)
+        assertEquals(GoalState.COMPLETED, DesktopGoalPlanner.getState(plan.goal.id))
+        assertEquals(listOf("spotify"), launched)
     }
 
     @Test

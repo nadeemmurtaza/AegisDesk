@@ -3,6 +3,7 @@ package com.newax.aegis.desktop.planner
 import com.newax.aegis.desktop.ExecutionAudit
 import com.newax.aegis.desktop.GoalsSnapshot
 import com.newax.aegis.desktop.PlanVerdict
+import com.newax.aegis.desktop.TaskFailureKind
 import com.newax.aegis.platform.CapabilityResolution
 import com.newax.aegis.platform.CapabilityResolver
 import com.newax.aegis.platform.PlatformCapabilityRegistry
@@ -33,6 +34,8 @@ data class TaskNode(
     var result: String? = null,
     var startedMs: Long? = null,
     var completedMs: Long? = null,
+    /** Why a failed task failed (POLICY/CAPABILITY) — mirrors Android's TaskNode. */
+    var failureKind: TaskFailureKind? = null,
 )
 
 data class TaskGraph(
@@ -217,10 +220,19 @@ object DesktopGoalPlanner {
      * and auto-completes the goal when every task is COMPLETED/SKIPPED — the
      * exact semantics of Android's `GoalPlanner.updateTask`.
      */
-    fun updateTask(goalId: String, taskId: String, status: TaskStatus, result: String? = null) {
+    fun updateTask(
+        goalId: String,
+        taskId: String,
+        status: TaskStatus,
+        result: String? = null,
+        failureKind: TaskFailureKind? = null,
+    ) {
         graphs[goalId]?.tasks?.find { it.id == taskId }?.let { task ->
             task.status = status
             task.result = result
+            // A re-run clears the stale failure kind (Android's exact semantics:
+            // RUNNING/COMPLETED wipe it; FAILED carries the fresh one).
+            task.failureKind = if (status == TaskStatus.FAILED) failureKind else null
             if (status == TaskStatus.RUNNING) task.startedMs = System.currentTimeMillis()
             if (status == TaskStatus.COMPLETED || status == TaskStatus.FAILED)
                 task.completedMs = System.currentTimeMillis()

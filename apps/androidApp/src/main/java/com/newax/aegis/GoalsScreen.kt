@@ -1,5 +1,10 @@
 package com.newax.aegis
 
+import android.content.ClipData
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,7 +17,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,15 +33,19 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.newax.aegis.engine.audit.ExecutionAuditEntry
 import com.newax.aegis.engine.audit.ExecutionAuditHolder
+import com.newax.aegis.engine.audit.ExecutionCsv
 import com.newax.aegis.engine.audit.RunOutcome
+import java.io.File
 import com.newax.aegis.engine.bus.AegisEvent
 import com.newax.aegis.engine.bus.AegisEventBus
 import com.newax.aegis.engine.execution.GoalExecutor
 import com.newax.aegis.engine.intelligence.Goal
 import com.newax.aegis.engine.intelligence.GoalPlanner
 import com.newax.aegis.engine.intelligence.PlanResult
+import com.newax.aegis.engine.intelligence.SkillRegistry
 import com.newax.aegis.engine.intelligence.TaskFailureKind
 import com.newax.aegis.engine.intelligence.TaskGraph
 import com.newax.aegis.engine.intelligence.TaskStatus
@@ -103,8 +114,12 @@ private fun readGoalSnapshot(): List<GoalRow> =
 @Composable
 fun GoalsScreen(
     padding: PaddingValues,
-    /** Fired from a policy-blocked task — jumps the user to the Policy modes section. */
-    onOpenPolicyModes: () -> Unit = {}
+    /**
+     * Fired from a policy-blocked task with the policy action class that was
+     * refused (or null when unknown) — jumps the user to that class's row in
+     * Policy modes, highlighting it; null falls back to the section top.
+     */
+    onOpenPolicyModes: (String?) -> Unit = {}
 ) {
     var refreshKey by remember { mutableStateOf(0) }
     var draft by remember { mutableStateOf("") }
@@ -258,7 +273,7 @@ private fun addGoal(text: String, onAdded: () -> Unit) {
 }
 
 @Composable
-private fun GoalCard(row: GoalRow, onOpenPolicyModes: () -> Unit, onChanged: () -> Unit) {
+private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChanged: () -> Unit) {
     val plan  = row.plan
     val graph = row.graph
     val tasks = graph?.tasks.orEmpty()
@@ -427,7 +442,9 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: () -> Unit, onChanged: () 
                             Text(result, fontSize = 12.sp, color = TextTer, lineHeight = 16.sp)
                         }
                         Spacer(Modifier.height(2.dp))
-                        ActionButton("Policy modes", WarnCol, onOpenPolicyModes)
+                        ActionButton("Policy modes", WarnCol) {
+                            onOpenPolicyModes(policyActionClassFor(failed.skillId))
+                        }
                     }
                 }
             }
@@ -538,8 +555,126 @@ private fun BlockBanner(iconColor: Color, title: String, body: String?) {
 private fun RecentRunsSection(runs: List<ExecutionAuditEntry>) {
     if (runs.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Recent runs", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Recent runs",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                color = TextPri,
+                modifier = Modifier.weight(1f)
+            )
+            AuditExportControls()
+        }
         runs.forEach { run -> RunCard(run) }
+    }
+}
+
+/** Where the last execution-audit CSV export ended: nothing yet, saved, or failed. */
+private sealed interface AuditExportStatus {
+    data object Idle : AuditExportStatus
+    data object Done : AuditExportStatus
+    data class Failed(val message: String) : AuditExportStatus
+}
+
+private val AUDIT_CSV_TIMESTAMP = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault())
+
+private fun auditCsvTimestamp(): String = AUDIT_CSV_TIMESTAMP.format(Date())
+
+/**
+ * Export + share for the execution audit trail: SAF create-document (the user
+ * picks where the CSV lands), a cache copy exposed through the manifest
+ * FileProvider (guaranteed readable by email apps), and a Share button on
+ * success — the same flow as the policy-decision history screen.
+ */
+@Composable
+private fun AuditExportControls() {
+    var status by remember { mutableStateOf<AuditExportStatus>(AuditExportStatus.Idle) }
+    var shareUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult // user cancelled the picker
+        val entries = ExecutionAuditHolder.all().sortedByDescending { it.startedMs }
+        val bytes = ExecutionCsv.csv(entries).toByteArray(Charsets.UTF_8)
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { out -> out.write(bytes) }
+                ?: throw IllegalStateException("Could not open the selected file")
+            status = AuditExportStatus.Done
+        } catch (e: Exception) {
+            status = AuditExportStatus.Failed(e.message ?: e.javaClass.simpleName)
+            return@rememberLauncherForActivityResult
+        }
+        // Share copy in app cache — best effort: Share appears only if this works.
+        shareUri = runCatching {
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val file = File(dir, "audit-${auditCsvTimestamp()}.csv")
+            file.writeBytes(bytes)
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        }.getOrNull()
+    }
+
+    Column(horizontalAlignment = Alignment.End) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(
+                onClick = {
+                    status = AuditExportStatus.Idle
+                    exportLauncher.launch("audit-${auditCsvTimestamp()}.csv")
+                },
+                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Icon(Icons.Rounded.Download, contentDescription = null, Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Export CSV", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+            }
+            if (status is AuditExportStatus.Done && shareUri != null) {
+                Spacer(Modifier.width(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        val uri = shareUri
+                        if (uri != null) {
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/csv"
+                                putExtra(Intent.EXTRA_SUBJECT, "Aegis execution audit CSV")
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                clipData = ClipData.newRawUri("Aegis execution audit CSV", uri)
+                            }
+                            context.startActivity(Intent.createChooser(send, "Share execution audit CSV"))
+                        }
+                    },
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Icon(Icons.Rounded.Share, contentDescription = null, Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Share", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        when (val s = status) {
+            is AuditExportStatus.Idle -> Unit
+            is AuditExportStatus.Done -> {
+                Spacer(Modifier.height(4.dp))
+                Text("Exported — email it with Share", fontSize = 11.sp, color = ReadyCol)
+            }
+            is AuditExportStatus.Failed -> {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    s.message,
+                    fontSize = 11.sp,
+                    color = ErrorCol,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
@@ -635,6 +770,14 @@ private fun PolicyTag() {
 }
 
 @Composable
+/**
+ * The policy action class a blocked task's skill maps to (same mapping the
+ * executor's policy gate uses), or null when the skill has no policy action —
+ * the caller then falls back to scrolling to the Policy modes section top.
+ */
+private fun policyActionClassFor(skillId: String?): String? =
+    skillId?.let { SkillRegistry.policyActionFor(it) }?.let { it::class.simpleName }
+
 private fun ActionButton(label: String, color: Color, onClick: () -> Unit) {
     TextButton(
         onClick  = onClick,

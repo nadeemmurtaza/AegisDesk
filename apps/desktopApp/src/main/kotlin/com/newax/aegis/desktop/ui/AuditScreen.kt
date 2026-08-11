@@ -181,7 +181,7 @@ private fun AuditSummaryCard(
                     Text("Export CSV", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.width(12.dp))
-                ExportStatusLine(exportState)
+                ExportStatusLine(exportState, "Exports land in ~/.aegis/audit-<timestamp>.csv")
             }
         }
     }
@@ -232,32 +232,6 @@ private fun successRateColor(percent: Int): Color = when {
     percent >= 80 -> ReadyColor
     percent >= 50 -> WarningColor
     else -> ErrorColor
-}
-
-@Composable
-private fun ExportStatusLine(state: ExportState) {
-    when (state) {
-        is ExportState.Idle -> Text(
-            "Exports land in ~/.aegis/audit-<timestamp>.csv",
-            fontSize = 12.sp,
-            color = TextTertiaryColor
-        )
-        is ExportState.Done -> Text(
-            "Exported → $state.path",
-            fontSize = 12.sp,
-            color = ReadyColor,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        is ExportState.Failed -> Text(
-            state.message,
-            fontSize = 12.sp,
-            color = ErrorColor,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
 }
 
 @Composable

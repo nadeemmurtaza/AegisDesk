@@ -4,6 +4,7 @@ import com.newax.aegis.desktop.DesktopGoalPlanner
 import com.newax.aegis.desktop.ExecutionAudit
 import com.newax.aegis.desktop.ExecutionAuditEntry
 import com.newax.aegis.desktop.GoalsStore
+import com.newax.aegis.desktop.TaskFailureKind
 import com.newax.aegis.desktop.planner.DesktopPlan
 import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState
@@ -15,11 +16,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** One task line on a goal card — status plus the executor's result text. */
+/** One task line on a goal card — status, the executor's result text, and why it failed (policy/capability). */
 data class GoalTaskUi(
     val description: String,
     val status: TaskStatus,
     val result: String?,
+    val failureKind: TaskFailureKind? = null,
 )
 
 /** One goal on the board, pre-computed for rendering (progress, feasibility, actions). */
@@ -152,7 +154,9 @@ class GoalsScreenState(
     private fun rowOf(goal: Goal): GoalUiRow {
         val state = planner.getState(goal.id) ?: GoalState.OPEN
         val graph = planner.getGraph(goal.id)
-        val tasks = graph?.tasks.orEmpty().map { GoalTaskUi(it.description, it.status, it.result) }
+        val tasks = graph?.tasks.orEmpty().map {
+            GoalTaskUi(it.description, it.status, it.result, it.failureKind)
+        }
         val progress = graph?.progress() ?: 0f
         return GoalUiRow(
             goal = goal,

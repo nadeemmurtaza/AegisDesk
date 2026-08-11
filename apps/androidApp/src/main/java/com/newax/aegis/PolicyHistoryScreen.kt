@@ -1,5 +1,10 @@
 package com.newax.aegis
 
+import android.content.ClipData
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +25,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -42,15 +49,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.newax.aegis.authority.PolicyAuditRecord
 import com.newax.aegis.authority.PolicyDecision
 import com.newax.aegis.engine.audit.ActionClassStat
+import com.newax.aegis.engine.audit.PolicyCsv
 import com.newax.aegis.engine.audit.actionClassBreakdown
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,6 +92,17 @@ private fun decisionLabel(decision: PolicyDecision): String = when (decision) {
     PolicyDecision.DENY             -> "Denied"
 }
 
+/** Where the last CSV export attempt ended: nothing yet, saved, or failed with a reason. */
+private sealed interface ExportStatus {
+    data object Idle : ExportStatus
+    data object Done : ExportStatus
+    data class Failed(val message: String) : ExportStatus
+}
+
+private val CSV_TIMESTAMP_FORMAT = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault())
+
+private fun csvTimestamp(): String = CSV_TIMESTAMP_FORMAT.format(Date())
+
 /**
  * Policy-decision history — the full audit trail across sessions (RULE 8: who
  * asked, what was decided). Read from the persistent [PolicyHolder.auditHistory]:
@@ -93,9 +115,53 @@ fun PolicyHistoryScreen(padding: PaddingValues, onOpenActionClass: (String) -> U
     val records = remember(version) { PolicyHolder.auditHistory() }
     var filter by remember { mutableStateOf<PolicyDecision?>(null) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var exportStatus by remember { mutableStateOf<ExportStatus>(ExportStatus.Idle) }
+    var shareUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
     val fmt = remember { SimpleDateFormat("MMM d · HH:mm", Locale.getDefault()) }
 
     val filtered = if (filter == null) records else records.filter { it.decision == filter }
+
+    // SAF create-document: the user picks where the CSV lands (no storage permission needed).
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult // user cancelled the picker
+        val csv = PolicyCsv.csv(filtered.sortedByDescending { it.auditedAtMs })
+        val bytes = csv.toByteArray(Charsets.UTF_8)
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                out.write(bytes)
+            } ?: throw IllegalStateException("Could not open the selected file")
+            exportStatus = ExportStatus.Done
+        } catch (e: Exception) {
+            exportStatus = ExportStatus.Failed(e.message ?: e.javaClass.simpleName)
+            return@rememberLauncherForActivityResult
+        }
+        // Share copy in app cache, exposed through the manifest FileProvider —
+        // guaranteed readable by email apps, unlike re-sharing the SAF-picked
+        // URI (provider-dependent). Best effort: Share appears only if this works.
+        shareUri = runCatching {
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val file = File(dir, "policy-audit-${csvTimestamp()}.csv")
+            file.writeBytes(bytes)
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        }.getOrNull()
+    }
+
+    val shareExport: () -> Unit = {
+        val uri = shareUri
+        if (uri != null) {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_SUBJECT, "Aegis policy audit CSV")
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = ClipData.newRawUri("Aegis policy audit CSV", uri)
+            }
+            context.startActivity(Intent.createChooser(send, "Share policy export CSV"))
+        }
+    }
 
     LazyColumn(
         Modifier
@@ -168,6 +234,70 @@ fun PolicyHistoryScreen(padding: PaddingValues, onOpenActionClass: (String) -> U
                                 fontSize = 11.sp,
                                 color = TextTer
                             )
+                        }
+
+                        // CSV export — writes the currently filtered trail to the
+                        // location the user picks (mirrors the desktop Policy tab).
+                        Spacer(Modifier.height(12.dp))
+                        HorizontalDivider(color = Border)
+                        Spacer(Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = {
+                                    exportStatus = ExportStatus.Idle
+                                    exportLauncher.launch("policy-audit-${csvTimestamp()}.csv")
+                                },
+                                enabled = records.isNotEmpty(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = TextPri,
+                                    contentColor = Surface,
+                                    disabledContainerColor = SurfaceMuted,
+                                    disabledContentColor = TextTer
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Rounded.Download, contentDescription = null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Export CSV", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            when (val status = exportStatus) {
+                                is ExportStatus.Idle -> Text(
+                                    "Exports the shown trail — you pick where it saves",
+                                    fontSize = 11.5.sp,
+                                    color = TextTer,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                is ExportStatus.Done -> Text(
+                                    "Exported ✓",
+                                    fontSize = 11.5.sp,
+                                    color = AutoCol,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                is ExportStatus.Failed -> Text(
+                                    status.message,
+                                    fontSize = 11.5.sp,
+                                    color = StrongCol,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (exportStatus is ExportStatus.Done && shareUri != null) {
+                                Spacer(Modifier.width(8.dp))
+                                OutlinedButton(
+                                    onClick = shareExport,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Share, contentDescription = null, Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Share", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                         }
                     }
                 }

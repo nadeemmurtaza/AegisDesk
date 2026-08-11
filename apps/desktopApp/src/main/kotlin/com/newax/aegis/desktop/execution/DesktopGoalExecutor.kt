@@ -1,7 +1,10 @@
 package com.newax.aegis.desktop.execution
 
+import com.newax.aegis.assistant.ActionOrigin
+import com.newax.aegis.desktop.DesktopPolicyHolder
 import com.newax.aegis.desktop.ExecutionAudit
 import com.newax.aegis.desktop.ExecutionAuditEntry
+import com.newax.aegis.desktop.TaskFailureKind
 import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.SkillRegistry
@@ -159,7 +162,29 @@ object DesktopGoalExecutor {
                 goalId, task,
                 "Capability '$cap' is not ready — resolve it first (see \"status\" / \"skills\")",
                 onProgress,
+                kind = TaskFailureKind.CAPABILITY,
             )
+        }
+
+        // Policy gate — rule 10 (PLAN is never EXECUTE): the goal/plan grants
+        // zero execution authority. Privileged tasks are evaluated through the
+        // shared PolicyEngine as AGENT origin (stricter than user); only
+        // AUTO_EXECUTE runs autonomously — the desktop mirror of Android's
+        // GoalExecutor gate. When the holder is not initialized (tests,
+        // pre-bootstrap) the gate is skipped so execution degrades exactly as
+        // before the authority slice landed.
+        val policyAction = SkillRegistry.policyActionFor(skillId)
+        if (policyAction != null) {
+            val evaluation = DesktopPolicyHolder.evaluateOrNull(policyAction, ActionOrigin.AGENT)
+            if (evaluation != null && !evaluation.decision.allowsAutonomousExecution) {
+                return finishFailed(
+                    goalId, task,
+                    "Skill '$skillId' cannot run autonomously — policy ${evaluation.decision.name} " +
+                        "(${evaluation.reason}). Change its mode in the Policy tab, or approve it manually.",
+                    onProgress,
+                    kind = TaskFailureKind.POLICY,
+                )
+            }
         }
 
         DesktopGoalPlanner.updateTask(goalId, task.id, TaskStatus.RUNNING)
@@ -275,8 +300,14 @@ object DesktopGoalExecutor {
         onProgress("DONE     ${task.description} — $message")
     }
 
-    private fun finishFailed(goalId: String, task: TaskNode, reason: String, onProgress: (String) -> Unit): Result<Unit> {
-        DesktopGoalPlanner.updateTask(goalId, task.id, TaskStatus.FAILED, reason)
+    private fun finishFailed(
+        goalId: String,
+        task: TaskNode,
+        reason: String,
+        onProgress: (String) -> Unit,
+        kind: TaskFailureKind? = null,
+    ): Result<Unit> {
+        DesktopGoalPlanner.updateTask(goalId, task.id, TaskStatus.FAILED, reason, kind)
         onProgress("FAILED   ${task.description} — $reason")
         return Result.failure(IllegalStateException(reason))
     }

@@ -131,6 +131,7 @@ class FileGoalsStore(private val file: Path) : GoalsStore {
                         .putOpt("result", t.result)
                         .putOpt("startedMs", t.startedMs)
                         .putOpt("completedMs", t.completedMs)
+                        .putOpt("failureKind", t.failureKind?.name)
                 )
             }
             graphsArr.put(
@@ -202,6 +203,11 @@ class FileGoalsStore(private val file: Path) : GoalsStore {
                     result = t.optString("result").ifEmpty { null },
                     startedMs = t.optLongOrNull("startedMs"),
                     completedMs = t.optLongOrNull("completedMs"),
+                    // Missing/unknown decodes to null — old B3 snapshots predating
+                    // the policy gate still load cleanly.
+                    failureKind = TaskFailureKind.entries.firstOrNull {
+                        it.name == t.optString("failureKind")
+                    },
                 )
             }
             TaskGraph(goalId = o.getString("goalId"), tasks = tasks, createdMs = o.getLong("createdMs"))

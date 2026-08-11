@@ -183,4 +183,7 @@ object ExecutionAuditHolder {
     fun recent(limit: Int): List<ExecutionAuditEntry> = synchronized(lock) {
         entries.takeLast(limit).reversed()
     }
+
+    /** The full trail, oldest first (chronological append order) — for CSV exports. */
+    fun all(): List<ExecutionAuditEntry> = synchronized(lock) { entries }
 }

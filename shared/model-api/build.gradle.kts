@@ -13,6 +13,16 @@ kotlin {
         }
     }
 
+    // Apple targets — Track M1 logic-only slice: the ModelProvider contract
+    // (expect-free commonMain) now compiles for macOS + iOS. Apple-target
+    // compiles run on a macOS host only; CI and this Linux sandbox keep
+    // verifying jvm + android.
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+    macosX64()
+    macosArm64()
+
     sourceSets {
         val commonMain by getting {
             dependencies {
