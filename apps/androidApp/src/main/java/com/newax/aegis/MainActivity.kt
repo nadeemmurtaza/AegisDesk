@@ -332,7 +332,7 @@ fun AegisApp(
                     Screen.Nearby -> NearbyShareScreen(padding)
                     Screen.Sync -> SyncScreen(padding)
                     Screen.AgentMemory -> AgentMemoryScreen(padding)
-                    Screen.Agents -> AgentsScreen(padding)
+                    Screen.Agents -> AgentsScreen(padding, onContinueTask = { vm.submit(it) })
                     Screen.Skills -> SkillsScreen(padding)
                 }
             }

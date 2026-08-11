@@ -53,7 +53,9 @@ object SkillManager {
     private data class SkillSeed(
         val id: String, val name: String, val description: String, val category: String,
         val capability: String, val sandboxRequired: Boolean, val requiresApproval: Boolean,
-        val risks: String, val defaultAgents: List<String>
+        val risks: String, val defaultAgents: List<String>,
+        /** "agent" (needs a grant) or "global" (implicitly granted to every agent). */
+        val scope: String = "agent"
     )
 
     private val SEEDS = listOf(
@@ -81,6 +83,43 @@ object SkillManager {
     )
 
     /** Default named bundles created at seed time. */
+    /**
+     * The universal SYSTEM skills (docs/AGENTS_DESIGN.md §runtime) — the
+     * standard agent capabilities every agent shares, extracted OUT of agent
+     * code into decoupled system skills under `app/skills/system/`:
+     *  - skill.sys.mcp_stream — live token/phase streaming to the UI (the MCP
+     *    dispatcher, [AgentStream]),
+     *  - skill.sys.serialize_state — freeze/thaw session serialization
+     *    ([StateArchiver]),
+     *  - skill.sys.health_audit — integrity audit + quarantine ([AgentRuntimeEngine]),
+     *  - skill.sys.task_control — abort/suspend/resume ([AgentRuntimeEngine]).
+     * All are scope = "global": granted to every active agent implicitly — the
+     * permission controller bypasses the restrictive whitelist for these core
+     * utilities while shell/files skills stay "agent"-scoped and restricted.
+     */
+    private val SYSTEM_SKILLS = listOf(
+        SkillSeed(
+            "skill.sys.mcp_stream", "Stream Dispatcher",
+            "Broadcast live tokens, phases, and progress to the assistant UI over the structured stream protocol.",
+            "system", "system", sandboxRequired = false, requiresApproval = false,
+            "Read-only UI telemetry", emptyList(), scope = "global"),
+        SkillSeed(
+            "skill.sys.serialize_state", "State Archiver",
+            "Freeze an agent session (task, context, result) to app-private disk and restore it later.",
+            "system", "system", sandboxRequired = false, requiresApproval = false,
+            "Writes app-private state files only", emptyList(), scope = "global"),
+        SkillSeed(
+            "skill.sys.health_audit", "Health Audit",
+            "Verify agent integrity — database, manifest, package, skills, sessions — and quarantine a faulted agent.",
+            "system", "system", sandboxRequired = false, requiresApproval = false,
+            "May disable a faulted agent until a human restores it", emptyList(), scope = "global"),
+        SkillSeed(
+            "skill.sys.task_control", "Task Control",
+            "Abort, suspend, or resume a running agent session from the runtime.",
+            "system", "system", sandboxRequired = false, requiresApproval = false,
+            "Stops a running session", emptyList(), scope = "global")
+    )
+
     private val DEFAULT_SETS = listOf(
         Triple("automation", "Automation", "Shell + app control skills"),
         Triple("knowledge", "Knowledge", "Query and research skills"),
@@ -136,6 +175,23 @@ object SkillManager {
                     }
                     DEFAULT_SET_MEMBERS.forEach { (setId, skills) ->
                         skills.forEach { dao.addToSet(SkillSetMember(setId = setId, skillId = it)) }
+                    }
+                }
+                // System skills seed idempotently — OUTSIDE the isEmpty() gate, so an
+                // existing install that upgrades into v18 still gets them.
+                SYSTEM_SKILLS.forEach { s ->
+                    if (runCatching { dao.skillById(s.id) }.getOrNull() == null) {
+                        dao.upsertSkill(
+                            SkillEntity(
+                                skillId = s.id, name = s.name, description = s.description,
+                                category = s.category, version = "1.0.0",
+                                capability = s.capability,
+                                sandboxRequired = s.sandboxRequired,
+                                requiresApproval = s.requiresApproval,
+                                risks = s.risks, scope = s.scope,
+                                enabled = true, source = SOURCE_BUILTIN, installedAtMs = System.currentTimeMillis()
+                            )
+                        )
                     }
                 }
                 // Migrate the legacy agents.skills comma column (v15) into real grants.
@@ -295,10 +351,19 @@ object SkillManager {
 
     // ── permissions (which agent may use which skill) ───────────────────────
 
-    /** The permission primitive: granted AND skill enabled (agent enabled is checked by routing). */
+    /**
+     * The permission primitive: granted AND skill enabled (agent enabled is
+     * checked by routing) — except GLOBAL-scope system skills, which every
+     * agent may use without a grant row (the zero-policy-maintenance bypass).
+     */
     fun canUse(agentId: String, skillId: String): Boolean {
         val db = runCatching { AegisDatabase.get }.getOrNull() ?: return false
-        return runBlocking { runCatching { db.skillManagerDao().canUseCount(agentId, skillId) }.getOrDefault(0) } > 0
+        return runBlocking {
+            val skill = runCatching { db.skillManagerDao().skillById(skillId) }.getOrNull() ?: return@runBlocking false
+            if (!skill.enabled) return@runBlocking false
+            if (skill.scope == "global") return@runBlocking true
+            runCatching { db.skillManagerDao().canUseCount(agentId, skillId) }.getOrDefault(0) > 0
+        }
     }
 
     fun grant(agentId: String, skillId: String) {

@@ -59,9 +59,15 @@ interface SkillManagerDao {
     )
     suspend fun canUseCount(agentId: String, skillId: String): Int
 
+    /**
+     * What an agent may use: its granted skills PLUS every GLOBAL-scope
+     * system skill (skill.sys.*) — the global access scope tag means core
+     * runtime utilities never need per-agent grant rows.
+     */
     @Query(
-        "SELECT s.* FROM skills s JOIN agent_skills a ON a.skillId = s.skillId " +
-            "WHERE a.agentId = :agentId AND s.enabled = 1 ORDER BY s.category ASC, s.name ASC"
+        "SELECT s.* FROM skills s WHERE s.enabled = 1 AND " +
+            "(s.scope = 'global' OR EXISTS (SELECT 1 FROM agent_skills a WHERE a.skillId = s.skillId AND a.agentId = :agentId)) " +
+            "ORDER BY s.category ASC, s.name ASC"
     )
     suspend fun skillsForAgent(agentId: String): List<SkillEntity>
 

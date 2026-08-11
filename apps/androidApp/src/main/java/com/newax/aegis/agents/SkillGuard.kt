@@ -69,11 +69,18 @@ object SkillGuard {
             ?: return Decision.Denied("agent-not-found")
         if (!agent.enabled) return Decision.Denied("agent-disabled")
 
-        // 3. The grant — absence = denied.
-        if (!SkillManager.canUse(agentId, skillId)) return Decision.Denied("not-granted")
+        // 3. The grant — absence = denied. EXCEPT GLOBAL-scope system skills
+        //    (skill.sys.*): they are granted to every active agent implicitly
+        //    (zero policy maintenance bloat) — core runtime utilities bypass the
+        //    restrictive whitelist while dangerous shell/files skills stay
+        //    "agent"-scoped and keep every restriction.
+        val globalScope = skill.scope == "global"
+        if (!globalScope && !SkillManager.canUse(agentId, skillId)) return Decision.Denied("not-granted")
 
-        // 4. Capability bridge — what the agent knows how to do vs. what the skill does.
-        if (skill.capability.isNotBlank()) {
+        // 4. Capability bridge — what the agent knows how to do vs. what the
+        //    skill does. Skipped for global system skills (they are runtime
+        //    primitives, not agent capabilities).
+        if (!globalScope && skill.capability.isNotBlank()) {
             val capabilities = agent.capabilities.split(',').map { it.trim() }.filter { it.isNotBlank() }
             if (skill.capability !in capabilities) return Decision.Denied("capability-not-declared")
         }

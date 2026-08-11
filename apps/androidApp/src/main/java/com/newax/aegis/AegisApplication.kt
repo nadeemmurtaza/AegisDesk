@@ -79,6 +79,10 @@ class AegisApplication : Application() {
         // skills + default per-agent grants + named sets; migrates the legacy
         // agents.skills column into grant rows.
         com.newax.aegis.agents.SkillManager.init(this)
+        // Agent runtime (docs/AGENTS_DESIGN.md §runtime): the PRAM controller
+        // surface (run/abort/status/health_check), the run ledger + health
+        // audit, and the State Archiver for freeze/thaw.
+        com.newax.aegis.agents.AgentRuntimeEngine.init(this)
         // Goals survive restarts (Track A5): every planner mutation persists a JSON
         // snapshot to the existing kv_store table (no schema change), and restore
         // rehydrates the planner before any screen or executor reads it.

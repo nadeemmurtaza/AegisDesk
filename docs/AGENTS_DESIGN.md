@@ -1,4 +1,4 @@
-# Multi-Agent Management System (schema v15)
+# Multi-Agent Management System (schema v18)
 
 The agent registry + routing + orchestration layer that makes the assistant a
 swarm: import agent packages, enable/disable/upgrade/uninstall them, and have
@@ -130,11 +130,101 @@ contains this three ways:
   Skills screen pops the allow/deny window. 30-min TTL expires undecided
   requests. Every decision is recorded — who asked, what for, allow or deny.
 
-## Wiring
+## Agent runtime — the PRAM controller (schema v18)
 
-- `AgentRegistry.init` + `SkillManager.init` run at app start (seeds built-ins after DB init).
+Agents are more than prompt profiles: every agent exposes the SAME
+encapsulated interface and communicates through strict structured blocks,
+never raw chatter. This is the Action + Memory pillar of the PRAM framework
+(Perception / Reasoning / Action / Memory).
+
+### The standard interface — `AgentController`
+
+```
+run(task_prompt, context)   # starts execution, returns the session id
+abort()                     # force-stops the agent's active session(s)
+status()                    # get_status: live phase + result/error block
+health_check()              # integrity audit (skill.sys.health_audit)
+```
+
+`AgentRuntimeEngine.controllerFor(agentId)` returns the same controller for
+every agent — built-in or imported. One shared model serves all agents; the
+per-agent brain is the role context + permitted skills.
+
+### Strict structured output
+
+Agents never return unpredictable chatter. The run ledger
+(`agent_sessions`) holds only strict blocks:
+
+```json
+{"status":"success","artifact_path":"…","summary":"…"}
+{"status":"error","error_type":"PERMISSION_DENIAL","message":"…"}
+```
+
+`AgentResult.success/error` build them; the core app parses them for clean
+UI handling. Live progress streams through `AgentStream`
+(skill.sys.mcp_stream) — phase transitions, artifacts, errors — and the
+Agents screen renders the feed in real time.
+
+### Freeze / thaw — `StateArchiver` (skill.sys.serialize_state)
+
+Any session can be serialized to app-private disk (device-encrypted at rest)
+and restored later without losing the running task's context. Freeze writes
+`<agentId>-<sessionId>.json` and marks the session FROZEN; Thaw restores the
+latest frozen state as a RUNNING session (phase "Restored") carrying the
+original task + context, which the user can Continue in chat.
+
+### System skills — GLOBAL access scope (zero policy maintenance bloat)
+
+Universal capabilities are extracted OUT of agent code into decoupled system
+skills under `app/skills/system/`, registered in the permission pool with
+`scope = "global"`:
+
+- `skill.sys.mcp_stream` — Stream Dispatcher (live tokens/phases to the UI),
+- `skill.sys.serialize_state` — State Archiver (freeze/thaw),
+- `skill.sys.health_audit` — Health Audit (integrity + quarantine),
+- `skill.sys.task_control` — Task Control (abort/suspend/resume).
+
+The permission guard marks GLOBAL scope and **bypasses the restrictive
+per-agent whitelist** (no grant row, no capability bridge) for these core
+utilities — every active agent inherits them automatically — while dangerous
+shell/files skills stay "agent"-scoped and keep every restriction
+(`run_shell` still needs the grant + sandbox + approval).
+
+### Health audit and fault handling — `AgentRuntimeEngine.healthCheck`
+
+Real integrity checks, each a named finding: database reachable + session
+table writable; agent record exists; zip-imported package directory exists;
+granted skills resolve; no stale RUNNING sessions (crash residue).
+
+- **HEALTHY** — all checks pass.
+- **DEGRADED** — soft issues (missing package, missing skill, stale
+  session): monitored, never disabled.
+- **FAULTED** — hard failures (DB unreachable, agent record missing): the
+  agent is **quarantined — auto-disabled** — and an episode records the
+  fault with the lesson. The user restores it from the Agents screen
+  (`Restore` → re-enables + clears the fault counter).
+
+A session failure runs the audit automatically: a transient model error
+finds the agent HEALTHY and changes nothing; a real fault quarantines it.
+
+### Function-calling readiness
+
+The active agent's permitted tool schemas (`SkillManager.toolSchemasForAgent`,
+now including global system skills) ride into the LLM prompt so the model can
+invoke them with exact parameters; a cloud model with true function calling
+binds the same schemas. One source of truth for tools.
+
+### Wiring
+
+- `AgentRegistry.init` + `SkillManager.init` + `AgentRuntimeEngine.init` run
+  at app start (seeds built-ins after DB init).
 - `MainViewModel.submit` plans every request, runs `assemble` (episodes +
-  handoffs), injects the active-agent block into the LLM prompt, and passes
-  the step's dominant-agent context into each part of a multi-step command.
-- Agents screen: list + enable/disable + uninstall, zip import/upgrade, and a
-  live routing preview showing per-step dominance.
+  handoffs), starts a runtime session for the step-1 dominant agent
+  (run → Thinking → strict result block), injects the active-agent block +
+  tool schemas into the LLM prompt, discards the late result when the user
+  aborted mid-inference, and fails the session with a uniform error block on
+  exception.
+- Agents screen: list + enable/disable + uninstall, zip import/upgrade, a
+  live routing preview, and the runtime panel — live sessions with
+  Abort/Freeze, the health ledger with Check/Restore, Thaw + Continue for
+  frozen state, and the MCP stream feed.

@@ -29,7 +29,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,8 +46,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.agents.AgentRegistry
+import com.newax.aegis.agents.AgentResult
 import com.newax.aegis.agents.AgentRouter
+import com.newax.aegis.agents.AgentRuntimeEngine
+import com.newax.aegis.agents.AgentStream
 import com.newax.aegis.db.entity.AgentEntity
+import com.newax.aegis.db.entity.AgentHealthStatus
+import com.newax.aegis.db.entity.SessionPhase
+import com.newax.aegis.db.entity.SessionStatus
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
 private val Surface = Color(0xFFFFFFFF)
@@ -66,7 +74,7 @@ private val AccentRed = Color(0xFFDC2626)
  * multi-step tasks.
  */
 @Composable
-fun AgentsScreen(padding: PaddingValues) {
+fun AgentsScreen(padding: PaddingValues, onContinueTask: (String) -> Unit = {}) {
     val context = LocalContext.current
     var agents by remember { mutableStateOf(AgentRegistry.agents()) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -137,6 +145,221 @@ fun AgentsScreen(padding: PaddingValues) {
         item { Spacer(Modifier.height(4.dp)) }
         item { SectionLabel2("Routing preview — who dominates what") }
         item { RoutingPreview() }
+
+        item { Spacer(Modifier.height(4.dp)) }
+        item { SectionLabel2("Agent runtime — PRAM controller (run / abort / get_status / health_check)") }
+        item { AgentRuntimePanel(onContinueTask) }
+    }
+}
+
+private val AccentBlue = Color(0xFF3B82F6)
+private val AccentAmber = Color(0xFFF59E0B)
+
+private fun elapsed(ms: Long): String {
+    val s = (System.currentTimeMillis() - ms) / 1000
+    return if (s < 60) "${s}s" else "${s / 60}m ${s % 60}s"
+}
+
+private fun phaseColor(phase: String): Color = when (phase) {
+    SessionPhase.RUNNING_TOOL -> AccentAmber
+    SessionPhase.RESTORED -> AccentBlue
+    SessionPhase.DONE -> AccentGreen
+    else -> TextTer
+}
+
+private fun healthColor(status: String?): Color = when (status) {
+    AgentHealthStatus.FAULTED -> AccentRed
+    AgentHealthStatus.DEGRADED -> AccentAmber
+    else -> AccentGreen
+}
+
+/**
+ * The runtime surface (docs/AGENTS_DESIGN.md §runtime; R13): live sessions
+ * with phase + elapsed + Abort (Cancel) / Freeze (skill.sys.serialize_state),
+ * the health-audit ledger with Health check / Restore (skill.sys.health_audit),
+ * Thaw for frozen state, Continue for restored tasks, and the live MCP stream
+ * feed (skill.sys.mcp_stream). Live-updates via the stream bus.
+ */
+@Composable
+private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { AgentStream.events.collect { tick++ } }
+    val sessions = AgentRuntimeEngine.activeSessions()
+    val frozen = AgentRuntimeEngine.frozenSessions()
+    val healthRows = AgentRuntimeEngine.allHealth().associateBy { it.agentId }
+    val agentNames = remember { AgentRegistry.agents().associate { it.agentId to it.name } }
+    val feed = AgentStream.events.value.takeLast(5)
+    val name = { id: String -> agentNames[id] ?: id }
+
+    // ── live sessions ───────────────────────────────────────────────────────
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Live sessions", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Spacer(Modifier.height(4.dp))
+            Text("Every agent runs through the same controller — run(), abort(), get_status(), health_check().", fontSize = 12.sp, color = TextSec)
+            if (sessions.isEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("No sessions running.", fontSize = 12.sp, color = TextTer)
+            }
+            sessions.forEach { s ->
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(phaseColor(s.phase))
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${name(s.agentId)} — ${s.phase}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
+                        Text("${s.taskPrompt.take(70)} · ${elapsed(s.startedAtMs)}", fontSize = 11.sp, color = TextTer, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    TextButton(onClick = { AgentRuntimeEngine.controllerFor(s.agentId).abort() }) {
+                        Text("Abort", fontSize = 12.sp, color = AccentRed)
+                    }
+                    TextButton(onClick = { AgentRuntimeEngine.freeze(s.sessionId) }) {
+                        Text("Freeze", fontSize = 12.sp)
+                    }
+                }
+                if (s.phase == SessionPhase.RESTORED) {
+                    Spacer(Modifier.height(2.dp))
+                    TextButton(
+                        onClick = { onContinueTask(s.taskPrompt) },
+                        modifier = Modifier.align(Alignment.End)
+                    ) { Text("Continue in chat", fontSize = 12.sp, color = AccentBlue) }
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    // ── health audit ────────────────────────────────────────────────────────
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Health audit — skill.sys.health_audit", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Spacer(Modifier.height(4.dp))
+            Text("A FAULTED agent is quarantined (auto-disabled) until you restore it. Soft issues are DEGRADED and monitored.", fontSize = 12.sp, color = TextSec)
+            AgentRegistry.agents().forEach { agent ->
+                val h = healthRows[agent.agentId]
+                val status = h?.status
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(healthColor(status))
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(agent.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
+                        val detail = h?.detail
+                        Text(
+                            if (detail.isNullOrBlank()) "${status ?: "not audited yet"} · faults: ${h?.faultCount ?: 0}" else "$status · ${detail.take(60)}",
+                            fontSize = 11.sp, color = TextTer, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    TextButton(onClick = { AgentRuntimeEngine.controllerFor(agent.agentId).healthCheck() }) {
+                        Text("Check", fontSize = 12.sp)
+                    }
+                    if (status == AgentHealthStatus.FAULTED) {
+                        TextButton(onClick = { AgentRuntimeEngine.recover(agent.agentId) }) {
+                            Text("Restore", fontSize = 12.sp, color = AccentGreen)
+                        }
+                    }
+                    if (frozen.any { it.agentId == agent.agentId }) {
+                        TextButton(onClick = { AgentRuntimeEngine.thaw(agent.agentId) }) {
+                            Text("Thaw", fontSize = 12.sp, color = AccentBlue)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    // ── stream feed ─────────────────────────────────────────────────────────
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Stream feed — skill.sys.mcp_stream", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Spacer(Modifier.height(4.dp))
+            Text("Agents stream their progress here in real time — structured events, never raw chatter.", fontSize = 12.sp, color = TextSec)
+            if (feed.isEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("No stream events yet.", fontSize = 12.sp, color = TextTer)
+            }
+            feed.forEach { e ->
+                Spacer(Modifier.height(4.dp))
+                Text("[${e.type}] ${name(e.agentId)} ${e.phase}: ${e.text.take(80)}", fontSize = 11.sp, color = TextSec, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    // ── recent runs (strict result/error blocks, read by the core app) ──────
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Recent runs — structured blocks", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Spacer(Modifier.height(4.dp))
+            Text("The app reads these strict blocks ({\"status\":…}) to render results and errors cleanly.", fontSize = 12.sp, color = TextSec)
+            val recent = AgentRuntimeEngine.recentSessions(4)
+            if (recent.isEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("No completed runs yet.", fontSize = 12.sp, color = TextTer)
+            }
+            recent.forEach { r ->
+                Spacer(Modifier.height(8.dp))
+                val parsed = AgentResult.parse(r.resultJson.ifBlank { r.errorJson })
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(
+                                when (parsed?.status) {
+                                    "success" -> AccentGreen
+                                    "error" -> AccentRed
+                                    else -> TextTer
+                                }
+                            )
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${name(r.agentId)} — ${r.status}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
+                        val line = when {
+                            parsed == null -> r.taskPrompt.take(60)
+                            parsed.status == "success" -> parsed.summary
+                            else -> "[${parsed.errorType}] ${parsed.message}"
+                        }
+                        Text(line.take(90), fontSize = 11.sp, color = if (parsed?.status == "error") AccentRed else TextTer, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
     }
 }
 

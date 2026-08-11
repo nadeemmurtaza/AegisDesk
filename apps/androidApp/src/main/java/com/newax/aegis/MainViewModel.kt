@@ -455,6 +455,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 messages += ChatMessage("No verified offline model is ready. Use Import model, or use a deterministic device command.", false)
                 return
             }
+            // Agent runtime (docs/AGENTS_DESIGN.md §runtime): the dominant
+            // agent of step 1 runs this request through the standard controller
+            // — run() → live phases → strict result/error block in the ledger.
+            val dominantAgent = agentPlan.steps.firstOrNull()?.dominant
+            val sessionId = dominantAgent?.let { agent ->
+                val ctx = com.newax.aegis.agents.AgentContext(
+                    taskPrompt = text.take(2000),
+                    planSummary = agentPlan.steps.joinToString("; ") { s ->
+                        (s.dominant?.name ?: "assistant") + " → " + s.text.take(80)
+                    }.take(500),
+                    memoryPointers = listOf("library", "episodes", "handoffs"),
+                    skills = runCatching { com.newax.aegis.agents.SkillManager.skillsForAgent(agent.agentId).map { it.skillId } }
+                        .getOrDefault(emptyList())
+                )
+                com.newax.aegis.agents.AgentRuntimeEngine.start(agent.agentId, text, ctx.toJson())
+            }
             modelBusy = true
             viewModelScope.launch {
                 try {
@@ -465,6 +481,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         CandidateMerger.merge(resolved, plan)
                     }
                     if (!merged.requiresLlm && merged.topFacts.isNotEmpty()) {
+                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, merged.summary) }
                         messages += ChatMessage(merged.summary, false)
                         modelBusy = false
                         return@launch
@@ -491,6 +508,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val prompt = buildString {
                             val agentContext = com.newax.aegis.agents.AgentOrchestrator.contextFor(agentPlan)
                             if (agentContext.isNotBlank()) append("$agentContext\n")
+                            // Function-calling readiness (docs/AGENTS_DESIGN.md §runtime):
+                            // the active agent's permitted tool schemas ride in the
+                            // prompt so the model can invoke them with exact parameters;
+                            // a cloud model with true function calling binds the same
+                            // schemas from SkillManager.toolSchemasForAgent.
+                            val agentSchemas = dominantAgent?.let { a ->
+                                runCatching { com.newax.aegis.agents.SkillManager.toolSchemasForAgent(a.agentId) }.getOrDefault(emptyList())
+                            } ?: emptyList()
+                            if (agentSchemas.isNotEmpty()) {
+                                append("Available tools for the active agent (JSON function schemas — call them with the exact parameters):\n")
+                                agentSchemas.take(3).forEach { append(it.take(600)); append('\n') }
+                            }
                             val profile = memory.getAllCategories().entries
                                 .filter { it.value.isNotEmpty() }
                                 .joinToString("\n") { "${it.key.uppercase()}:\n- " + it.value.joinToString("\n- ") }
@@ -510,6 +539,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 out.toByteArray()
                             }
                         }
+                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.phase(it, com.newax.aegis.db.entity.SessionPhase.THINKING) }
                         val reply = provider.complete(
                             ModelRequest(
                                 text          = prompt,
@@ -522,6 +552,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ResourceGovernor.preemptForUser(llmJob)
                     val replyText = resultDeferred.await()
 
+                    // Abort check (docs/AGENTS_DESIGN.md §runtime): if the user hit
+                    // Cancel mid-inference (Agents screen), the run ledger is ABORTED
+                    // — the late result is discarded, never surfaced as a reply.
+                    if (sessionId != null &&
+                        com.newax.aegis.agents.AgentRuntimeEngine.status(sessionId)?.status == com.newax.aegis.db.entity.SessionStatus.ABORTED
+                    ) {
+                        messages += ChatMessage("Task aborted — the result was discarded.", false)
+                        return@launch
+                    }
+
                     val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty()
                     val firstLine = replyText.trim().lineSequence().firstOrNull()?.trim().orEmpty()
                     if (firstLine.isNotBlank() && engine.canHandle(firstLine)) {
@@ -529,13 +569,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val explanation = replyText.trim().removePrefix(firstLine).trim()
                         messages += ChatMessage(if (explanation.isNotBlank()) explanation else commandReply.text, false)
                         commandReply.proposedAction?.let { processAction(it) }
+                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, explanation.ifBlank { commandReply.text }) }
                     } else {
                         messages += ChatMessage(replyText, false)
+                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, replyText) }
                     }
                     if (isBackground && text.contains("[Live Call]")) {
                         tts?.speak(replyText, TextToSpeech.QUEUE_FLUSH, null, null)
                     }
                 } catch (error: Throwable) {
+                    sessionId?.let {
+                        com.newax.aegis.agents.AgentRuntimeEngine.fail(
+                            it,
+                            com.newax.aegis.db.entity.AgentErrorType.MODEL_ERROR,
+                            error.message ?: error.javaClass.simpleName
+                        )
+                    }
                     messages += ChatMessage("Offline model error: ${error.message ?: error.javaClass.simpleName}", false)
                 } finally { modelBusy = false }
             }

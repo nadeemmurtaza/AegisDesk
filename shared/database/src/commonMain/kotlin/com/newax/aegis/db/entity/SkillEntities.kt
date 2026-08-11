@@ -44,6 +44,17 @@ data class SkillEntity(
     val requiresApproval: Boolean = false,
     /** Comma-separated risk notes surfaced in the approval dialog. */
     val risks: String = "",
+    /**
+     * "agent" (default) or "global". GLOBAL-scope SYSTEM skills
+     * (skill.sys.* — mcp_stream, serialize_state, health_audit, task_control)
+     * are granted to every active agent implicitly: the guard skips the
+     * agent_skills whitelist and the capability bridge for them, so core
+     * runtime utilities never need per-agent grant rows (zero policy
+     * maintenance bloat) — while dangerous shell/files skills stay "agent"
+     * scope and keep every restriction.
+     */
+    @ColumnInfo(defaultValue = "'agent'")
+    val scope: String = "agent",
     @ColumnInfo(defaultValue = "1")
     val enabled: Boolean = true,
     /** "builtin" or "zip:<packageName>". */

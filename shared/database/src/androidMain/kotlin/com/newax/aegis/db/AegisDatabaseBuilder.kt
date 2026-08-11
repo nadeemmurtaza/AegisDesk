@@ -31,7 +31,8 @@ fun getAegisDatabase(context: Context, passphrase: ByteArray): AegisDatabase {
             AegisDatabase.MIGRATION_13_14,
             AegisDatabase.MIGRATION_14_15,
             AegisDatabase.MIGRATION_15_16,
-            AegisDatabase.MIGRATION_16_17
+            AegisDatabase.MIGRATION_16_17,
+            AegisDatabase.MIGRATION_17_18
         )
         .build()
         .also {

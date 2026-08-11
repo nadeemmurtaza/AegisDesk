@@ -52,9 +52,11 @@ import androidx.sqlite.execSQL
         AgentSkill::class,
         SkillSet::class,
         SkillSetMember::class,
-        SkillApproval::class
+        SkillApproval::class,
+        AgentSessionEntity::class,
+        AgentHealthEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 @ConstructedBy(AegisDatabaseConstructor::class)
@@ -78,6 +80,7 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun agentMemoryDao(): AgentMemoryDao
     abstract fun agentRegistryDao(): AgentRegistryDao
     abstract fun skillManagerDao(): SkillManagerDao
+    abstract fun agentRuntimeDao(): AgentRuntimeDao
 
     companion object {
         @Volatile private var INSTANCE: AegisDatabase? = null
@@ -454,6 +457,51 @@ abstract class AegisDatabase : RoomDatabase() {
                         PRIMARY KEY (approvalId)
                     )
                 """)
+            }
+        }
+
+        /**
+         * v18 — the agent runtime layer (docs/AGENTS_DESIGN.md §runtime):
+         * `agent_sessions` (the run ledger: status, live phase, strict
+         * result/error blocks, frozen payload path) and `agent_health` (the
+         * health-audit ledger with fault count + action taken). Device-local
+         * like `agents`/`skills` — no sync columns. `skills` gains `scope`
+         * ("agent" | "global") — GLOBAL-scope system skills (skill.sys.*)
+         * bypass the per-agent grant whitelist (zero policy maintenance).
+         */
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS agent_sessions (
+                        sessionId TEXT NOT NULL,
+                        agentId TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        phase TEXT NOT NULL,
+                        taskPrompt TEXT NOT NULL,
+                        contextJson TEXT NOT NULL,
+                        resultJson TEXT NOT NULL,
+                        errorJson TEXT NOT NULL,
+                        frozenPath TEXT NOT NULL,
+                        startedAtMs INTEGER NOT NULL DEFAULT 0,
+                        updatedAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (sessionId)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_agent_sessions_agentId ON agent_sessions(agentId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_agent_sessions_status ON agent_sessions(status)")
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS agent_health (
+                        agentId TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        detail TEXT NOT NULL,
+                        faultCount INTEGER NOT NULL,
+                        actionTaken TEXT NOT NULL,
+                        lastCheckAtMs INTEGER NOT NULL DEFAULT 0,
+                        lastRecoveredAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (agentId)
+                    )
+                """)
+                connection.execSQL("ALTER TABLE skills ADD COLUMN scope TEXT NOT NULL DEFAULT 'agent'")
             }
         }
 
