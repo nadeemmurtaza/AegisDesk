@@ -1,6 +1,7 @@
 package com.newax.aegis.engine.graph
 
 import kotlinx.coroutines.runBlocking
+import com.newax.aegis.SyncRuntime
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.EntityAlias
 import com.newax.aegis.db.entity.GraphBlob
@@ -99,15 +100,32 @@ object GraphStore {
             val n = name.trim()
             db.graphDao().findByName(n)?.let { return@runBlocking it.id }
             db.graphDao().findEntityByAlias(n)?.let { return@runBlocking it }
-            db.graphDao().insertEntity(
+            val id = db.graphDao().insertEntity(
                 GraphEntity(type = type, canonicalName = n, createdAt = System.currentTimeMillis())
             )
+            SyncRuntime.captureRecord(
+                "entities", n,
+                listOf(
+                    "name" to n,
+                    "type" to type.toString(),
+                    "createdAt" to System.currentTimeMillis().toString()
+                )
+            )
+            id
         }
     }
 
     fun addAlias(db: AegisDatabase, entityId: Long, alias: String) {
+        val trimmed = alias.trim()
         kotlinx.coroutines.runBlocking {
-            db.graphDao().insertAlias(EntityAlias(entityId = entityId, alias = alias.trim()))
+            db.graphDao().insertAlias(EntityAlias(entityId = entityId, alias = trimmed))
+        }
+        val entityName = kotlinx.coroutines.runBlocking { db.graphDao().entityById(entityId)?.canonicalName }
+        if (entityName != null) {
+            SyncRuntime.captureRecord(
+                "entity_aliases", trimmed.lowercase(),
+                listOf("alias" to trimmed, "entityName" to entityName)
+            )
         }
     }
 
@@ -119,7 +137,9 @@ object GraphStore {
         return kotlinx.coroutines.runBlocking {
             val n = name.lowercase().trim().replace(' ', '_')
             db.graphDao().predicateByName(n)?.id
-                ?: db.graphDao().insertPredicate(GraphPredicate(name = n))
+                ?: db.graphDao().insertPredicate(GraphPredicate(name = n)).also {
+                    SyncRuntime.captureRecord("predicates", n, listOf("name" to n))
+                }
         }
     }
 

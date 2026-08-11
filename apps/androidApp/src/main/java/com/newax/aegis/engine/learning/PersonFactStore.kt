@@ -1,5 +1,6 @@
 package com.newax.aegis.engine.learning
 
+import com.newax.aegis.SyncRuntime
 import com.newax.aegis.db.AegisDatabase
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
@@ -55,6 +56,17 @@ object PersonFactStore {
                     timestampMs = draft.timestampMs
                 )
             )
+            SyncRuntime.captureRecord(
+                "person_facts", "$name\u0001${draft.fact}",
+                listOf(
+                    "personName" to name,
+                    "fact" to draft.fact,
+                    "category" to draft.category,
+                    "confidence" to draft.confidence.toString(),
+                    "source" to draft.source,
+                    "timestampMs" to draft.timestampMs.toString()
+                )
+            )
             // Index for semantic search immediately if engine is ready; worker catches up otherwise
             val indexText = buildString {
                 append(draft.fact)
@@ -88,6 +100,7 @@ object PersonFactStore {
             val tm = db.personMentionDao().totalMentions(personId) ?: 1
             val score = computeScore(sc, tm)
             db.personDao().updateStats(personId, sc, tm, score, now)
+            capturePerson(db, name)
         }
     }
 
@@ -112,6 +125,7 @@ object PersonFactStore {
 
     fun markProfileBuilt(db: AegisDatabase, name: String) {
         kotlinx.coroutines.runBlocking { db.personDao().markProfileBuilt(name) }
+        capturePerson(db, name)
     }
 
     fun getPeopleNeedingProfileBuild(db: AegisDatabase): List<String> =
@@ -148,9 +162,33 @@ object PersonFactStore {
 
     private fun getOrCreateId(db: AegisDatabase, name: String): Long {
         return kotlinx.coroutines.runBlocking {
+            val existing = db.personDao().findByName(name)
+            if (existing != null) return@runBlocking existing.id
             db.personDao().insertIfAbsent(PersonEntity(name = name))
+            capturePerson(db, name)
             db.personDao().idForName(name) ?: -1L
         }
+    }
+
+    /**
+     * Journal the person's full current state (LWW per name). Called only on
+     * the paths that actually change the person row — create, stats update,
+     * profile-built. Materialize never goes through this path (it writes DAOs
+     * directly), so remote applies can't re-capture.
+     */
+    private fun capturePerson(db: AegisDatabase, name: String) {
+        val p = kotlinx.coroutines.runBlocking { db.personDao().findByName(name) } ?: return
+        SyncRuntime.captureRecord(
+            "persons", p.name,
+            listOf(
+                "name" to p.name,
+                "importanceScore" to p.importanceScore.toString(),
+                "sourceCount" to p.sourceCount.toString(),
+                "totalMentions" to p.totalMentions.toString(),
+                "lastSeenMs" to p.lastSeenMs.toString(),
+                "profileBuilt" to p.profileBuilt.toString()
+            )
+        )
     }
 
     private fun computeScore(sourceCount: Int, totalMentions: Int): Float {

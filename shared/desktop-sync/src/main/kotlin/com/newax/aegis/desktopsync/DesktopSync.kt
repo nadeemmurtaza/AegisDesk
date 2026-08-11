@@ -1,8 +1,14 @@
 package com.newax.aegis.desktopsync
 
 import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.entity.EntityAlias
+import com.newax.aegis.db.entity.GraphEntity
+import com.newax.aegis.db.entity.GraphPredicate
+import com.newax.aegis.db.entity.PersonEntity
+import com.newax.aegis.db.entity.PersonFactEntity
 import com.newax.aegis.db.getAegisDatabase
 import com.newax.aegis.db.sync.RoomJournalStore
+import com.newax.aegis.db.sync.SyncPayload
 import com.newax.aegis.sync.AntiEntropyRunner
 import com.newax.aegis.sync.Identity
 import com.newax.aegis.sync.JvmLanTransport
@@ -64,6 +70,10 @@ object DesktopSync {
     @Volatile
     private var store: RoomJournalStore? = null
 
+    /** The opened Room DB — set in [start], used by materialize. */
+    @Volatile
+    private var database: AegisDatabase? = null
+
     @Volatile
     private var identityHolder: StoredIdentity? = null
 
@@ -80,6 +90,7 @@ object DesktopSync {
                 val me = this.identity(displayName)
                 val db = getAegisDatabase(File(home, ".aegis/sync.db"))
                 AegisDatabase.init(db)
+                database = db
                 val journalStore = RoomJournalStore(
                     db.syncJournalDao(),
                     db.syncVectorDao(),
@@ -123,6 +134,7 @@ object DesktopSync {
                 transport?.stop()
                 transport = null
                 store = null
+                database = null
             }
         }.apply {
             isDaemon = true
@@ -269,13 +281,143 @@ object DesktopSync {
 
     private fun materialize(entry: SyncEntry) {
         if (entry.kind != SyncEntry.Kind.RECORD) return
-        if (entry.table != TABLE_MEMORY_PROFILE || entry.tombstone) return
         runCatching {
-            val array = JSONArray(entry.payload.decodeToString())
-            val facts = buildList {
-                for (i in 0 until array.length()) add(array.getString(i))
+            when (entry.table) {
+                TABLE_MEMORY_PROFILE -> if (!entry.tombstone) materializeMemory(entry)
+                // Record tables (Slice 1): full-state LWW per natural key.
+                "entities" -> materializeEntity(entry)
+                "predicates" -> materializePredicate(entry)
+                "entity_aliases" -> materializeAlias(entry)
+                "persons" -> materializePerson(entry)
+                "person_facts" -> materializePersonFact(entry)
+                else -> Unit
             }
-            applyMemoryProfile(entry.key, facts)
+        }
+    }
+
+    private fun materializeMemory(entry: SyncEntry) {
+        val array = JSONArray(entry.payload.decodeToString())
+        val facts = buildList {
+            for (i in 0 until array.length()) add(array.getString(i))
+        }
+        applyMemoryProfile(entry.key, facts)
+    }
+
+    /**
+     * LWW guard — mirror of SyncRuntime.locallyNewer: skip an incoming RECORD
+     * when the local journal already holds a strictly newer entry for the same
+     * (table, key), ordered by (hlcWall, hlcCounter, deviceId).
+     */
+    private fun locallyNewer(entry: SyncEntry): Boolean {
+        val db = database ?: return false
+        return runCatching {
+            val latest = kotlinx.coroutines.runBlocking {
+                db.syncJournalDao().latestFor(entry.table, entry.key)
+            } ?: return@runCatching false
+            (latest.hlcWall > entry.hlc.wall) ||
+                (latest.hlcWall == entry.hlc.wall && latest.hlcCounter > entry.hlc.counter) ||
+                (latest.hlcWall == entry.hlc.wall && latest.hlcCounter == entry.hlc.counter &&
+                    latest.deviceId > entry.deviceId)
+        }.getOrDefault(false)
+    }
+
+    private fun materializeEntity(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            if (db.graphDao().findByName(name) != null) return@runBlocking
+            db.graphDao().insertEntity(
+                GraphEntity(
+                    type = fields["type"]?.toIntOrNull() ?: 0,
+                    canonicalName = name,
+                    createdAt = fields["createdAt"]?.toLongOrNull() ?: entry.createdAt
+                )
+            )
+        }
+    }
+
+    private fun materializePredicate(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            if (db.graphDao().predicateByName(name) != null) return@runBlocking
+            db.graphDao().insertPredicate(GraphPredicate(name = name))
+        }
+    }
+
+    private fun materializeAlias(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val alias = fields["alias"]?.takeIf { it.isNotBlank() } ?: return
+        val entityName = fields["entityName"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            val dao = db.graphDao()
+            if (dao.findEntityByAlias(alias) != null) return@runBlocking
+            val entityId = dao.findByName(entityName)?.id ?: return@runBlocking
+            dao.insertAlias(EntityAlias(entityId = entityId, alias = alias))
+        }
+    }
+
+    private fun materializePerson(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            val dao = db.personDao()
+            val existing = dao.findByName(name)
+            if (existing != null) {
+                dao.updateStats(
+                    existing.id,
+                    fields["sourceCount"]?.toIntOrNull() ?: existing.sourceCount,
+                    fields["totalMentions"]?.toIntOrNull() ?: existing.totalMentions,
+                    fields["importanceScore"]?.toFloatOrNull() ?: existing.importanceScore,
+                    fields["lastSeenMs"]?.toLongOrNull() ?: existing.lastSeenMs
+                )
+                if (fields["profileBuilt"] == "true") dao.markProfileBuilt(name)
+            } else {
+                dao.insertIfAbsent(
+                    PersonEntity(
+                        name = name,
+                        importanceScore = fields["importanceScore"]?.toFloatOrNull() ?: 0f,
+                        sourceCount = fields["sourceCount"]?.toIntOrNull() ?: 0,
+                        totalMentions = fields["totalMentions"]?.toIntOrNull() ?: 0,
+                        lastSeenMs = fields["lastSeenMs"]?.toLongOrNull() ?: 0L,
+                        profileBuilt = fields["profileBuilt"] == "true"
+                    )
+                )
+            }
+        }
+    }
+
+    private fun materializePersonFact(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val personName = fields["personName"]?.takeIf { it.isNotBlank() } ?: return
+        val fact = fields["fact"]?.takeIf { it.isNotBlank() } ?: return
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            val personDao = db.personDao()
+            val personId = personDao.findByName(personName)?.id
+                ?: personDao.insertIfAbsent(PersonEntity(name = personName)).let {
+                    personDao.idForName(personName) ?: return@runBlocking
+                }
+            if (db.personFactDao().findExact(personId, fact) != null) return@runBlocking
+            db.personFactDao().insert(
+                PersonFactEntity(
+                    personId = personId,
+                    fact = fact,
+                    category = fields["category"] ?: "",
+                    confidence = fields["confidence"]?.toFloatOrNull() ?: 0.7f,
+                    source = fields["source"] ?: "",
+                    timestampMs = fields["timestampMs"]?.toLongOrNull() ?: 0L
+                )
+            )
         }
     }
 

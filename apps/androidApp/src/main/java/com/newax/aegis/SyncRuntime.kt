@@ -3,7 +3,13 @@ package com.newax.aegis
 import android.content.Context
 import android.os.Build
 import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.entity.EntityAlias
+import com.newax.aegis.db.entity.GraphEntity
+import com.newax.aegis.db.entity.GraphPredicate
 import com.newax.aegis.db.entity.KvStoreEntity
+import com.newax.aegis.db.entity.PersonEntity
+import com.newax.aegis.db.entity.PersonFactEntity
+import com.newax.aegis.db.sync.SyncPayload
 import com.newax.aegis.db.sync.toEntity
 import com.newax.aegis.memory.EncryptedMemory
 import com.newax.aegis.sync.Crypto
@@ -183,6 +189,17 @@ object SyncRuntime {
         capture(SyncEntry.Kind.RECORD, TABLE_MEMORY_PROFILE, category, payload)
     }
 
+    /**
+     * Journal the full state of one record (LWW per key) for the syncable DB
+     * tables — the payload is [SyncPayload]-encoded ordered fields, the key is
+     * the record's natural key (canonical entity name, predicate name, alias,
+     * person name, personName + fact). Best-effort like [capture]: never
+     * breaks the write path it observes.
+     */
+    fun captureRecord(table: String, key: String, fields: List<Pair<String, String>>, tombstone: Boolean = false) {
+        capture(SyncEntry.Kind.RECORD, table, key, SyncPayload.encode(fields), tombstone)
+    }
+
     fun capture(
         kind: SyncEntry.Kind,
         table: String,
@@ -222,18 +239,133 @@ object SyncRuntime {
         for (entry in entries) {
             if (entry.kind != SyncEntry.Kind.RECORD) continue
             try {
-                when {
-                    entry.table == TABLE_MEMORY_PROFILE && !entry.tombstone ->
-                        materializeMemoryProfile(entry)
-
-                    entry.table == "kv_store" && SyncPolicy.isSyncableKey(entry.key) ->
-                        materializeKv(entry)
-
+                when (entry.table) {
+                    TABLE_MEMORY_PROFILE -> if (!entry.tombstone) materializeMemoryProfile(entry)
+                    "kv_store" -> if (SyncPolicy.isSyncableKey(entry.key)) materializeKv(entry)
+                    // Record tables (Slice 1): full-state LWW per natural key.
+                    "entities" -> materializeEntity(entry)
+                    "predicates" -> materializePredicate(entry)
+                    "entity_aliases" -> materializeAlias(entry)
+                    "persons" -> materializePerson(entry)
+                    "person_facts" -> materializePersonFact(entry)
                     else -> Unit // tables not yet captured/materialized
                 }
             } catch (_: Exception) {
                 // A malformed payload must not kill the rest of the round.
             }
+        }
+    }
+
+    /**
+     * LWW guard: skip an incoming RECORD when the local journal already holds
+     * a strictly newer entry for the same (table, key). Ordering is the
+     * engine's journal order (hlcWall, hlcCounter, deviceId). The incoming
+     * entry is in the journal by the time materialize runs (the anti-entropy
+     * round appends before applying), so "equal" means the entry itself.
+     */
+    private fun locallyNewer(entry: SyncEntry): Boolean = runBlocking {
+        runCatching {
+            val latest = AegisDatabase.get.syncJournalDao().latestFor(entry.table, entry.key)
+                ?: return@runCatching false
+            (latest.hlcWall > entry.hlc.wall) ||
+                (latest.hlcWall == entry.hlc.wall && latest.hlcCounter > entry.hlc.counter) ||
+                (latest.hlcWall == entry.hlc.wall && latest.hlcCounter == entry.hlc.counter &&
+                    latest.deviceId > entry.deviceId)
+        }.getOrDefault(false)
+    }
+
+    private fun materializeEntity(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            if (AegisDatabase.get.graphDao().findByName(name) != null) return@runBlocking
+            AegisDatabase.get.graphDao().insertEntity(
+                GraphEntity(
+                    type = fields["type"]?.toIntOrNull() ?: 0,
+                    canonicalName = name,
+                    createdAt = fields["createdAt"]?.toLongOrNull() ?: entry.createdAt
+                )
+            )
+        }
+    }
+
+    private fun materializePredicate(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            if (AegisDatabase.get.graphDao().predicateByName(name) != null) return@runBlocking
+            AegisDatabase.get.graphDao().insertPredicate(GraphPredicate(name = name))
+        }
+    }
+
+    private fun materializeAlias(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val alias = fields["alias"]?.takeIf { it.isNotBlank() } ?: return
+        val entityName = fields["entityName"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            val dao = AegisDatabase.get.graphDao()
+            if (dao.findEntityByAlias(alias) != null) return@runBlocking
+            val entityId = dao.findByName(entityName)?.id ?: return@runBlocking
+            dao.insertAlias(EntityAlias(entityId = entityId, alias = alias))
+        }
+    }
+
+    private fun materializePerson(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            val dao = AegisDatabase.get.personDao()
+            val existing = dao.findByName(name)
+            if (existing != null) {
+                dao.updateStats(
+                    existing.id,
+                    fields["sourceCount"]?.toIntOrNull() ?: existing.sourceCount,
+                    fields["totalMentions"]?.toIntOrNull() ?: existing.totalMentions,
+                    fields["importanceScore"]?.toFloatOrNull() ?: existing.importanceScore,
+                    fields["lastSeenMs"]?.toLongOrNull() ?: existing.lastSeenMs
+                )
+                if (fields["profileBuilt"] == "true") dao.markProfileBuilt(name)
+            } else {
+                dao.insertIfAbsent(
+                    PersonEntity(
+                        name = name,
+                        importanceScore = fields["importanceScore"]?.toFloatOrNull() ?: 0f,
+                        sourceCount = fields["sourceCount"]?.toIntOrNull() ?: 0,
+                        totalMentions = fields["totalMentions"]?.toIntOrNull() ?: 0,
+                        lastSeenMs = fields["lastSeenMs"]?.toLongOrNull() ?: 0L,
+                        profileBuilt = fields["profileBuilt"] == "true"
+                    )
+                )
+            }
+        }
+    }
+
+    private fun materializePersonFact(entry: SyncEntry) {
+        if (entry.tombstone || locallyNewer(entry)) return
+        val fields = SyncPayload.decode(entry.payload)
+        val personName = fields["personName"]?.takeIf { it.isNotBlank() } ?: return
+        val fact = fields["fact"]?.takeIf { it.isNotBlank() } ?: return
+        runBlocking {
+            val personDao = AegisDatabase.get.personDao()
+            val personId = personDao.findByName(personName)?.id
+                ?: personDao.insertIfAbsent(PersonEntity(name = personName)).let {
+                    personDao.idForName(personName) ?: return@runBlocking
+                }
+            if (AegisDatabase.get.personFactDao().findExact(personId, fact) != null) return@runBlocking
+            AegisDatabase.get.personFactDao().insert(
+                PersonFactEntity(
+                    personId = personId,
+                    fact = fact,
+                    category = fields["category"] ?: "",
+                    confidence = fields["confidence"]?.toFloatOrNull() ?: 0.7f,
+                    source = fields["source"] ?: "",
+                    timestampMs = fields["timestampMs"]?.toLongOrNull() ?: 0L
+                )
+            )
         }
     }
 

@@ -41,6 +41,18 @@ interface SyncJournalDao {
     )
     suspend fun entriesFor(tableName: String, key: String): List<SyncJournalEntity>
 
+    /**
+     * The newest local journal entry for one record — the LWW guard for
+     * materialize: an incoming RECORD is applied only when nothing newer for
+     * the same (table, key) exists locally (ties broken by deviceId, matching
+     * the engine's journal order).
+     */
+    @Query(
+        "SELECT * FROM sync_journal WHERE tableName = :tableName AND key = :key " +
+            "ORDER BY hlcWall DESC, hlcCounter DESC, deviceId DESC LIMIT 1"
+    )
+    suspend fun latestFor(tableName: String, key: String): SyncJournalEntity?
+
     @Query("SELECT COUNT(*) FROM sync_journal")
     suspend fun count(): Long
 
