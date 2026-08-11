@@ -21,12 +21,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -81,6 +84,12 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
     var pairMessage by remember { mutableStateOf<String?>(null) }
     var relayInput by remember { mutableStateOf(SyncRuntime.relayUrl()) }
     var relayMessage by remember { mutableStateOf<String?>(null) }
+    var catStates by remember {
+        mutableStateOf(
+            SyncRuntime.CATEGORY_TABLES.mapValues { (_, tables) -> tables.any { SyncRuntime.categoryEnabled(it) } }
+        )
+    }
+    var permsPeer by remember { mutableStateOf<PairedPeer?>(null) }
 
     val pairingCode = remember { SyncRuntime.pairingCode() }
 
@@ -184,6 +193,42 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                         Spacer(Modifier.height(8.dp))
                         Text(it, fontSize = 13.sp, color = TextSec)
                     }
+                }
+            }
+        }
+
+        // ── Sync categories ──────────────────────────────────────────────
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Sync categories", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "What this device shares with — and accepts from — paired devices.",
+                        fontSize = 13.sp, color = TextSec
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    SyncRuntime.CATEGORY_TABLES.forEach { (name, tables) ->
+                        CategoryToggleRow(
+                            name = name,
+                            enabled = catStates[name] ?: true,
+                            onToggle = {
+                                val on = !(catStates[name] ?: true)
+                                tables.forEach { t -> SyncRuntime.setCategoryEnabled(t, on) }
+                                catStates = catStates.toMutableMap().apply { put(name, on) }
+                            }
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Device trust records always sync so revocations reach the mesh.",
+                        fontSize = 11.sp, color = TextTer
+                    )
                 }
             }
         }
@@ -358,17 +403,107 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
             }
         } else {
             items(peers, key = { it.deviceId }) { peer ->
-                PairedPeerRow(peer) {
-                    SyncRuntime.unpair(peer.deviceId)
-                    peers = SyncRuntime.peers()
-                }
+                PairedPeerRow(
+                    peer = peer,
+                    onPermissions = { permsPeer = peer },
+                    onUnpair = {
+                        SyncRuntime.unpair(peer.deviceId)
+                        peers = SyncRuntime.peers()
+                    }
+                )
             }
         }
+    }
+
+    permsPeer?.let { peer ->
+        PeerPermissionsDialog(
+            peer = peer,
+            allowed = SyncRuntime.peerPermissions(peer.deviceId),
+            onDismiss = { permsPeer = null },
+            onSave = { classes ->
+                SyncRuntime.setPeerPermissions(peer.deviceId, classes)
+                permsPeer = null
+            }
+        )
     }
 }
 
 @Composable
-private fun PairedPeerRow(peer: PairedPeer, onUnpair: () -> Unit) {
+private fun CategoryToggleRow(name: String, enabled: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(name, fontSize = 14.sp, color = TextPri, modifier = Modifier.weight(1f))
+        Switch(
+            checked = enabled,
+            onCheckedChange = { onToggle() },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Primary,
+                uncheckedThumbColor = Color(0xFF8D8D87),
+                uncheckedTrackColor = Color(0xFFE7E7E2)
+            )
+        )
+    }
+}
+
+@Composable
+private fun PeerPermissionsDialog(
+    peer: PairedPeer,
+    allowed: Set<String>,
+    onDismiss: () -> Unit,
+    onSave: (Set<String>) -> Unit
+) {
+    var selected by remember { mutableStateOf(allowed) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Permissions for ${peer.displayName}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+        text = {
+            Column {
+                Text(
+                    "Which command classes may this device send you? Unchecked means blocked.",
+                    fontSize = 13.sp, color = TextSec
+                )
+                Spacer(Modifier.height(8.dp))
+                SyncRuntime.COMMAND_CLASSES.forEach { cls ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = cls in selected,
+                            onCheckedChange = {
+                                selected = if (it) selected + cls else selected - cls
+                            }
+                        )
+                        Text(cls, fontSize = 13.sp, color = TextPri, fontFamily = FontFamily.Monospace)
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (selected.isEmpty()) "Nothing allowed — the peer can only sync data, not send commands."
+                    else "Restrictions apply to commands; data sync always follows the categories above.",
+                    fontSize = 11.sp, color = TextTer
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(selected) }) { Text("Save", color = Primary) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSec) }
+        },
+        containerColor = Surface
+    )
+}
+
+@Composable
+private fun PairedPeerRow(peer: PairedPeer, onPermissions: () -> Unit, onUnpair: () -> Unit) {
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Surface),
@@ -386,6 +521,9 @@ private fun PairedPeerRow(peer: PairedPeer, onUnpair: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(peer.displayName, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPri)
                 Text(peer.deviceId, fontSize = 12.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+            }
+            IconButton(onClick = onPermissions) {
+                Icon(Icons.Outlined.Sync, contentDescription = "Permissions", tint = TextSec, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onUnpair) {
                 Icon(Icons.Rounded.Delete, contentDescription = "Unpair", tint = AccentRed, modifier = Modifier.size(18.dp))

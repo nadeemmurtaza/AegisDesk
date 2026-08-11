@@ -70,6 +70,54 @@ object SyncRuntime {
     private const val KEY_STATUS = "sync:status"
     private const val KEY_RELAY = "sync:relay"
     private const val ADDR_PREFIX = "sync:addr:"
+    private const val CAT_PREFIX = "sync:cat:"
+    private const val PEER_PERM_PREFIX = "sync:peerperm:"
+
+    /**
+     * The per-category sync toggles (design §5, S5 settings surface): the four
+     * user-facing categories map to the journal table names that are captured
+     * today. A disabled category is gated at capture (nothing new journaled)
+     * AND at materialize (nothing applied) — the peer's older entries stay in
+     * the journal but stop touching local state. `peer_trust` is deliberately
+     * not in any category: revocation must always flow.
+     */
+    val CATEGORY_TABLES: Map<String, List<String>> = linkedMapOf(
+        "Memory profile" to listOf(TABLE_MEMORY_PROFILE),
+        "Knowledge graph" to listOf("entities", "predicates", "entity_aliases"),
+        "People" to listOf("persons", "person_facts"),
+        "Settings & preferences" to listOf("kv_store")
+    )
+
+    /**
+     * Command classes a peer may send to this device (design §6). The set is
+     * stored per peer (`sync:peerperm:<deviceId>`, local, never synced); an
+     * EMPTY set means unrestricted — the default. Enforcement lands with S6
+     * command dispatch, which gates on this; the settings surface ships now
+     * (design sequencing: S5 settings before S6 commands).
+     */
+    val COMMAND_CLASSES = listOf(
+        "send_email", "open_app", "open_file", "browse_files",
+        "run_goal", "system_query", "run_shell"
+    )
+
+    fun categoryEnabled(table: String): Boolean = kvGet(CAT_PREFIX + table) != "0"
+
+    fun setCategoryEnabled(table: String, on: Boolean) {
+        if (on) kvDelete(CAT_PREFIX + table) else kvPut(CAT_PREFIX + table, "0")
+    }
+
+    /** Allowed command classes for one peer; empty = unrestricted. */
+    fun peerPermissions(peerDeviceId: String): Set<String> =
+        kvGet(PEER_PERM_PREFIX + peerDeviceId)
+            ?.split(",")
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
+
+    fun setPeerPermissions(peerDeviceId: String, classes: Set<String>) {
+        if (classes.isEmpty()) kvDelete(PEER_PERM_PREFIX + peerDeviceId)
+        else kvPut(PEER_PERM_PREFIX + peerDeviceId, classes.sorted().joinToString(","))
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -251,6 +299,9 @@ object SyncRuntime {
         tombstone: Boolean = false
     ) {
         if (!enabled()) return
+        // Per-category toggle — a disabled category journals nothing new.
+        // peer_trust is not in any category, so revocation always flows.
+        if (table != TABLE_PEER_TRUST && !categoryEnabled(table)) return
         val entry = SyncEntry.of(
             opId = UUID.randomUUID().toString(),
             deviceId = deviceId(),
@@ -281,6 +332,9 @@ object SyncRuntime {
     fun materialize(entries: List<SyncEntry>) {
         for (entry in entries) {
             if (entry.kind != SyncEntry.Kind.RECORD) continue
+            // Per-category toggle — disabled categories are not applied either
+            // (defense in depth; older entries stay in the journal, harmless).
+            if (entry.table != TABLE_PEER_TRUST && !categoryEnabled(entry.table)) continue
             try {
                 when (entry.table) {
                     TABLE_MEMORY_PROFILE -> if (!entry.tombstone) materializeMemoryProfile(entry)

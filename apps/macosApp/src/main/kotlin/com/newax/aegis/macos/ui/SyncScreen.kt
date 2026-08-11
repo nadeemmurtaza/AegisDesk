@@ -137,6 +137,50 @@ fun SyncScreen() {
                     }
                 }
 
+                // ── Sync categories ───────────────────────────────────────
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Surface),
+                        border = BorderStroke(1.dp, Border),
+                        elevation = CardDefaults.cardElevation(0.dp)
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Sync categories", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPrimary)
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "What this device shares with — and accepts from — paired devices.",
+                                fontSize = 13.sp, color = TextSecondary
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            DesktopSync.CATEGORY_TABLES.forEach { (name, tables) ->
+                                val enabled = tables.any { DesktopSync.categoryEnabled(it) }
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(name, fontSize = 14.sp, color = TextPrimary, modifier = Modifier.weight(1f))
+                                    androidx.compose.material3.Switch(
+                                        checked = enabled,
+                                        onCheckedChange = { on -> tables.forEach { t -> DesktopSync.setCategoryEnabled(t, on) }; status = DesktopSync.status() },
+                                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = Primary
+                                        )
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Device trust records always sync so revocations reach the mesh.",
+                                fontSize = 11.sp, color = TextTertiary
+                            )
+                        }
+                    }
+                }
+
                 // ── This device / pairing code ────────────────────────────
                 item {
                     Card(

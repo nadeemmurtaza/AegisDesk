@@ -62,6 +62,28 @@ object DesktopSync {
     private const val TABLE_PEER_TRUST = "peer_trust"
     private const val TRUST_SEP = "\u0001"
 
+    /** Per-category toggles + per-peer permissions — mirror of SyncRuntime. */
+    private const val CAT_PREFIX = "sync:cat:"
+    private const val PEER_PERM_PREFIX = "sync:peerperm:"
+
+    /**
+     * The four user-facing sync categories → journal table names (mirror of
+     * SyncRuntime.CATEGORY_TABLES; same keys so a policy written on one
+     * platform reads on the other). `peer_trust` is never gated.
+     */
+    val CATEGORY_TABLES: Map<String, List<String>> = linkedMapOf(
+        "Memory profile" to listOf(TABLE_MEMORY_PROFILE),
+        "Knowledge graph" to listOf("entities", "predicates", "entity_aliases"),
+        "People" to listOf("persons", "person_facts"),
+        "Settings & preferences" to listOf("kv_store")
+    )
+
+    /** Command classes a peer may send (design §6); empty set = unrestricted. */
+    val COMMAND_CLASSES = listOf(
+        "send_email", "open_app", "open_file", "browse_files",
+        "run_goal", "system_query", "run_shell"
+    )
+
     private const val LOOP_INTERVAL_MS = 15_000L
 
     private val home: File
@@ -183,6 +205,57 @@ object DesktopSync {
     private fun nextHlc(): Hlc = synchronized(hlcLock) {
         clock = Hlc.tick(clock, System.currentTimeMillis())
         clock
+    }
+
+    // ── sync policy (per-category toggles + per-peer permissions) ───────────
+
+    fun categoryEnabled(table: String): Boolean = kvGet(CAT_PREFIX + table) != "0"
+
+    fun setCategoryEnabled(table: String, on: Boolean) {
+        if (on) kvDelete(CAT_PREFIX + table) else kvPut(CAT_PREFIX + table, "0")
+    }
+
+    /** Grouped category states for the UI/CLI: category → enabled. */
+    fun categories(): List<Pair<String, Boolean>> =
+        CATEGORY_TABLES.map { (name, tables) -> name to tables.any { categoryEnabled(it) } }
+
+    fun setCategory(category: String, on: Boolean) {
+        val tables = CATEGORY_TABLES[category] ?: return
+        tables.forEach { setCategoryEnabled(it, on) }
+    }
+
+    /** Allowed command classes for one peer; empty = unrestricted. */
+    fun peerPermissions(peerDeviceId: String): Set<String> =
+        kvGet(PEER_PERM_PREFIX + peerDeviceId)
+            ?.split(",")
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
+
+    fun setPeerPermissions(peerDeviceId: String, classes: Set<String>) {
+        if (classes.isEmpty()) kvDelete(PEER_PERM_PREFIX + peerDeviceId)
+        else kvPut(PEER_PERM_PREFIX + peerDeviceId, classes.sorted().joinToString(","))
+    }
+
+    private fun kvGet(key: String): String? {
+        val db = database ?: return null
+        return kotlinx.coroutines.runBlocking {
+            runCatching { db.kvStoreDao().get(key) }.getOrNull()
+        }
+    }
+
+    private fun kvPut(key: String, value: String) {
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching { db.kvStoreDao().put(com.newax.aegis.db.entity.KvStoreEntity(key, value)) }
+        }
+    }
+
+    private fun kvDelete(key: String) {
+        val db = database ?: return
+        kotlinx.coroutines.runBlocking {
+            runCatching { db.kvStoreDao().delete(key) }
+        }
     }
 
     // ── status / surface ─────────────────────────────────────────────────────
@@ -334,6 +407,9 @@ object DesktopSync {
 
     private fun materialize(entry: SyncEntry) {
         if (entry.kind != SyncEntry.Kind.RECORD) return
+        // Per-category toggle — disabled categories are not applied (mirror of
+        // SyncRuntime; peer_trust always flows).
+        if (entry.table != TABLE_PEER_TRUST && !categoryEnabled(entry.table)) return
         runCatching {
             when (entry.table) {
                 TABLE_MEMORY_PROFILE -> if (!entry.tombstone) materializeMemory(entry)

@@ -387,7 +387,45 @@ private fun printSyncCommand(arg: String) {
                 }
             }
         }
-        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory")
+        arg.equals("categories", ignoreCase = true) -> {
+            DesktopSync.categories().forEach { (name, enabled) ->
+                println("    ${if (enabled) "on " else "off"}  $name")
+            }
+        }
+        arg.startsWith("category ", ignoreCase = true) -> {
+            val parts = arg.substring(9).trim().split(Regex("\\s+"))
+            if (parts.size != 2 || (parts[1] != "on" && parts[1] != "off")) {
+                println("    usage: sync category <Memory profile|Knowledge graph|People|Settings & preferences> on|off")
+            } else {
+                val name = parts.slice(0 until parts.size - 1).joinToString(" ")
+                DesktopSync.setCategory(name, parts[1] == "on")
+                println("    ✓ $name ${parts[1]}")
+            }
+        }
+        arg.startsWith("perms", ignoreCase = true) -> {
+            val peers = DesktopSync.peers()
+            if (peers.isEmpty()) {
+                println("    No paired devices.")
+            } else {
+                peers.forEach { p ->
+                    val allowed = DesktopSync.peerPermissions(p.deviceId)
+                    println("    ${p.displayName} (${p.deviceId}): " +
+                        (if (allowed.isEmpty()) "all commands" else allowed.sorted().joinToString(", ")))
+                }
+            }
+        }
+        arg.startsWith("perm ", ignoreCase = true) -> {
+            val parts = arg.substring(5).trim().split(Regex("\\s+"))
+            if (parts.size != 3 || (parts[2] != "on" && parts[2] != "off")) {
+                println("    usage: sync perm <deviceId> <commandClass> on|off")
+            } else {
+                val current = DesktopSync.peerPermissions(parts[0]).toMutableSet()
+                if (parts[2] == "on") current.add(parts[1]) else current.remove(parts[1])
+                DesktopSync.setPeerPermissions(parts[0], current)
+                println("    ✓ ${parts[1]} ${parts[2]} for ${parts[0]}")
+            }
+        }
+        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory, categories, category <name> on|off, perms, perm <id> <class> on|off")
     }
     println()
 }
