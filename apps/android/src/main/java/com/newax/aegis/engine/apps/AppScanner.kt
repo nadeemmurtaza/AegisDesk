@@ -5,7 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import kotlinx.coroutines.runBlocking
 import com.newax.aegis.SyncRuntime
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.AppCapabilityLink
 import com.newax.aegis.db.entity.AppRecord
 import com.newax.aegis.engine.apps.AppCapability.*
@@ -15,7 +15,7 @@ object AppScanner {
 
     // ── Phase A+B: package scan + known capability seed ───────────────────────
 
-    fun scan(context: Context, db: AegisDatabase) {
+    fun scan(context: Context, db: NewaxDatabase) {
         val pm = context.packageManager
         val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
         val now  = System.currentTimeMillis()
@@ -66,7 +66,7 @@ object AppScanner {
 
     // ── Seed graph triples (app --supports--> capability) ─────────────────────
 
-    fun seedGraphTriples(db: AegisDatabase) {
+    fun seedGraphTriples(db: NewaxDatabase) {
         val allRecords = runBlocking { db.appRegistryDao().allRecords() }
         allRecords.forEach { record ->
             val caps = runBlocking { db.appRegistryDao().capabilitiesForPackage(record.packageName) }
@@ -78,7 +78,7 @@ object AppScanner {
 
     // ── Phase C: learn screens from active accessibility window ───────────────
 
-    fun learnScreen(db: AegisDatabase, packageName: String, screenSignature: String,
+    fun learnScreen(db: NewaxDatabase, packageName: String, screenSignature: String,
                     screenType: String, nodesJson: String, appVersion: String) {
         runBlocking {
             db.appRegistryDao().upsertScreen(
@@ -90,7 +90,7 @@ object AppScanner {
         }
     }
 
-    fun learnNavigation(db: AegisDatabase, fromSig: String, toSig: String,
+    fun learnNavigation(db: NewaxDatabase, fromSig: String, toSig: String,
                         viewId: String, contentDesc: String, text: String) {
         runBlocking {
             db.appRegistryDao().upsertNavEdge(
@@ -156,7 +156,7 @@ object AppScanner {
         NAVIGATE     to android.content.Intent.ACTION_VIEW
     )
 
-    private fun seedKnownCapabilities(db: AegisDatabase, pkg: String) {
+    private fun seedKnownCapabilities(db: NewaxDatabase, pkg: String) {
         KNOWN_CAPABILITIES[pkg]?.forEach { cap ->
             runBlocking {
                 val link = AppCapabilityLink(
@@ -173,7 +173,7 @@ object AppScanner {
         }
     }
 
-    private fun seedIntentCapabilities(context: Context, db: AegisDatabase, pkg: String) {
+    private fun seedIntentCapabilities(context: Context, db: NewaxDatabase, pkg: String) {
         val pm = context.packageManager
         // Detect share targets via ACTION_SEND resolution
         val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "text/plain" }

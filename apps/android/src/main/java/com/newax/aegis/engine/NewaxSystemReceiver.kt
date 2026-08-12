@@ -12,7 +12,7 @@ import android.telephony.TelephonyManager
 /**
  * Listens for system-level events (Battery, Calls).
  */
-class AegisSystemReceiver : BroadcastReceiver() {
+class NewaxSystemReceiver : BroadcastReceiver() {
 
     private fun setSpeakerphoneOn(audioManager: AudioManager, on: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -48,7 +48,7 @@ class AegisSystemReceiver : BroadcastReceiver() {
                 if (!exceptionActive) {
                     TriggerEngine.evaluateEvent("ScreenOff", "Screen locked. Evaluate if connectivity needs to be turned off.")
                 } else {
-                    android.util.Log.i("AegisSystem", "Screen off but exception active (Music/Call). Keeping connectivity on.")
+                    android.util.Log.i("NewaxSystem", "Screen off but exception active (Music/Call). Keeping connectivity on.")
                 }
             }
             Intent.ACTION_BATTERY_LOW -> {

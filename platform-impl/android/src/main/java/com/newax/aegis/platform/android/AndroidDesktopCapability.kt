@@ -13,7 +13,7 @@ import com.newax.aegis.platform.desktop.ScrollDirection
 import com.newax.aegis.platform.desktop.UiTarget
 
 /**
- * The accessibility bridge the app's AegisAccessibilityService implements and
+ * The accessibility bridge the app's NewaxAccessibilityService implements and
  * injects. All operations are *semantic* (labels), never coordinates —
  * ARCHITECTURE.md RULE 5. Returning false means "element not found / action failed",
  * which the capability maps to a typed failure.
@@ -38,7 +38,7 @@ fun interface ScreenCapturer {
 /**
  * Desktop capability on Android = UI automation through the accessibility service.
  * The [SemanticAutomation] bridge is attached at runtime by the app's
- * AegisAccessibilityService ([attach] on service connect, [detach] on destroy), so
+ * NewaxAccessibilityService ([attach] on service connect, [detach] on destroy), so
  * the capability reports [CapabilityStatus.READY] while the service is connected and
  * [CapabilityStatus.UNAVAILABLE] otherwise — the real platform state, not a stub.
  */

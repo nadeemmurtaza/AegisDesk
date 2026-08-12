@@ -9,14 +9,14 @@ import com.newax.aegis.platform.android.SemanticAutomation
 
 /**
  * App-level holder for the platform capability registry, initialized once during
- * Application bootstrap (AegisApplication.onCreate).
+ * Application bootstrap (NewaxApplication.onCreate).
  *
  * The Capabilities screen reads this to show capability status; the executor and
  * skill registry (later slices) consume the same instance, so there is exactly one
  * registry in the process.
  *
  * The Desktop capability's [SemanticAutomation] bridge is attached at runtime: the
- * app's AegisAccessibilityService calls [attachAutomation] when it connects and
+ * app's NewaxAccessibilityService calls [attachAutomation] when it connects and
  * [detachAutomation] when it is destroyed. Ordering is safe either way — a service
  * that connects before bootstrap is replayed into the capability at [init].
  */
@@ -45,7 +45,7 @@ object PlatformCapabilitiesHolder {
         }
     }
 
-    /** Called by AegisAccessibilityService.onServiceConnected. */
+    /** Called by NewaxAccessibilityService.onServiceConnected. */
     fun attachAutomation(automation: SemanticAutomation) {
         synchronized(lock) {
             pendingAutomation = automation
@@ -53,7 +53,7 @@ object PlatformCapabilitiesHolder {
         }
     }
 
-    /** Called by AegisAccessibilityService.onDestroy. */
+    /** Called by NewaxAccessibilityService.onDestroy. */
     fun detachAutomation() {
         synchronized(lock) {
             pendingAutomation = null

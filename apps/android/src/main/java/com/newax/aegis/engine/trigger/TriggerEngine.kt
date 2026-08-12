@@ -3,7 +3,7 @@ package com.newax.aegis.engine.trigger
 import android.content.Context
 import android.os.BatteryManager
 import com.newax.aegis.SyncRuntime
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.engine.CalendarQueries
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +22,7 @@ object TriggerEngine {
     val triggerEvents = MutableSharedFlow<String>(extraBufferCapacity = 32)
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var db: AegisDatabase? = null
+    private var db: NewaxDatabase? = null
     private var appContext: Context? = null
     private var onAction: ((TriggerRule, Map<String, String>) -> Unit)? = null
     @Volatile private var started = false
@@ -31,7 +31,7 @@ object TriggerEngine {
 
     fun start(
         context: Context,
-        database: AegisDatabase,
+        database: NewaxDatabase,
         actionCallback: (rule: TriggerRule, eventContext: Map<String, String>) -> Unit
     ) {
         if (started) {

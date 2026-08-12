@@ -1,6 +1,6 @@
 'use strict';
 
-// Shared envelope codec for the Aegis sync relay (docs/SYNC_DESIGN.md §10).
+// Shared envelope codec for the Newax Aegis sync relay (docs/SYNC_DESIGN.md §10).
 // Every WebSocket message is one binary envelope:
 //
 //   [type:1][deviceId:utf8][0x00][payload]

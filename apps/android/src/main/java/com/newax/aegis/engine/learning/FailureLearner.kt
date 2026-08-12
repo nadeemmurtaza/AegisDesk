@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.learning
 
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import java.util.concurrent.ConcurrentHashMap
 
 data class FailureRecord(
@@ -53,7 +53,7 @@ object FailureLearner {
             if (records.size >= MAX_RECORDS) records.removeAt(0)
             records.add(record)
         }
-        AegisEventBus.emit(AegisEvent.FailureRecorded(module, operationId, reason))
+        NewaxEventBus.emit(NewaxEvent.FailureRecorded(module, operationId, reason))
         return record
     }
 

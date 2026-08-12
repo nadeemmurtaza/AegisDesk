@@ -127,7 +127,7 @@ private fun PolicyModesHeaderCard() {
             Text("Policy modes", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
             Spacer(Modifier.height(4.dp))
             Text(
-                "What Aegis may do automatically per action class. The mode is the policy " +
+                "What Newax may do automatically per action class. The mode is the policy " +
                     "answer (permission is the OS answer); the mapping is user-controllable " +
                     "and persists encrypted. Auto / Configurable / Approval / Strong confirmation.",
                 fontSize = 12.sp,

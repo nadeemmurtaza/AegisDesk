@@ -1,7 +1,7 @@
 package com.newax.aegis.memory
 
 import com.newax.aegis.SyncRuntime
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.AgentScratchpad
 import com.newax.aegis.db.entity.Episode
 import com.newax.aegis.db.entity.EpisodeOutcome
@@ -53,7 +53,7 @@ object AgentMemory {
         val now = System.currentTimeMillis()
         runBlocking {
             runCatching {
-                val db = AegisDatabase.get
+                val db = NewaxDatabase.get
                 db.agentMemoryDao().pruneExpiredScratchpad(now)
                 db.agentMemoryDao().putScratchpad(
                     AgentScratchpad(
@@ -70,25 +70,25 @@ object AgentMemory {
 
     fun scratchpadGet(agentId: String, key: String): String? = runBlocking {
         runCatching {
-            AegisDatabase.get.agentMemoryDao().scratchpadFor(agentId)
+            NewaxDatabase.get.agentMemoryDao().scratchpadFor(agentId)
                 .firstOrNull { it.key == key }?.value
         }.getOrNull()
     }
 
     fun scratchpadFor(agentId: String): List<AgentScratchpad> = runBlocking {
         runCatching {
-            val dao = AegisDatabase.get.agentMemoryDao()
+            val dao = NewaxDatabase.get.agentMemoryDao()
             dao.pruneExpiredScratchpad(System.currentTimeMillis())
             dao.scratchpadFor(agentId)
         }.getOrDefault(emptyList())
     }
 
     fun scratchpadDelete(agentId: String, key: String) {
-        runBlocking { runCatching { AegisDatabase.get.agentMemoryDao().deleteScratchpad(agentId, key) } }
+        runBlocking { runCatching { NewaxDatabase.get.agentMemoryDao().deleteScratchpad(agentId, key) } }
     }
 
     fun scratchpadClear(agentId: String) {
-        runBlocking { runCatching { AegisDatabase.get.agentMemoryDao().clearScratchpad(agentId) } }
+        runBlocking { runCatching { NewaxDatabase.get.agentMemoryDao().clearScratchpad(agentId) } }
     }
 
     // ── Episodic memory (the "periodic" layer: outcome + lesson) ───────────
@@ -110,7 +110,7 @@ object AgentMemory {
         val now = System.currentTimeMillis()
         runBlocking {
             runCatching {
-                AegisDatabase.get.agentMemoryDao().insertEpisode(
+                NewaxDatabase.get.agentMemoryDao().insertEpisode(
                     Episode(
                         episodeId = episodeId,
                         agentId = agentId,
@@ -140,7 +140,7 @@ object AgentMemory {
         // Semantic path — best-effort: no-op when the embedder isn't ready.
         runCatching {
             com.newax.aegis.engine.embedding.VectorStore.indexEpisode(
-                AegisDatabase.get, episodeId, summary, lesson, outcome
+                NewaxDatabase.get, episodeId, summary, lesson, outcome
             )
         }
         return episodeId
@@ -148,12 +148,12 @@ object AgentMemory {
 
     /** The chronological timeline — newest first. */
     fun recentEpisodes(limit: Int = 50): List<Episode> = runBlocking {
-        runCatching { AegisDatabase.get.agentMemoryDao().recentEpisodes(limit) }.getOrDefault(emptyList())
+        runCatching { NewaxDatabase.get.agentMemoryDao().recentEpisodes(limit) }.getOrDefault(emptyList())
     }
 
     /** FAILURE episodes with lessons — the collective-learning feed. */
     fun lessonsLearned(limit: Int = 50): List<Episode> = runBlocking {
-        runCatching { AegisDatabase.get.agentMemoryDao().lessonsLearned(limit) }.getOrDefault(emptyList())
+        runCatching { NewaxDatabase.get.agentMemoryDao().lessonsLearned(limit) }.getOrDefault(emptyList())
     }
 
     // ── L3 Handoffs (shared write, clean artifacts + pointers) ─────────────
@@ -172,7 +172,7 @@ object AgentMemory {
         val now = System.currentTimeMillis()
         runBlocking {
             runCatching {
-                AegisDatabase.get.agentMemoryDao().insertHandoff(
+                NewaxDatabase.get.agentMemoryDao().insertHandoff(
                     HandoffEntry(
                         handoffId = handoffId,
                         fromAgent = fromAgent,
@@ -208,7 +208,7 @@ object AgentMemory {
     fun ackHandoff(handoffId: String) {
         if (handoffId.isBlank()) return
         runBlocking {
-            runCatching { AegisDatabase.get.agentMemoryDao().updateHandoffStatus(handoffId, HandoffStatus.ACKED) }
+            runCatching { NewaxDatabase.get.agentMemoryDao().updateHandoffStatus(handoffId, HandoffStatus.ACKED) }
         }
         SyncRuntime.captureRecord(
             SyncRuntime.TABLE_HANDOFFS, handoffId,
@@ -217,18 +217,18 @@ object AgentMemory {
     }
 
     fun handoffInbox(agent: String): List<HandoffEntry> = runBlocking {
-        runCatching { AegisDatabase.get.agentMemoryDao().handoffInbox(agent) }.getOrDefault(emptyList())
+        runCatching { NewaxDatabase.get.agentMemoryDao().handoffInbox(agent) }.getOrDefault(emptyList())
     }
 
     fun handoffOutbox(agent: String, limit: Int = 50): List<HandoffEntry> = runBlocking {
-        runCatching { AegisDatabase.get.agentMemoryDao().handoffOutbox(agent, limit) }.getOrDefault(emptyList())
+        runCatching { NewaxDatabase.get.agentMemoryDao().handoffOutbox(agent, limit) }.getOrDefault(emptyList())
     }
 
     // ── Work log (zero work duplication, device-local) ─────────────────────
 
     fun isWorkDone(action: String, resource: String): Boolean = runBlocking {
         runCatching {
-            AegisDatabase.get.agentMemoryDao().workFor(action, resource)?.status == WorkLogStatus.DONE
+            NewaxDatabase.get.agentMemoryDao().workFor(action, resource)?.status == WorkLogStatus.DONE
         }.getOrDefault(false)
     }
 
@@ -237,7 +237,7 @@ object AgentMemory {
         if (action.isBlank() || resource.isBlank()) return false
         val inserted = runBlocking {
             runCatching {
-                AegisDatabase.get.agentMemoryDao().insertWork(
+                NewaxDatabase.get.agentMemoryDao().insertWork(
                     WorkLogEntry(action = action, resource = resource, agentId = agentId, status = WorkLogStatus.IN_PROGRESS)
                 )
             }.getOrDefault(0L)
@@ -248,13 +248,13 @@ object AgentMemory {
     fun completeWork(action: String, resource: String) {
         runBlocking {
             runCatching {
-                AegisDatabase.get.agentMemoryDao().updateWork(action, resource, WorkLogStatus.DONE, System.currentTimeMillis())
+                NewaxDatabase.get.agentMemoryDao().updateWork(action, resource, WorkLogStatus.DONE, System.currentTimeMillis())
             }
         }
     }
 
     fun recentWork(limit: Int = 50): List<WorkLogEntry> = runBlocking {
-        runCatching { AegisDatabase.get.agentMemoryDao().recentWork(limit) }.getOrDefault(emptyList())
+        runCatching { NewaxDatabase.get.agentMemoryDao().recentWork(limit) }.getOrDefault(emptyList())
     }
 
     // ── L1 Global Library (gated: PENDING → human approval → ACTIVE) ───────
@@ -270,7 +270,7 @@ object AgentMemory {
         val now = System.currentTimeMillis()
         runBlocking {
             runCatching {
-                AegisDatabase.get.agentMemoryDao().upsertLibrary(
+                NewaxDatabase.get.agentMemoryDao().upsertLibrary(
                     LibraryEntry(
                         entryId = entryId,
                         category = category,
@@ -304,7 +304,7 @@ object AgentMemory {
     fun approveKnowledge(entryId: String) {
         setLibraryStatus(entryId, LibraryStatus.ACTIVE)
         runCatching {
-            val db = AegisDatabase.get
+            val db = NewaxDatabase.get
             val entry = runBlocking { db.agentMemoryDao().libraryById(entryId) } ?: return
             com.newax.aegis.engine.embedding.VectorStore.indexLibrary(db, entryId, entry.category, entry.title, entry.content)
         }
@@ -313,7 +313,7 @@ object AgentMemory {
     fun rejectKnowledge(entryId: String) {
         setLibraryStatus(entryId, LibraryStatus.REJECTED)
         runCatching {
-            com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, entryId)
+            com.newax.aegis.engine.embedding.VectorStore.removeLibrary(NewaxDatabase.get, entryId)
         }
     }
 
@@ -321,7 +321,7 @@ object AgentMemory {
         if (entryId.isBlank()) return
         val now = System.currentTimeMillis()
         runBlocking {
-            runCatching { AegisDatabase.get.agentMemoryDao().setLibraryStatus(entryId, status, now) }
+            runCatching { NewaxDatabase.get.agentMemoryDao().setLibraryStatus(entryId, status, now) }
         }
         SyncRuntime.captureRecord(
             SyncRuntime.TABLE_LIBRARY_ENTRIES, entryId,
@@ -332,13 +332,13 @@ object AgentMemory {
     /** The read-only library — ACTIVE only; agents never see the gate. */
     fun library(category: String? = null): List<LibraryEntry> = runBlocking {
         runCatching {
-            val dao = AegisDatabase.get.agentMemoryDao()
+            val dao = NewaxDatabase.get.agentMemoryDao()
             if (category.isNullOrBlank()) dao.activeLibrary() else dao.activeLibraryCategory(category)
         }.getOrDefault(emptyList())
     }
 
     fun pendingApprovals(limit: Int = 100): List<LibraryEntry> = runBlocking {
-        runCatching { AegisDatabase.get.agentMemoryDao().libraryByStatus(LibraryStatus.PENDING_APPROVAL, limit) }
+        runCatching { NewaxDatabase.get.agentMemoryDao().libraryByStatus(LibraryStatus.PENDING_APPROVAL, limit) }
             .getOrDefault(emptyList())
     }
 
@@ -361,7 +361,7 @@ object AgentMemory {
      */
     fun recall(query: String, limit: Int = 5): List<String> {
         if (query.isBlank()) return emptyList()
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         val seen = LinkedHashSet<String>(limit * 3)
         val out = mutableListOf<String>()
         fun add(text: String) {
@@ -417,7 +417,7 @@ object AgentMemory {
 
     private fun resolveConflicts(): Int = runBlocking {
         runCatching {
-            val dao = AegisDatabase.get.agentMemoryDao()
+            val dao = NewaxDatabase.get.agentMemoryDao()
             var resolved = 0
             for (pending in dao.libraryByStatus(LibraryStatus.PENDING_APPROVAL, 200)) {
                 val active = dao.activeLibrary().filter { it.category == pending.category && it.title == pending.title }
@@ -426,13 +426,13 @@ object AgentMemory {
                 when {
                     dup -> {
                         dao.setLibraryStatus(pending.entryId, LibraryStatus.REJECTED, System.currentTimeMillis())
-                        com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, pending.entryId)
+                        com.newax.aegis.engine.embedding.VectorStore.removeLibrary(NewaxDatabase.get, pending.entryId)
                         resolved++
                     }
                     !conflict && pending.confidence >= 90 -> {
                         dao.setLibraryStatus(pending.entryId, LibraryStatus.ACTIVE, System.currentTimeMillis())
                         com.newax.aegis.engine.embedding.VectorStore.indexLibrary(
-                            AegisDatabase.get, pending.entryId, pending.category, pending.title, pending.content
+                            NewaxDatabase.get, pending.entryId, pending.category, pending.title, pending.content
                         )
                         resolved++
                     }
@@ -453,7 +453,7 @@ object AgentMemory {
      */
     fun consolidateLessons(): Int = runBlocking {
         runCatching {
-            val db = AegisDatabase.get
+            val db = NewaxDatabase.get
             val dao = db.agentMemoryDao()
             val lessons = dao.allLessonTexts().map { it.trim().lowercase() }.filter { it.isNotBlank() }
             if (lessons.isEmpty()) return@runCatching 0
@@ -508,7 +508,7 @@ object AgentMemory {
      */
     fun decay(): Int = runBlocking {
         runCatching {
-            val db = AegisDatabase.get
+            val db = NewaxDatabase.get
             val dao = db.agentMemoryDao()
             val now = System.currentTimeMillis()
             var touched = 0

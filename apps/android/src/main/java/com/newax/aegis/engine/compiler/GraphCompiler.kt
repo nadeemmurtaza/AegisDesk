@@ -1,6 +1,6 @@
 package com.newax.aegis.engine.compiler
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.graph.GraphStore
 import com.newax.aegis.db.StandardPredicates
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +15,7 @@ object GraphCompiler {
         val durationMs: Long
     )
 
-    suspend fun compileFromPersonFacts(db: AegisDatabase): CompileResult = withContext(Dispatchers.IO) {
+    suspend fun compileFromPersonFacts(db: NewaxDatabase): CompileResult = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         var entitiesAdded = 0
         var edgesAdded = 0
@@ -45,7 +45,7 @@ object GraphCompiler {
         CompileResult(entitiesAdded, edgesAdded, skipped, System.currentTimeMillis() - startMs)
     }
 
-    suspend fun compileFromMemoryRecords(db: AegisDatabase): CompileResult = withContext(Dispatchers.IO) {
+    suspend fun compileFromMemoryRecords(db: NewaxDatabase): CompileResult = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         var edgesAdded = 0
         var skipped = 0
@@ -69,7 +69,7 @@ object GraphCompiler {
         CompileResult(0, edgesAdded, skipped, System.currentTimeMillis() - startMs)
     }
 
-    suspend fun compileFromFileEntities(db: AegisDatabase): CompileResult = withContext(Dispatchers.IO) {
+    suspend fun compileFromFileEntities(db: NewaxDatabase): CompileResult = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         var edgesAdded = 0
         var skipped = 0
@@ -92,7 +92,7 @@ object GraphCompiler {
         CompileResult(0, edgesAdded, skipped, System.currentTimeMillis() - startMs)
     }
 
-    suspend fun compileAll(db: AegisDatabase): CompileResult = withContext(Dispatchers.IO) {
+    suspend fun compileAll(db: NewaxDatabase): CompileResult = withContext(Dispatchers.IO) {
         val r1 = compileFromPersonFacts(db)
         val r2 = compileFromMemoryRecords(db)
         val r3 = compileFromFileEntities(db)

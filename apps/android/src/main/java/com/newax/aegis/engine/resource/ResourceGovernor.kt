@@ -55,14 +55,14 @@ object ResourceGovernor {
 
     private val scope       = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val mutex       = Mutex()
-    private val queue       = PriorityQueue<AegisJob>(compareBy { it.priority.level })
+    private val queue       = PriorityQueue<NewaxJob>(compareBy { it.priority.level })
     private var heavyJob:   Job? = null
     private var heavyLabel: String? = null
     private var criticalRunning = false
 
     // ── Submit ────────────────────────────────────────────────────────────────
 
-    suspend fun submit(job: AegisJob): String {
+    suspend fun submit(job: NewaxJob): String {
         return mutex.withLock {
             when (job.resourceClass) {
                 ResourceClass.TINY  -> { launchTiny(job); job.id }
@@ -93,7 +93,7 @@ object ResourceGovernor {
 
     // ── Preempt: P0 user command cancels running heavy job ───────────────────
 
-    suspend fun preemptForUser(job: AegisJob): String {
+    suspend fun preemptForUser(job: NewaxJob): String {
         mutex.withLock {
             if (heavyJob?.isActive == true && heavyLabel != null) {
                 heavyJob!!.cancel()
@@ -106,11 +106,11 @@ object ResourceGovernor {
 
     // ── Internal launchers ────────────────────────────────────────────────────
 
-    private fun launchTiny(job: AegisJob) {
+    private fun launchTiny(job: NewaxJob) {
         scope.launch(Dispatchers.IO) { runSafe(job) }
     }
 
-    private fun launchLight(job: AegisJob) {
+    private fun launchLight(job: NewaxJob) {
         if (pressureLevel.get() >= 4 && job.priority.level > JobPriority.P1_ACTIVE_SEARCH.level) return
         scope.launch(Dispatchers.IO) { runSafe(job) }
     }
@@ -135,7 +135,7 @@ object ResourceGovernor {
         }
     }
 
-    private suspend fun runSafe(job: AegisJob) {
+    private suspend fun runSafe(job: NewaxJob) {
         if (System.currentTimeMillis() > job.deadlineMs) { failedCount.incrementAndGet(); return }
         try {
             if (job.deadlineMs == Long.MAX_VALUE) {
@@ -160,7 +160,7 @@ object ResourceGovernor {
     ): JobResult<T> {
         if (pressureLevel.get() >= 5 && resourceClass == ResourceClass.HEAVY) return JobResult.ResourceDenied
         val deferred = CompletableDeferred<JobResult<T>>()
-        val job = AegisJob(
+        val job = NewaxJob(
             id            = newId(),
             label         = label,
             resourceClass = resourceClass,
@@ -228,7 +228,7 @@ object ResourceGovernor {
         block: suspend () -> Unit
     ) {
         scope.launch {
-            submit(AegisJob(
+            submit(NewaxJob(
                 id            = newId(),
                 label         = label,
                 resourceClass = resourceClass,

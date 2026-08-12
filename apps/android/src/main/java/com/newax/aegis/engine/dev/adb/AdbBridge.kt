@@ -4,9 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.dev.ci.HeadlessCi
-import com.newax.aegis.engine.dev.log.AegisLogger
+import com.newax.aegis.engine.dev.log.NewaxLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,13 +32,13 @@ class AdbBridge : BroadcastReceiver() {
         val arg3 = intent.getStringExtra(EXTRA_ARG3) ?: ""
 
         Log.d(TAG, "ADB CMD: $cmd arg1=$arg1 arg2=$arg2 arg3=$arg3")
-        AegisLogger.i(TAG, "ADB CMD: $cmd", module = "AdbBridge")
+        NewaxLogger.i(TAG, "ADB CMD: $cmd", module = "AdbBridge")
 
         scope.launch {
             val db = getDatabase(context)
             val result = HeadlessCi.execute(context, db, cmd, arg1, arg2, arg3)
             Log.d(TAG, "ADB RESULT: $result")
-            AegisLogger.i(TAG, "ADB RESULT [$cmd]: $result", module = "AdbBridge")
+            NewaxLogger.i(TAG, "ADB RESULT [$cmd]: $result", module = "AdbBridge")
 
             val resultIntent = Intent("${ACTION}_RESULT").apply {
                 setPackage(context.packageName)
@@ -50,7 +50,7 @@ class AdbBridge : BroadcastReceiver() {
         }
     }
 
-    private fun getDatabase(context: Context): AegisDatabase? = try {
-        AegisDatabase.get
+    private fun getDatabase(context: Context): NewaxDatabase? = try {
+        NewaxDatabase.get
     } catch (_: Exception) { null }
 }

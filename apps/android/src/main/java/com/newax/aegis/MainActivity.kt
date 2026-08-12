@@ -121,7 +121,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            AegisApp(
+            NewaxApp(
                 onAccessibility  = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
                 onNotifications  = { startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) }
             )
@@ -141,7 +141,7 @@ class MainActivity : FragmentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AegisApp(
+fun NewaxApp(
     vm: MainViewModel = viewModel(),
     onAccessibility: () -> Unit,
     onNotifications: () -> Unit
@@ -199,7 +199,7 @@ fun AegisApp(
                 ModalDrawerSheet(drawerContainerColor = Surface, modifier = Modifier.width(280.dp)) {
                     Spacer(Modifier.height(24.dp))
                     Text(
-                        "Aegis",
+                        "Newax",
                         modifier = Modifier.padding(horizontal = 20.dp),
                         fontWeight = FontWeight.SemiBold,
                         fontSize   = 22.sp,
@@ -472,7 +472,7 @@ fun ChatScreen(
 @Composable
 private fun EmptyState(modifier: Modifier, onChip: (String) -> Unit) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("Aegis", fontWeight = FontWeight.SemiBold, fontSize = 28.sp, color = TextPri)
+        Text("Newax Aegis", fontWeight = FontWeight.SemiBold, fontSize = 28.sp, color = TextPri)
         Spacer(Modifier.height(8.dp))
         Text("Your private, on-device assistant.", color = TextSec, fontSize = 15.sp)
         Spacer(Modifier.height(32.dp))
@@ -531,7 +531,7 @@ private fun ChatBubble(msg: ChatMessage) {
                         onClick      = {},
                         onLongClick  = {
                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            cm.setPrimaryClip(ClipData.newPlainText("Aegis", msg.text))
+                            cm.setPrimaryClip(ClipData.newPlainText("Newax", msg.text))
                         }
                     )
                     .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -1062,7 +1062,7 @@ fun SettingsScreen(
                     HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 16.dp))
                     PermissionRow("Inbox Access (Notifications)", "Read incoming notifications", onNotifications)
                     HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 16.dp))
-                    PermissionRow("App Permissions", "Control which apps Aegis can interact with", onNavigateToAppPermissions)
+                    PermissionRow("App Permissions", "Control which apps Newax can interact with", onNavigateToAppPermissions)
                 }
             }
         }
@@ -1393,7 +1393,7 @@ fun BiometricOverlay(vm: MainViewModel) {
             })
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Aegis Security")
+                .setTitle("Newax Security")
                 .setSubtitle("Verify identity to execute sensitive action")
                 .setNegativeButtonText("Cancel")
                 .build()

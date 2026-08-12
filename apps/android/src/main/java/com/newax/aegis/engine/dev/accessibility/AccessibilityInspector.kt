@@ -2,7 +2,7 @@ package com.newax.aegis.engine.dev.accessibility
 
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import com.newax.aegis.accessibility.AegisAccessibilityService
+import com.newax.aegis.accessibility.NewaxAccessibilityService
 import com.newax.aegis.engine.grounding.ScreenGrounder
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -70,7 +70,7 @@ object AccessibilityInspector {
     )
 
     fun dumpNodeTree(maxDepth: Int = 20): String {
-        val root = AegisAccessibilityService.instance?.getRootNode()
+        val root = NewaxAccessibilityService.instance?.getRootNode()
             ?: return "Accessibility service not running"
         return buildString {
             fun visit(node: AccessibilityNodeInfo?, depth: Int) {
@@ -95,7 +95,7 @@ object AccessibilityInspector {
     }
 
     fun flatNodes(): List<NodeInfo> {
-        val root = AegisAccessibilityService.instance?.getRootNode() ?: return emptyList()
+        val root = NewaxAccessibilityService.instance?.getRootNode() ?: return emptyList()
         val result = mutableListOf<NodeInfo>()
         fun visit(node: AccessibilityNodeInfo?, depth: Int) {
             if (node == null) return
@@ -135,7 +135,7 @@ object AccessibilityInspector {
     }
 
     fun signature(): ScreenSignature {
-        val svc = AegisAccessibilityService.instance
+        val svc = NewaxAccessibilityService.instance
         val root = svc?.getRootNode()
         if (root == null) return ScreenSignature(svc?.currentPackage ?: "", 0, 0, "")
         var count = 0
@@ -164,7 +164,7 @@ object AccessibilityInspector {
     }
 
     fun scoreGrounding(target: String): GroundingScoreResult {
-        val root = AegisAccessibilityService.instance?.getRootNode()
+        val root = NewaxAccessibilityService.instance?.getRootNode()
             ?: return GroundingScoreResult(target, emptyList())
         val best = ScreenGrounder.findTarget(root, target)
         val nodes = flatNodes()

@@ -27,7 +27,7 @@ import kotlin.coroutines.resume
  */
 object OcrEngine {
 
-    private const val TAG = "AegisOCR"
+    private const val TAG = "NewaxOCR"
 
     // Minimum Levenshtein-distance ratio to consider text "changed" vs previous result
     private const val CHANGE_THRESHOLD = 0.15f

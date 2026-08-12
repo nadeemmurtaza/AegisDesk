@@ -48,8 +48,8 @@ class VoiceRecognitionService : Service(), RecognitionListener {
         val channel = NotificationChannel("voice", "Voice Recognition", NotificationManager.IMPORTANCE_LOW)
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         startForeground(2, NotificationCompat.Builder(this, "voice")
-            .setContentTitle("Aegis Voice")
-            .setContentText("Listening for 'Hey Aegis' (Vosk)")
+            .setContentTitle("Newax Voice")
+            .setContentText("Listening for 'Hey Newax' (Vosk)")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .build())
     }
@@ -71,12 +71,12 @@ class VoiceRecognitionService : Service(), RecognitionListener {
                             startListening()
                         }
                     } catch (e: Exception) {
-                        Log.e("AegisVoice", "Failed to unpack SPK model: ${e.message}")
+                        Log.e("NewaxVoice", "Failed to unpack SPK model: ${e.message}")
                     }
                 }.start()
             },
             { e ->
-                Log.e("AegisVoice", "Failed to unpack Vosk model: ${e.message}")
+                Log.e("NewaxVoice", "Failed to unpack Vosk model: ${e.message}")
                 stopSelf()
             }
         )
@@ -91,9 +91,9 @@ class VoiceRecognitionService : Service(), RecognitionListener {
             speechService = SpeechService(recognizer, 16000.0f)
             speechService?.startListening(this)
             isListening = true
-            Log.i("AegisVoice", "Vosk Full-Text listener started.")
+            Log.i("NewaxVoice", "Vosk Full-Text listener started.")
         } catch (e: Exception) {
-            Log.e("AegisVoice", "Failed to start speech service", e)
+            Log.e("NewaxVoice", "Failed to start speech service", e)
             stopSelf()
         }
     }
@@ -110,11 +110,11 @@ class VoiceRecognitionService : Service(), RecognitionListener {
         if (text.isNotBlank()) {
             if (ambientMode == "Meeting" || ambientMode == "Lecture") {
                 ambientTranscript.append(text).append(" ")
-                Log.d("AegisVoice", "[$ambientMode] Appended: $text")
+                Log.d("NewaxVoice", "[$ambientMode] Appended: $text")
             } else if (text.contains("hey aegis") || text.contains("ہیلو ایجس")) {
-                Log.i("AegisVoice", "Wake word detected!")
+                Log.i("NewaxVoice", "Wake word detected!")
             } else {
-                Log.i("AegisVoice", "Transcribed caller: $text")
+                Log.i("NewaxVoice", "Transcribed caller: $text")
                 com.newax.aegis.engine.TriggerEngine.initialize(this)
                 val systemPrompt = "[Live Call] Caller said: $text\nReply briefly and conversationally."
                 com.newax.aegis.engine.TriggerEngine.triggerEvents.tryEmit(systemPrompt)
@@ -125,7 +125,7 @@ class VoiceRecognitionService : Service(), RecognitionListener {
     override fun onFinalResult(hypothesis: String?) {}
 
     override fun onError(e: Exception?) {
-        Log.e("AegisVoice", "Vosk error", e)
+        Log.e("NewaxVoice", "Vosk error", e)
     }
 
     override fun onTimeout() {

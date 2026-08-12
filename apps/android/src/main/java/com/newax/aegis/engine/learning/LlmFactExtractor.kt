@@ -21,7 +21,7 @@ import org.json.JSONArray
  */
 object LlmFactExtractor {
 
-    private const val TAG          = "AegisLlmExtract"
+    private const val TAG          = "NewaxLlmExtract"
     private const val MIN_TEXT_LEN = 80
     private const val MAX_TEXT_LEN = 1200
     private const val MIN_CONF     = 0.50f

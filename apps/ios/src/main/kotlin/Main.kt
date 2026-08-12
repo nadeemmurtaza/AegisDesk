@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalForeignApi::class)
 fun main() {
-    println("Aegis iOS — offline-first assistant")
+    println("Newax Aegis iOS — offline-first assistant")
     println("shared/model-api · platform-impl:ios · Phase M · SwiftUI (TBD)")
 
     // Bootstrap platform capabilities

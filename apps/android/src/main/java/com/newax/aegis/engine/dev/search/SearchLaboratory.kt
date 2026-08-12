@@ -1,6 +1,6 @@
 package com.newax.aegis.engine.dev.search
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.ai.MemoryRanker
 import com.newax.aegis.engine.embedding.VectorStore
 import com.newax.aegis.engine.graph.GraphStore
@@ -34,7 +34,7 @@ object SearchLaboratory {
 
     private fun ramMb() = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)
 
-    suspend fun runExact(query: String, db: AegisDatabase): SearchResult = withContext(Dispatchers.IO) {
+    suspend fun runExact(query: String, db: NewaxDatabase): SearchResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val ram0 = ramMb()
         return@withContext try {
@@ -46,7 +46,7 @@ object SearchLaboratory {
         }
     }
 
-    suspend fun runFts(query: String, db: AegisDatabase): SearchResult = withContext(Dispatchers.IO) {
+    suspend fun runFts(query: String, db: NewaxDatabase): SearchResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val ram0 = ramMb()
         return@withContext try {
@@ -64,7 +64,7 @@ object SearchLaboratory {
         }
     }
 
-    suspend fun runGraph(query: String, db: AegisDatabase): SearchResult = withContext(Dispatchers.IO) {
+    suspend fun runGraph(query: String, db: NewaxDatabase): SearchResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val ram0 = ramMb()
         return@withContext try {
@@ -79,7 +79,7 @@ object SearchLaboratory {
         }
     }
 
-    suspend fun runTemporal(query: String, db: AegisDatabase, lastNDays: Int = 7): SearchResult = withContext(Dispatchers.IO) {
+    suspend fun runTemporal(query: String, db: NewaxDatabase, lastNDays: Int = 7): SearchResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val ram0 = ramMb()
         return@withContext try {
@@ -94,7 +94,7 @@ object SearchLaboratory {
         }
     }
 
-    suspend fun runVector(query: String, db: AegisDatabase): SearchResult = withContext(Dispatchers.IO) {
+    suspend fun runVector(query: String, db: NewaxDatabase): SearchResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val ram0 = ramMb()
         return@withContext try {
@@ -110,7 +110,7 @@ object SearchLaboratory {
         }
     }
 
-    suspend fun runHybrid(query: String, db: AegisDatabase): SearchResult = withContext(Dispatchers.IO) {
+    suspend fun runHybrid(query: String, db: NewaxDatabase): SearchResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val ram0 = ramMb()
         return@withContext try {
@@ -123,7 +123,7 @@ object SearchLaboratory {
         }
     }
 
-    suspend fun compareAll(query: String, db: AegisDatabase): LabComparison {
+    suspend fun compareAll(query: String, db: NewaxDatabase): LabComparison {
         val overall = System.currentTimeMillis()
         val all = mapOf(
             SearchStrategy.EXACT to runExact(query, db),

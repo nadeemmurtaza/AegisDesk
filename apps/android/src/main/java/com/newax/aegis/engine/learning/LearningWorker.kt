@@ -3,7 +3,7 @@ package com.newax.aegis.engine.learning
 import android.content.Context
 import android.util.Log
 import androidx.work.*
-import com.newax.aegis.engine.resource.AegisJob
+import com.newax.aegis.engine.resource.NewaxJob
 import com.newax.aegis.engine.resource.JobPriority
 import com.newax.aegis.engine.resource.ResourceClass
 import com.newax.aegis.engine.resource.ResourceGovernor
@@ -29,7 +29,7 @@ class LearningWorker(appContext: Context, params: WorkerParameters) : Worker(app
         return try {
             var draftsCreated = 0
             runBlocking {
-                ResourceGovernor.submit(AegisJob(
+                ResourceGovernor.submit(NewaxJob(
                     id            = ResourceGovernor.newId(),
                     label         = "learning-batch",
                     resourceClass = ResourceClass.HEAVY,
@@ -50,7 +50,7 @@ class LearningWorker(appContext: Context, params: WorkerParameters) : Worker(app
     }
 
     companion object {
-        private const val TAG = "AegisLearner"
+        private const val TAG = "NewaxLearner"
         private const val WORK_NAME = "aegis_background_learner"
         private const val OUTPUT_KEY = "drafts_created"
         const val INTERVAL_MINUTES = 20L   // one source batch every 20 min

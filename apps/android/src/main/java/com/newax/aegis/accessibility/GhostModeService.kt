@@ -24,9 +24,9 @@ class GhostModeService : Service() {
         
         ghostView = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
-            // Add a small subtle text so the user knows it's Aegis, not a broken screen
+            // Add a small subtle text so the user knows it's Newax, not a broken screen
             val text = android.widget.TextView(this@GhostModeService).apply {
-                text = "Aegis Ghost Mode Active"
+                text = "Newax Ghost Mode Active"
                 setTextColor(Color.DKGRAY)
                 textSize = 14f
             }

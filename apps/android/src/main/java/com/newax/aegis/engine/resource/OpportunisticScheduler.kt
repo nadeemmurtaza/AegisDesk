@@ -38,7 +38,7 @@ object OpportunisticScheduler {
         runCount++
         tasks.forEach { task ->
             if (!ResourceGovernor.isCriticalRunning()) {
-                ResourceGovernor.submit(AegisJob(
+                ResourceGovernor.submit(NewaxJob(
                     id            = ResourceGovernor.newId(),
                     label         = "opportunistic",
                     resourceClass = ResourceClass.HEAVY,

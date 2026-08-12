@@ -51,7 +51,7 @@ import com.newax.aegis.sync.PairedPeer
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 
-// ── Design tokens — same palette as the rest of the Aegis apps ──────────────
+// ── Design tokens — same palette as the rest of the Newax apps ──────────────
 private val Background = Color(0xFFF7F7F5)
 private val Surface = Color(0xFFFFFFFF)
 private val SurfaceMuted = Color(0xFFF2F2EF)
@@ -92,7 +92,7 @@ fun SyncScreen() {
             ) {
                 item {
                     Text(
-                        "Aegis — Device Sync",
+                        "Newax Aegis — Device Sync",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 20.sp,
                         color = TextPrimary

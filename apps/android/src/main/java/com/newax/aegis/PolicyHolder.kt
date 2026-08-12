@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * App-level holder for the one [PolicyEngine] per process — the authority
  * spine's policy layer (ARCHITECTURE.md rule 3). Initialized once during
- * Application bootstrap ([AegisApplication.onCreate]).
+ * Application bootstrap ([NewaxApplication.onCreate]).
  *
  * There is exactly one policy surface: the authority flow
  * ([MainViewModel.processAction]) evaluates actions through this instance, and
@@ -61,7 +61,7 @@ object PolicyHolder {
 
     /**
      * Wires the persistent audit trail. Called after the database initializes
-     * (AegisApplication bootstrap); safe to call repeatedly. Loads decisions
+     * (NewaxApplication bootstrap); safe to call repeatedly. Loads decisions
      * from previous sessions and merges any records evaluated before this call
      * (early bootstrap) so nothing is lost.
      */

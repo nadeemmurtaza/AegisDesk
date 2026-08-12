@@ -7,7 +7,7 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.*
 import kotlinx.coroutines.runBlocking
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.KvStoreEntity
 import com.newax.aegis.db.entity.LearningDraftEntity
 import com.newax.aegis.db.entity.PersonEntity
@@ -24,11 +24,11 @@ import org.json.JSONObject
  */
 class LegacyMigrationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) {
 
-    private val TAG = "AegisMigration"
+    private val TAG = "NewaxMigration"
     private val DONE_KEY = "migration_v1_done"
 
     override fun doWork(): Result {
-        val db = try { AegisDatabase.get } catch (_: Exception) {
+        val db = try { NewaxDatabase.get } catch (_: Exception) {
             Log.w(TAG, "DB not ready, will retry")
             return Result.retry()
         }
@@ -53,7 +53,7 @@ class LegacyMigrationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx
         }
     }
 
-    private fun migrateDrafts(db: AegisDatabase, memory: EncryptedMemory) {
+    private fun migrateDrafts(db: NewaxDatabase, memory: EncryptedMemory) {
         val raw = memory.getRaw("learning_drafts") ?: return
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return
         val entities = (0 until arr.length()).mapNotNull { i ->
@@ -78,7 +78,7 @@ class LegacyMigrationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx
         }
     }
 
-    private fun migratePersonFacts(db: AegisDatabase, memory: EncryptedMemory) {
+    private fun migratePersonFacts(db: NewaxDatabase, memory: EncryptedMemory) {
         val indexRaw = memory.getRaw("pf_index") ?: return
         val names = runCatching {
             val arr = JSONArray(indexRaw)
@@ -115,7 +115,7 @@ class LegacyMigrationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx
         Log.d(TAG, "Migrated $totalFacts person facts for ${names.size} people")
     }
 
-    private fun migratePersonMentions(db: AegisDatabase, memory: EncryptedMemory) {
+    private fun migratePersonMentions(db: NewaxDatabase, memory: EncryptedMemory) {
         val indexRaw = memory.getRaw("pf_index") ?: return
         val names = runCatching {
             val arr = JSONArray(indexRaw)

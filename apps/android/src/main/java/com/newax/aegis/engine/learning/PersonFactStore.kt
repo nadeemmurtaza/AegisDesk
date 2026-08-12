@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.learning
 
 import com.newax.aegis.SyncRuntime
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
 import com.newax.aegis.engine.embedding.VectorStore
@@ -40,7 +40,7 @@ object PersonFactStore {
     // ── Public API ────────────────────────────────────────────────────────────
 
     /** Store a fact linked to a named person. Deduplicates by trigram Jaccard > 0.80. */
-    fun addFact(db: AegisDatabase, name: String, draft: LearningDraft) {
+    fun addFact(db: NewaxDatabase, name: String, draft: LearningDraft) {
         kotlinx.coroutines.runBlocking {
             val personId = getOrCreateId(db, name)
             val existing = db.personFactDao().forPerson(personId)
@@ -82,7 +82,7 @@ object PersonFactStore {
         }
     }
 
-    fun factsFor(db: AegisDatabase, name: String): List<PersonFact> {
+    fun factsFor(db: NewaxDatabase, name: String): List<PersonFact> {
         val personId = getPersonId(db, name) ?: return emptyList()
         return kotlinx.coroutines.runBlocking { db.personFactDao().forPerson(personId).map { it.toPersonFact(name) } }
     }
@@ -91,7 +91,7 @@ object PersonFactStore {
      * Record that this person was encountered in a scan source.
      * Increments per-source count, updates denormalized totals + importance score.
      */
-    fun recordMention(db: AegisDatabase, name: String, source: String) {
+    fun recordMention(db: NewaxDatabase, name: String, source: String) {
         val now = System.currentTimeMillis()
         kotlinx.coroutines.runBlocking {
             val personId = getOrCreateId(db, name)
@@ -104,18 +104,18 @@ object PersonFactStore {
         }
     }
 
-    fun getImportanceScore(db: AegisDatabase, name: String): Float =
+    fun getImportanceScore(db: NewaxDatabase, name: String): Float =
         kotlinx.coroutines.runBlocking { db.personDao().findByName(name)?.importanceScore ?: 0f }
 
-    fun getPersonId(db: AegisDatabase, name: String): Long? =
+    fun getPersonId(db: NewaxDatabase, name: String): Long? =
         kotlinx.coroutines.runBlocking { db.personDao().findByName(name)?.id }
 
     /** Top N people by importance score. */
-    fun getTopPeople(db: AegisDatabase, limit: Int = 20): List<PersonImportance> =
+    fun getTopPeople(db: NewaxDatabase, limit: Int = 20): List<PersonImportance> =
         kotlinx.coroutines.runBlocking { db.personDao().getTopPeople(limit).map { it.toPersonImportance() } }
 
     /** True if person crossed the threshold and hasn't had a profile built yet. */
-    fun needsProfileBuild(db: AegisDatabase, name: String): Boolean {
+    fun needsProfileBuild(db: NewaxDatabase, name: String): Boolean {
         return kotlinx.coroutines.runBlocking {
             val person = db.personDao().findByName(name) ?: return@runBlocking false
             if (person.profileBuilt) return@runBlocking false
@@ -123,19 +123,19 @@ object PersonFactStore {
         }
     }
 
-    fun markProfileBuilt(db: AegisDatabase, name: String) {
+    fun markProfileBuilt(db: NewaxDatabase, name: String) {
         kotlinx.coroutines.runBlocking { db.personDao().markProfileBuilt(name) }
         capturePerson(db, name)
     }
 
-    fun getPeopleNeedingProfileBuild(db: AegisDatabase): List<String> =
+    fun getPeopleNeedingProfileBuild(db: NewaxDatabase): List<String> =
         kotlinx.coroutines.runBlocking { db.personDao().getPeopleNeedingProfileBuild(CROSS_SOURCE_THRESHOLD, TOTAL_MENTION_THRESHOLD).map { it.name } }
 
     /**
      * Full-text search across all person facts.
      * Query supports FTS4 MATCH syntax: "hospital", "work*", "Ahmed hospital".
      */
-    fun searchFacts(db: AegisDatabase, query: String, limit: Int = 50): List<PersonFact> =
+    fun searchFacts(db: NewaxDatabase, query: String, limit: Int = 50): List<PersonFact> =
         kotlinx.coroutines.runBlocking {
             if (query.isBlank()) return@runBlocking emptyList()
             val safe = query.trim().replace("\"", "")
@@ -144,14 +144,14 @@ object PersonFactStore {
             }
         }
 
-    fun resolveEntity(db: AegisDatabase, name: String): PersonEntity? =
+    fun resolveEntity(db: NewaxDatabase, name: String): PersonEntity? =
         kotlinx.coroutines.runBlocking { db.personDao().findByName(name) }
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
     private val nameCache = HashMap<Long, String>(64)
 
-    private fun resolvePersonName(db: AegisDatabase, personId: Long): String {
+    private fun resolvePersonName(db: NewaxDatabase, personId: Long): String {
         nameCache[personId]?.let { return it }
         // Fallback: scan from getTopPeople (not ideal, but search is rare)
         kotlinx.coroutines.runBlocking {
@@ -160,7 +160,7 @@ object PersonFactStore {
         return nameCache[personId] ?: ""
     }
 
-    private fun getOrCreateId(db: AegisDatabase, name: String): Long {
+    private fun getOrCreateId(db: NewaxDatabase, name: String): Long {
         return kotlinx.coroutines.runBlocking {
             val existing = db.personDao().findByName(name)
             if (existing != null) return@runBlocking existing.id
@@ -176,7 +176,7 @@ object PersonFactStore {
      * profile-built. Materialize never goes through this path (it writes DAOs
      * directly), so remote applies can't re-capture.
      */
-    private fun capturePerson(db: AegisDatabase, name: String) {
+    private fun capturePerson(db: NewaxDatabase, name: String) {
         val p = kotlinx.coroutines.runBlocking { db.personDao().findByName(name) } ?: return
         SyncRuntime.captureRecord(
             "persons", p.name,

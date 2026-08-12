@@ -2,8 +2,8 @@ package com.newax.aegis.engine.registry
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import java.util.concurrent.ConcurrentHashMap
 
 data class DeviceRecord(
@@ -35,14 +35,14 @@ object DeviceRegistry {
         } else device
         devices[device.id] = updated
         if (device.isConnected && existing?.isConnected != true) {
-            AegisEventBus.emit(AegisEvent.DeviceConnected(device.id, device.type.name))
+            NewaxEventBus.emit(NewaxEvent.DeviceConnected(device.id, device.type.name))
         }
     }
 
     fun disconnect(id: String) {
         devices[id]?.let { device ->
             devices[id] = device.copy(isConnected = false)
-            AegisEventBus.emit(AegisEvent.DeviceDisconnected(id))
+            NewaxEventBus.emit(NewaxEvent.DeviceDisconnected(id))
         }
     }
 

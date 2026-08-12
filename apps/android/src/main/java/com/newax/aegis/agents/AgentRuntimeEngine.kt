@@ -1,7 +1,7 @@
 package com.newax.aegis.agents
 
 import android.content.Context
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.*
 import com.newax.aegis.memory.AgentMemory
 import kotlinx.coroutines.runBlocking
@@ -68,7 +68,7 @@ object AgentRuntimeEngine {
     private fun startSession(agentId: String, taskPrompt: String, contextJson: String): String {
         val sessionId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
-        val db = runCatching { AegisDatabase.get }.getOrNull()
+        val db = runCatching { NewaxDatabase.get }.getOrNull()
         if (db != null) {
             runBlocking {
                 runCatching {
@@ -89,7 +89,7 @@ object AgentRuntimeEngine {
 
     /** The live phase metric — get_status()'s "what is it doing NOW". */
     fun phase(sessionId: String, phase: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         val agentId = runBlocking { runCatching { db.agentRuntimeDao().sessionById(sessionId)?.agentId }.getOrNull() } ?: return
         runBlocking { runCatching { db.agentRuntimeDao().setPhase(sessionId, phase, System.currentTimeMillis()) } }
         AgentStream.emit(AgentStream.Type.STATUS, sessionId, agentId, phase, "Phase: $phase")
@@ -97,7 +97,7 @@ object AgentRuntimeEngine {
 
     /** The task finished — write the strict success block. */
     fun complete(sessionId: String, summary: String, artifactPath: String = "") {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         val agentId = runBlocking { runCatching { db.agentRuntimeDao().sessionById(sessionId)?.agentId }.getOrNull() } ?: return
         runBlocking { runCatching { db.agentRuntimeDao().setResult(sessionId, AgentResult.success(summary, artifactPath), System.currentTimeMillis()) } }
         AgentStream.emit(AgentStream.Type.ARTIFACT, sessionId, agentId, SessionPhase.DONE, "Completed: ${summary.take(120)}")
@@ -110,7 +110,7 @@ object AgentRuntimeEngine {
      * nothing.
      */
     fun fail(sessionId: String, errorType: String, message: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         val agentId = runBlocking { runCatching { db.agentRuntimeDao().sessionById(sessionId)?.agentId }.getOrNull() } ?: return
         runBlocking { runCatching { db.agentRuntimeDao().setError(sessionId, AgentResult.error(errorType, message.take(500)), System.currentTimeMillis()) } }
         AgentStream.emit(AgentStream.Type.ERROR, sessionId, agentId, SessionPhase.DONE, "Failed [$errorType]: ${message.take(120)}")
@@ -119,29 +119,29 @@ object AgentRuntimeEngine {
 
     /** Force-stop — the user's Cancel. Writes the uniform USER_ABORT error block. */
     fun abortSession(sessionId: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         val agentId = runBlocking { runCatching { db.agentRuntimeDao().sessionById(sessionId)?.agentId }.getOrNull() } ?: return
         runBlocking { runCatching { db.agentRuntimeDao().setAborted(sessionId, AgentResult.error(AgentErrorType.USER_ABORT, "Aborted by user"), System.currentTimeMillis()) } }
         AgentStream.emit(AgentStream.Type.STATUS, sessionId, agentId, SessionPhase.DONE, "Aborted by user")
     }
 
     fun status(sessionId: String): AgentStatus? {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return null
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return null
         return runBlocking { runCatching { db.agentRuntimeDao().sessionById(sessionId)?.let { AgentStatus.from(it) } }.getOrNull() }
     }
 
     fun activeSessions(): List<AgentSessionEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.agentRuntimeDao().activeSessions() }.getOrDefault(emptyList()) }
     }
 
     fun recentSessions(limit: Int = 50): List<AgentSessionEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.agentRuntimeDao().recentSessions(limit) }.getOrDefault(emptyList()) }
     }
 
     fun frozenSessions(): List<AgentSessionEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.agentRuntimeDao().frozenSessions() }.getOrDefault(emptyList()) }
     }
 
@@ -149,7 +149,7 @@ object AgentRuntimeEngine {
 
     /** Serialize a running session to disk and mark it FROZEN. */
     fun freeze(sessionId: String): Boolean {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return false
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return false
         val session = runBlocking { runCatching { db.agentRuntimeDao().sessionById(sessionId) }.getOrNull() } ?: return false
         if (session.status == SessionStatus.FROZEN) return true
         val file = StateArchiver.freeze(session) ?: return false
@@ -191,7 +191,7 @@ object AgentRuntimeEngine {
      * (monitored, not disabled). Clean → HEALTHY.
      */
     fun healthCheck(agentId: String): HealthReport {
-        val db = runCatching { AegisDatabase.get }.getOrNull()
+        val db = runCatching { NewaxDatabase.get }.getOrNull()
         val now = System.currentTimeMillis()
         val findings = mutableListOf<String>()
 
@@ -273,7 +273,7 @@ object AgentRuntimeEngine {
 
     /** The human's Restore — clears the fault, re-enables the agent. */
     fun recover(agentId: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         val now = System.currentTimeMillis()
         runBlocking {
             runCatching {
@@ -291,7 +291,7 @@ object AgentRuntimeEngine {
     }
 
     fun allHealth(): List<AgentHealthEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.agentRuntimeDao().allHealth() }.getOrDefault(emptyList()) }
     }
 }

@@ -29,7 +29,7 @@ object ProfileManager {
         val persona: String = "helpful assistant",
         val interests: Set<String> = emptySet(),
         val dislikes: Set<String> = emptySet(),
-        val wakeWord: String = "Aegis"
+        val wakeWord: String = "Newax"
     )
 
     enum class CommunicationStyle { FORMAL, CASUAL, BALANCED, TECHNICAL }
@@ -55,7 +55,7 @@ object ProfileManager {
             persona = memory.getRaw(KEY_PERSONA) ?: "helpful assistant",
             interests = memory.getCategory(CATEGORY_INTERESTS).toSet(),
             dislikes = memory.getCategory(CATEGORY_DISLIKES).toSet(),
-            wakeWord = memory.getRaw(KEY_WAKE_WORD) ?: "Aegis"
+            wakeWord = memory.getRaw(KEY_WAKE_WORD) ?: "Newax"
         )
     }
 

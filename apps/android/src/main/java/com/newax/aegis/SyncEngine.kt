@@ -1,6 +1,6 @@
 package com.newax.aegis
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.sync.RoomJournalStore
 import com.newax.aegis.memory.AgentMemory
 import com.newax.aegis.sync.AntiEntropyRunner
@@ -49,7 +49,7 @@ object SyncEngine {
 
     private fun journalStore(): RoomJournalStore {
         val identity = SyncRuntime.identity()
-        val db = AegisDatabase.get
+        val db = NewaxDatabase.get
         return RoomJournalStore(
             db.syncJournalDao(),
             db.syncVectorDao(),

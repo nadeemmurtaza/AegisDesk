@@ -5,7 +5,7 @@ import com.newax.aegis.memory.EncryptedMemory
 
 /**
  * Structured screen analysis engine. Replaces the flat text-dump approach in
- * AegisAccessibilityService with node-type-aware parsing, sensitive field detection,
+ * NewaxAccessibilityService with node-type-aware parsing, sensitive field detection,
  * context correlation, and document classification.
  */
 object ScreenAnalyzer {

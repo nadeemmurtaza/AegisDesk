@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-// Aegis sync relay — E2E-blind rendezvous + ciphertext relay.
+// Newax Aegis sync relay — E2E-blind rendezvous + ciphertext relay.
 // (docs/SYNC_DESIGN.md §10: "No plaintext ever transits it.")
 //
 // What the relay sees: device ids, routing grants, and opaque frame payloads.

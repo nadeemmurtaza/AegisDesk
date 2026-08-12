@@ -6,7 +6,7 @@ import android.provider.CallLog
 import android.provider.MediaStore
 import android.provider.Telephony
 import android.util.Log
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.ContactNormalizer
 import com.newax.aegis.engine.ContactsManager
 import com.newax.aegis.engine.SensitiveInfoDetector
@@ -32,13 +32,13 @@ import com.newax.aegis.engine.learning.LlmTripleExtractor
  */
 object BackgroundLearner {
 
-    private const val TAG = "AegisLearner"
+    private const val TAG = "NewaxLearner"
 
     fun runNextBatch(context: Context, memory: EncryptedMemory): Int {
         ScanProgress.init(context)
         if (!ScanProgress.isEnabled()) return 0
 
-        val db = AegisDatabase.get
+        val db = NewaxDatabase.get
 
         var source = ScanProgress.currentSource()
         var skips = 0
@@ -91,7 +91,7 @@ object BackgroundLearner {
 
     // ── Profile build trigger ─────────────────────────────────────────────────
 
-    private fun triggerProfileBuilds(context: Context, db: AegisDatabase, memory: EncryptedMemory) {
+    private fun triggerProfileBuilds(context: Context, db: NewaxDatabase, memory: EncryptedMemory) {
         val tooBuild = PersonFactStore.getPeopleNeedingProfileBuild(db)
         if (tooBuild.isEmpty()) return
         val mgr = ContactsManager(context, memory)
@@ -119,7 +119,7 @@ object BackgroundLearner {
 
     // ── Contacts ─────────────────────────────────────────────────────────────
 
-    private fun scanContacts(context: Context, db: AegisDatabase, memory: EncryptedMemory): List<LearningDraft> {
+    private fun scanContacts(context: Context, db: NewaxDatabase, memory: EncryptedMemory): List<LearningDraft> {
         val mgr    = ContactsManager(context, memory)
         val all    = mgr.loadAllContacts()
         val offset = ScanProgress.getOffset(ScanSource.CONTACTS)
@@ -150,7 +150,7 @@ object BackgroundLearner {
         context: Context,
         uri: android.net.Uri,
         source: ScanSource,
-        db: AegisDatabase,
+        db: NewaxDatabase,
         memory: EncryptedMemory,
         llmBudget: IntArray,
         triplesBudget: IntArray
@@ -200,7 +200,7 @@ object BackgroundLearner {
     private fun scanCallLogs(
         context: Context,
         source: ScanSource,
-        db: AegisDatabase,
+        db: NewaxDatabase,
         memory: EncryptedMemory
     ): List<LearningDraft> {
         val lastMs = ScanProgress.getLastSeenMs(source)
@@ -260,7 +260,7 @@ object BackgroundLearner {
 
     // ── Gallery OCR ──────────────────────────────────────────────────────────
 
-    private fun scanGallery(context: Context, db: AegisDatabase, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
+    private fun scanGallery(context: Context, db: NewaxDatabase, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 
@@ -308,7 +308,7 @@ object BackgroundLearner {
 
     // ── Downloads ────────────────────────────────────────────────────────────
 
-    private fun scanDownloads(context: Context, db: AegisDatabase, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
+    private fun scanDownloads(context: Context, db: NewaxDatabase, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 
@@ -381,7 +381,7 @@ object BackgroundLearner {
     }
 
     private fun tripleExtract(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         text: String,
         source: String,
         subject: String?,

@@ -7,8 +7,8 @@ import com.newax.aegis.assistant.riskLevel
 import com.newax.aegis.engine.AutomationSettings
 
 /**
- * Policy modes — how much the user has authorized Aegis to do on its own.
- * The mode is the *policy* answer ("should Aegis do this automatically"),
+ * Policy modes — how much the user has authorized Newax to do on its own.
+ * The mode is the *policy* answer ("should Newax do this automatically"),
  * orthogonal to the *permission* answer ("can the OS/account do this").
  * ARCHITECTURE.md corollary: PrivilegeLevel maps to these modes
  * (READ_ONLY→AUTO, STANDARD→CONFIGURABLE, HIGH_IMPACT_SYSTEM→APPROVAL,

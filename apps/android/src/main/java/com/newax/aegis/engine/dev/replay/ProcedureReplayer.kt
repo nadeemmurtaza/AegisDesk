@@ -3,8 +3,8 @@ package com.newax.aegis.engine.dev.replay
 import android.content.Context
 import android.graphics.Bitmap
 import android.view.accessibility.AccessibilityNodeInfo
-import com.newax.aegis.accessibility.AegisAccessibilityService
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.accessibility.NewaxAccessibilityService
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.dev.procedure.ProcedureDebugger
 import com.newax.aegis.engine.dev.procedure.StepDebugResult
 import com.newax.aegis.engine.procedure.ProcedureExecutor
@@ -44,7 +44,7 @@ object ProcedureReplayer {
     suspend fun replay(
         steps: List<ProcedureStep>,
         context: Context,
-        db: AegisDatabase? = null,
+        db: NewaxDatabase? = null,
         procedureId: Long? = null,
         captureScreenshots: Boolean = false,
         screenshotDir: String? = null
@@ -55,7 +55,7 @@ object ProcedureReplayer {
         var success = true
 
         for ((i, step) in steps.withIndex()) {
-            val root = AegisAccessibilityService.instance?.getRootNode()
+            val root = NewaxAccessibilityService.instance?.getRootNode()
             val hashBefore = root?.let { hashTree(it) } ?: ""
 
             val debugResult = ProcedureDebugger.debugStep(step, i, context, execute = true)
@@ -85,7 +85,7 @@ object ProcedureReplayer {
         )
     }
 
-    suspend fun replayFromDb(procedureId: Long, context: Context, db: AegisDatabase): ReplaySession {
+    suspend fun replayFromDb(procedureId: Long, context: Context, db: NewaxDatabase): ReplaySession {
         val stepsJson = try {
             val cursor = db.openHelper.readableDatabase.query(
                 "SELECT steps FROM ui_procedures WHERE id = ?", arrayOf(procedureId.toString())

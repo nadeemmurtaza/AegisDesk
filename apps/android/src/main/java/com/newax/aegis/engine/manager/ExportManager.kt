@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.manager
 
 import android.content.Context
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.memory.EncryptedMemory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -75,7 +75,7 @@ object ExportManager {
 
     suspend fun exportDatabase(
         context: Context,
-        db: AegisDatabase,
+        db: NewaxDatabase,
         tables: List<String> = emptyList(),
         format: ExportFormat = ExportFormat.JSON
     ): ExportResult = withContext(Dispatchers.IO) {

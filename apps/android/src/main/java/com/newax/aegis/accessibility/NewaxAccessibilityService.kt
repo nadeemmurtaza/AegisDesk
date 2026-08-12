@@ -9,9 +9,9 @@ import com.newax.aegis.assistant.ProposedAction
 import com.newax.aegis.platform.android.SemanticAutomation
 import com.newax.aegis.platform.desktop.AppWindow
 
-class AegisAccessibilityService : AccessibilityService(), SemanticAutomation {
+class NewaxAccessibilityService : AccessibilityService(), SemanticAutomation {
     companion object {
-        @Volatile var instance: AegisAccessibilityService? = null
+        @Volatile var instance: NewaxAccessibilityService? = null
             private set
     }
 
@@ -161,7 +161,7 @@ class AegisAccessibilityService : AccessibilityService(), SemanticAutomation {
             @Suppress("DEPRECATION")
             val wakeLockFlags = android.os.PowerManager.PARTIAL_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP
             val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
-            val wakeLock = pm.newWakeLock(wakeLockFlags, "Aegis:ConnectivityToggle")
+            val wakeLock = pm.newWakeLock(wakeLockFlags, "Newax:ConnectivityToggle")
             wakeLock.acquire(3000)
             
             // Open Quick Settings

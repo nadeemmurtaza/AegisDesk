@@ -3,7 +3,7 @@ package com.newax.aegis.engine.execution
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.apps.AppCapability
 import com.newax.aegis.engine.apps.AppIntelligence
 import com.newax.aegis.engine.capability.Capability
@@ -28,7 +28,7 @@ data class ExecutionPlan(
 
 object ExecutionRouter {
 
-    fun resolveOpenApp(context: Context, db: AegisDatabase, packageName: String): ExecutionPlan {
+    fun resolveOpenApp(context: Context, db: NewaxDatabase, packageName: String): ExecutionPlan {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
         return if (launchIntent != null) {
             ExecutionPlan(ExecutionTier.ANDROID_API, "Direct launch: $packageName") {
@@ -60,7 +60,7 @@ object ExecutionRouter {
             }.isSuccess
         }
 
-    fun resolveCapability(context: Context, db: AegisDatabase, capability: AppCapability, pkgHint: String? = null): ExecutionTier {
+    fun resolveCapability(context: Context, db: NewaxDatabase, capability: AppCapability, pkgHint: String? = null): ExecutionTier {
         val cap = when (capability) {
             AppCapability.OPEN_APP     -> Capability.CAN_OPEN_APP
             AppCapability.SEND_TEXT    -> Capability.CAN_SEND_MESSAGE

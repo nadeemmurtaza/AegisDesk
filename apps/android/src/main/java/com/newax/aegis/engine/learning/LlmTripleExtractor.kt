@@ -4,7 +4,7 @@ import android.util.Log
 import com.newax.aegis.model.ModelProvider
 import com.newax.aegis.model.ModelRequest
 import com.newax.aegis.model.ModelState
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.TripleEntity
 import com.newax.aegis.engine.SensitiveInfoDetector
 import com.newax.aegis.engine.embedding.VectorStore
@@ -13,7 +13,7 @@ import org.json.JSONArray
 
 object LlmTripleExtractor {
 
-    private const val TAG          = "AegisTripExtract"
+    private const val TAG          = "NewaxTripExtract"
     private const val MIN_TEXT_LEN = 80
     private const val MAX_TEXT_LEN = 1200
     private const val MIN_CONF     = 0.55f
@@ -49,7 +49,7 @@ object LlmTripleExtractor {
      * Persist triples into the normalized graph store (entities + predicates + edges)
      * and index each edge for vector search.
      */
-    fun save(db: AegisDatabase, triples: List<TripleEntity>) {
+    fun save(db: NewaxDatabase, triples: List<TripleEntity>) {
         if (triples.isEmpty()) return
         val indexed = GraphStore.saveLlmTriples(db, triples)
         indexed.forEach { idx ->
@@ -58,14 +58,14 @@ object LlmTripleExtractor {
     }
 
     /** Persist a manually-created edge (e.g. from ProposedAction.UpdateGraph). */
-    fun saveEdge(db: AegisDatabase, from: String, relation: String, to: String, source: String = "manual") {
+    fun saveEdge(db: NewaxDatabase, from: String, relation: String, to: String, source: String = "manual") {
         GraphStore.saveEdge(db, from, relation, to, source)
     }
 
-    fun about(db: AegisDatabase, entity: String): List<TripleEntity> =
+    fun about(db: NewaxDatabase, entity: String): List<TripleEntity> =
         kotlinx.coroutines.runBlocking { db.tripleDao().involving(entity) }
 
-    fun count(db: AegisDatabase): Int =
+    fun count(db: NewaxDatabase): Int =
         kotlinx.coroutines.runBlocking { db.tripleDao().count() }
 
     // ── Prompt ───────────────────────────────────────────────────────────────

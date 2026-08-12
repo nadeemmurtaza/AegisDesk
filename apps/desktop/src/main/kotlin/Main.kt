@@ -1,5 +1,5 @@
 /**
- * Entry point for the Aegis Desktop app.
+ * Entry point for the Newax Desktop app.
  *
  * Default mode (Phase B1): opens the Compose Desktop window — Status
  * (capability + model state), Apps (Start Menu index + search), and the Goals
@@ -64,7 +64,7 @@ import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.SkillRegistry
 import com.newax.aegis.desktop.planner.TaskStatus
-import com.newax.aegis.desktop.ui.AegisDesktopApp
+import com.newax.aegis.desktop.ui.NewaxDesktopApp
 import com.newax.aegis.desktopsync.DesktopSync
 import com.newax.aegis.model.ModelRequest
 import com.newax.aegis.platform.windows.GgufHeaderParser
@@ -127,10 +127,10 @@ private fun windowMain() {
     application {
         Window(
             onCloseRequest = ::exitApplication,
-            title = "Aegis Assistant — Desktop",
+            title = "Newax Aegis — Desktop",
             state = rememberWindowState(size = DpSize(1120.dp, 760.dp)),
         ) {
-            AegisDesktopApp(appScope = appScope, appIndex = appIndex, store = goalsStore)
+            NewaxDesktopApp(appScope = appScope, appIndex = appIndex, store = goalsStore)
         }
     }
 
@@ -157,14 +157,14 @@ private suspend fun firstModelFile(): File? = withContext(Dispatchers.IO) {
 
 private suspend fun cliMain(args: Array<String>) {
     println()
-    println("  █████╗ ███████╗ ██████╗ ██╗███████╗")
-    println(" ██╔══██╗██╔════╝██╔════╝ ██║██╔════╝")
-    println(" ███████║█████╗  ██║  ███╗██║███████╗")
-    println(" ██╔══██║██╔══╝  ██║   ██║██║╚════██║")
-    println(" ██║  ██║███████╗╚██████╔╝██║███████║")
-    println(" ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝╚══════╝")
+    println("  ███╗   ██╗ ███████╗ ██╗    ██╗  █████╗ ██╗  ██╗")
+    println("  ████╗  ██║ ██╔════╝ ██║    ██║ ██╔══██╗╚██╗██╔╝")
+    println("  ██╔██╗ ██║ █████╗   ██║ █╗ ██║ ███████║ ╚███╔╝")
+    println("  ██║╚██╗██║ ██╔══╝   ██║███╗██║ ██╔══██║ ██╔██╗")
+    println("  ██║ ╚████║ ███████╗ ╚███╔███╔╝ ██║  ██║██╔╝ ██╗")
+    println("  ╚═╝  ╚═══╝ ╚══════╝  ╚══╝╚══╝  ╚═╝  ╚═╝╚═╝  ╚═╝")
     println()
-    println("  Desktop — offline GGUF model runner")
+    println("  Newax Aegis — Desktop · offline GGUF model runner")
     println("  shared/model-api · platform-impl:windows · Phase 5i · window UI (B1) — --cli for this loop")
     println()
 
@@ -235,61 +235,65 @@ private suspend fun cliMain(args: Array<String>) {
         provider.load()
         println("READY")
         println()
-        println("  Enter prompts below. \"status\" prints the capability/model block,")
+        println("  Enter prompts below. \"newax status\" prints the capability/model block,")
         println("  empty line or Ctrl+D to exit.")
         println("  ───────────────────────────────────────────────────────")
         println()
 
         // ── 4. Interactive inference loop ──────────────────────────────────
+        // Commands are branded with the `newax` prefix (e.g. "newax status",
+        // "newax plan open spotify"); bare prompts still go to the model.
         while (true) {
             print("  > ")
             val prompt = readLine()?.trim() ?: break
             if (prompt.isBlank() || prompt.equals("exit", ignoreCase = true)) break
-            if (prompt.equals("status", ignoreCase = true)) {
+            val cmd = if (prompt.startsWith("newax ", ignoreCase = true)) prompt.substring(6).trim() else prompt
+            if (cmd.isBlank()) continue
+            if (cmd.equals("status", ignoreCase = true)) {
                 printStatusBlock()
                 continue
             }
-            if (prompt.equals("skills", ignoreCase = true)) {
+            if (cmd.equals("skills", ignoreCase = true)) {
                 printSkills()
                 continue
             }
-            if (prompt.startsWith("plan ", ignoreCase = true)) {
-                printPlan(prompt.substring(5).trim())
+            if (cmd.startsWith("plan ", ignoreCase = true)) {
+                printPlan(cmd.substring(5).trim())
                 goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
-            if (prompt.startsWith("apps", ignoreCase = true)) {
-                printApps(if (prompt.length > 4) prompt.substring(4).trim() else "", appIndex)
+            if (cmd.startsWith("apps", ignoreCase = true)) {
+                printApps(if (cmd.length > 4) cmd.substring(4).trim() else "", appIndex)
                 continue
             }
-            if (prompt.equals("goals", ignoreCase = true)) {
+            if (cmd.equals("goals", ignoreCase = true)) {
                 printGoals()
                 continue
             }
-            if (prompt.equals("audit", ignoreCase = true) || prompt.startsWith("audit ", ignoreCase = true)) {
-                printAudit(if (prompt.length > 5) prompt.substring(5) else "")
+            if (cmd.equals("audit", ignoreCase = true) || cmd.startsWith("audit ", ignoreCase = true)) {
+                printAudit(if (cmd.length > 5) cmd.substring(5) else "")
                 continue
             }
-            if (prompt.equals("sync", ignoreCase = true) || prompt.startsWith("sync ", ignoreCase = true)) {
-                printSyncCommand(if (prompt.length > 4) prompt.substring(4).trim() else "")
+            if (cmd.equals("sync", ignoreCase = true) || cmd.startsWith("sync ", ignoreCase = true)) {
+                printSyncCommand(if (cmd.length > 4) cmd.substring(4).trim() else "")
                 continue
             }
-            if (prompt.equals("policy", ignoreCase = true) || prompt.startsWith("policy ", ignoreCase = true)) {
-                printPolicy(if (prompt.length > 6) prompt.substring(6).trim() else "")
+            if (cmd.equals("policy", ignoreCase = true) || cmd.startsWith("policy ", ignoreCase = true)) {
+                printPolicy(if (cmd.length > 6) cmd.substring(6).trim() else "")
                 continue
             }
-            if (prompt.startsWith("run ", ignoreCase = true)) {
-                printRunGoal(prompt.substring(4).trim(), appIndex)
+            if (cmd.startsWith("run ", ignoreCase = true)) {
+                printRunGoal(cmd.substring(4).trim(), appIndex)
                 goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
-            if (prompt.startsWith("abandon ", ignoreCase = true)) {
-                printAbandon(prompt.substring(8).trim())
+            if (cmd.startsWith("abandon ", ignoreCase = true)) {
+                printAbandon(cmd.substring(8).trim())
                 goalsStore.save(DesktopGoalPlanner.snapshot())
                 continue
             }
-            if (prompt.equals("proximity", ignoreCase = true) || prompt.startsWith("proximity ", ignoreCase = true)) {
-                printProximity(prompt.substring("proximity".length).trim())
+            if (cmd.equals("proximity", ignoreCase = true) || cmd.startsWith("proximity ", ignoreCase = true)) {
+                printProximity(cmd.substring("proximity".length).trim())
                 continue
             }
 
@@ -367,7 +371,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("pair ", ignoreCase = true) -> {
             val code = arg.substring(5).trim()
             if (code.isEmpty()) {
-                println("    usage: sync pair <their-code>")
+                println("    usage: newax sync pair <their-code>")
             } else {
                 val sas = DesktopSync.sasFor(DesktopSync.pairingCode(), code)
                 if (sas == null) {
@@ -392,7 +396,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("peer ", ignoreCase = true) -> {
             val parts = arg.substring(5).trim().split(Regex("\\s+"))
             if (parts.size != 2) {
-                println("    usage: sync peer <deviceId> <host:port>")
+                println("    usage: newax sync peer <deviceId> <host:port>")
             } else {
                 DesktopSync.setPeerAddress(parts[0], parts[1])
                 println("    ✓ direct address stored for ${parts[0]}")
@@ -417,7 +421,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("category ", ignoreCase = true) -> {
             val parts = arg.substring(9).trim().split(Regex("\\s+"))
             if (parts.size != 2 || (parts[1] != "on" && parts[1] != "off")) {
-                println("    usage: sync category <Memory profile|Knowledge graph|People|Settings & preferences> on|off")
+                println("    usage: newax sync category <Memory profile|Knowledge graph|People|Settings & preferences> on|off")
             } else {
                 val name = parts.slice(0 until parts.size - 1).joinToString(" ")
                 DesktopSync.setCategory(name, parts[1] == "on")
@@ -439,7 +443,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("perm ", ignoreCase = true) -> {
             val parts = arg.substring(5).trim().split(Regex("\\s+"))
             if (parts.size != 3 || (parts[2] != "on" && parts[2] != "off")) {
-                println("    usage: sync perm <deviceId> <commandClass> on|off")
+                println("    usage: newax sync perm <deviceId> <commandClass> on|off")
             } else {
                 val current = DesktopSync.peerPermissions(parts[0]).toMutableSet()
                 if (parts[2] == "on") current.add(parts[1]) else current.remove(parts[1])
@@ -450,7 +454,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("send ", ignoreCase = true) -> {
             val parts = arg.substring(5).trim().split(Regex("\\s+"))
             if (parts.size < 3) {
-                println("    usage: sync send <deviceId> <class> <json-args>  (classes: ${DesktopSync.COMMAND_CLASSES.joinToString(", ")})")
+                println("    usage: newax sync send <deviceId> <class> <json-args>  (classes: ${DesktopSync.COMMAND_CLASSES.joinToString(", ")})")
             } else {
                 val deviceId = parts[0]
                 val commandClass = parts[1]
@@ -487,7 +491,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("know ", ignoreCase = true) -> {
             val parts = arg.substring(5).trim().split("|", limit = 4)
             if (parts.size < 3) {
-                println("    usage: sync know <category> | <title> | <content>  (lands PENDING — approve with: sync approve <entryId>)")
+                println("    usage: newax sync know <category> | <title> | <content>  (lands PENDING — approve with: sync approve <entryId>)")
             } else {
                 DesktopSync.submitKnowledge(parts[0].trim(), parts[1].trim(), parts[2].trim())
                 println("    ✓ submitted to the human gate (PENDING_APPROVAL)")
@@ -500,7 +504,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("lesson ", ignoreCase = true) -> {
             val parts = arg.substring(7).trim().split("|", limit = 4)
             if (parts.size < 3) {
-                println("    usage: sync lesson <category> | <summary> | <lesson>  (FAILURE episode — propagates the fix)")
+                println("    usage: newax sync lesson <category> | <summary> | <lesson>  (FAILURE episode — propagates the fix)")
             } else {
                 DesktopSync.recordEpisode("desktop", parts[0].trim(), parts[1].trim(), "FAILURE", parts[2].trim())
                 println("    ✓ lesson recorded + journaled into the mesh")
@@ -509,7 +513,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("handoff ", ignoreCase = true) -> {
             val parts = arg.substring(8).trim().split("|", limit = 4)
             if (parts.size < 3) {
-                println("    usage: sync handoff <toAgent> | <task> | <summary>")
+                println("    usage: newax sync handoff <toAgent> | <task> | <summary>")
             } else {
                 DesktopSync.createHandoff("desktop", parts[0].trim(), parts[1].trim(), parts[2].trim())
                 println("    ✓ handoff written to ${parts[0].trim()} — ack with: sync ack <id>")
@@ -563,7 +567,7 @@ private fun printPlan(description: String) {
     println()
     println("  ── Plan ────────────────────────────────────────────────")
     if (description.isBlank()) {
-        println("    usage: plan <goal>  (e.g. \"plan open spotify\")")
+        println("    usage: newax plan <goal>  (e.g. \"plan open spotify\")")
         return
     }
     val plan = DesktopGoalPlanner.plan(description, DesktopCapabilitiesHolder.registry())
@@ -582,7 +586,7 @@ private fun printPlan(description: String) {
             (if (plan.feasible) "YES — all skills and platform capabilities are ready"
             else "NO — blocked capabilities above must be resolved first")
     )
-    if (plan.feasible) println("    Next     : run \"goals\", then \"run <goal>\" to execute it")
+    if (plan.feasible) println("    Next     : run \"newax goals\", then \"newax run <goal>\" to execute it")
     println()
 }
 
@@ -597,7 +601,7 @@ private fun printGoals() {
     println("  ── Goals ──────────────────────────────────────────────")
     val goals = sortedGoals()
     if (goals.isEmpty()) {
-        println("    No goals yet. Use \"plan <goal>\" to plan one.")
+        println("    No goals yet. Use \"newax plan <goal>\" to plan one.")
         println()
         return
     }
@@ -651,12 +655,12 @@ private suspend fun printRunGoal(ref: String, appIndex: WindowsAppIndex) {
     println()
     println("  ── Execute ─────────────────────────────────────────────")
     if (ref.isBlank()) {
-        println("    usage: run <goal>  (e.g. \"run 1\", \"run open spotify\")")
+        println("    usage: newax run <goal>  (e.g. \"run 1\", \"run open spotify\")")
         return
     }
     val goal = resolveGoal(ref)
     if (goal == null) {
-        println("    Unknown goal: $ref (run \"goals\" to list them)")
+        println("    Unknown goal: $ref (run \"newax goals\" to list them)")
         return
     }
     val plan = DesktopGoalPlanner.planOf(goal.id)
@@ -728,7 +732,7 @@ private fun printProximity(args: String) {
                 ProximityCli.send(file, deviceId)
             }
         }
-        else -> println("    usage: proximity listen | send <file> <deviceId> | nearby")
+        else ->    println("    usage: newax proximity listen | send <file> <deviceId> | nearby")
     }
     println()
 }
@@ -739,7 +743,7 @@ private fun printAbandon(ref: String) {
     println("  ── Abandon ─────────────────────────────────────────────")
     val goal = resolveGoal(ref)
     if (goal == null) {
-        println("    Unknown goal: $ref (run \"goals\" to list them)")
+        println("    Unknown goal: $ref (run \"newax goals\" to list them)")
         return
     }
     val ok = DesktopGoalPlanner.abandon(goal.id)
@@ -775,11 +779,11 @@ private fun printAudit(command: String) {
     }
     val runs = ExecutionAudit.all().sortedByDescending { it.completedMs }
     if (runs.isEmpty()) {
-        println("    No runs recorded yet. Run a goal (\"run <goal>\") to build the trail.")
+        println("    No runs recorded yet. Run a goal (\"newax run <goal>\") to build the trail.")
         println()
         return
     }
-    println("    ${runs.size} ${if (runs.size == 1) "run" else "runs"} · \"audit export\" writes CSV to ~/.aegis/")
+    println("    ${runs.size} ${if (runs.size == 1) "run" else "runs"} · \"newax audit export\" writes CSV to ~/.aegis/")
     val summary = AuditSummary.of(runs)
     println(
         "    Success rate: ${summary.successRatePercent}% (${summary.completedRuns}/${summary.totalRuns})" +

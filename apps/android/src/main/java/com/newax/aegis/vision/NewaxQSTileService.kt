@@ -5,9 +5,9 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import android.util.Log
 
-class AegisQSTileService : TileService() {
+class NewaxQSTileService : TileService() {
     companion object {
-        private const val TAG = "AegisQSTile"
+        private const val TAG = "NewaxQSTile"
     }
 
     override fun onStartListening() {

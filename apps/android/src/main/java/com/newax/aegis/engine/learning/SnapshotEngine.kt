@@ -1,10 +1,10 @@
 package com.newax.aegis.engine.learning
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.PersonSnapshot
 import com.newax.aegis.engine.HabitTracker
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -18,7 +18,7 @@ object SnapshotEngine {
         val confidence: Int
     )
 
-    suspend fun compilePersonSnapshot(personId: Long, db: AegisDatabase): PersonSnapshotData =
+    suspend fun compilePersonSnapshot(personId: Long, db: NewaxDatabase): PersonSnapshotData =
         withContext(Dispatchers.IO) {
             val facts = db.personFactDao().forPerson(personId)
                 .filter { it.confidence > 0.5f }
@@ -53,11 +53,11 @@ object SnapshotEngine {
                 )
             }
 
-            AegisEventBus.emit(AegisEvent.SnapshotCompiled("person", personId.toString()))
+            NewaxEventBus.emit(NewaxEvent.SnapshotCompiled("person", personId.toString()))
             PersonSnapshotData(personId, facts.map { it.fact }, sourceCount, totalMentions, confidence)
         }
 
-    suspend fun compileTopPersonSnapshots(db: AegisDatabase, limit: Int = 50): Int =
+    suspend fun compileTopPersonSnapshots(db: NewaxDatabase, limit: Int = 50): Int =
         withContext(Dispatchers.IO) {
             val persons = db.personDao().getTopPeople(limit)
             var compiled = 0
@@ -70,6 +70,6 @@ object SnapshotEngine {
 
     fun compileAppSnapshot(packageName: String): HabitTracker.AppHabitPattern? =
         HabitTracker.getPatternForPackage(packageName)?.also {
-            AegisEventBus.emit(AegisEvent.SnapshotCompiled("app", packageName))
+            NewaxEventBus.emit(NewaxEvent.SnapshotCompiled("app", packageName))
         }
 }

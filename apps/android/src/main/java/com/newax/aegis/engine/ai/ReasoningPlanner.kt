@@ -135,7 +135,7 @@ object ReasoningPlanner {
         return when {
             lower.contains("what time") -> "I don't have access to the current time."
             lower.contains("who are you") || lower.contains("what are you") ->
-                "I'm Aegis, your offline AI assistant."
+                "I'm Newax, your offline AI assistant."
             lower.contains("what can you do") ->
                 "I can search your files, messages, and memory; automate tasks; answer questions from your personal data; and more."
             else -> null

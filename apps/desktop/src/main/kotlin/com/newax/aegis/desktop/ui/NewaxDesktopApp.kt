@@ -46,12 +46,12 @@ private enum class DesktopScreen { STATUS, APPS, GOALS, POLICY, AUDIT }
  * Audit tab shows the full execution audit trail with CSV export.
  */
 @Composable
-fun AegisDesktopApp(
+fun NewaxDesktopApp(
     appScope: CoroutineScope,
     appIndex: WindowsAppIndex?,
     store: GoalsStore? = null,
 ) {
-    AegisTheme {
+    NewaxTheme {
         var screen by remember { mutableStateOf(DesktopScreen.STATUS) }
         val statusState = remember { StatusScreenState() }
         val appsState = remember { AppsScreenState({ appIndex }) }

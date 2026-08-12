@@ -16,7 +16,7 @@ import org.json.JSONObject
  */
 class PersonIntelligence(private val context: Context, private val memory: EncryptedMemory) {
 
-    private val TAG = "AegisPersonIntel"
+    private val TAG = "NewaxPersonIntel"
     private val PROFILE_KEY_PREFIX = "person_intel_"
 
     // ── Data structures ──────────────────────────────────────────────────────────

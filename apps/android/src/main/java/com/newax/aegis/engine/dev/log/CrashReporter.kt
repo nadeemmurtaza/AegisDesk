@@ -58,7 +58,7 @@ object CrashReporter {
         )
         crashes.add(record)
         if (crashes.size > MAX_CRASHES) crashes.removeAt(0)
-        AegisLogger.e("CrashReporter", "CRASH [${record.type}]: ${record.message}")
+        NewaxLogger.e("CrashReporter", "CRASH [${record.type}]: ${record.message}")
     }
 
     fun recordAnr(thread: String, blockedMs: Long) {

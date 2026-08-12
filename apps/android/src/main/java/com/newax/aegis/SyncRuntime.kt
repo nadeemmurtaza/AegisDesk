@@ -2,7 +2,7 @@ package com.newax.aegis
 
 import android.content.Context
 import android.os.Build
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.AppRecord
 import com.newax.aegis.db.entity.EntityAlias
 import com.newax.aegis.db.entity.Episode
@@ -244,7 +244,7 @@ object SyncRuntime {
     fun manualEndpoints(): List<PeerEndpoint> {
         val out = mutableListOf<PeerEndpoint>()
         val rows = runBlocking {
-            runCatching { AegisDatabase.get.kvStoreDao().getWithPrefix(ADDR_PREFIX) }.getOrNull().orEmpty()
+            runCatching { NewaxDatabase.get.kvStoreDao().getWithPrefix(ADDR_PREFIX) }.getOrNull().orEmpty()
         }
         for (row in rows) {
             val peerId = row.key.removePrefix(ADDR_PREFIX)
@@ -441,7 +441,7 @@ object SyncRuntime {
      * from the journal — no separate history table.
      */
     fun commandHistory(limit: Int = 50): List<CommandHistoryEntry> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking {
             runCatching { db.syncJournalDao().recentForTable(TABLE_COMMANDS, limit) }.getOrElse { emptyList() }
         }.mapNotNull { entry ->
@@ -492,7 +492,7 @@ object SyncRuntime {
         )
         scope.launch {
             try {
-                AegisDatabase.get.syncJournalDao().insert(entry.toEntity())
+                NewaxDatabase.get.syncJournalDao().insert(entry.toEntity())
             } catch (_: Exception) {
                 // Best-effort journaling — never break the caller's write.
             }
@@ -560,7 +560,7 @@ object SyncRuntime {
      */
     private fun locallyNewer(entry: SyncEntry): Boolean = runBlocking {
         runCatching {
-            val latest = AegisDatabase.get.syncJournalDao().latestFor(entry.table, entry.key)
+            val latest = NewaxDatabase.get.syncJournalDao().latestFor(entry.table, entry.key)
                 ?: return@runCatching false
             (latest.hlcWall > entry.hlc.wall) ||
                 (latest.hlcWall == entry.hlc.wall && latest.hlcCounter > entry.hlc.counter) ||
@@ -574,8 +574,8 @@ object SyncRuntime {
         val fields = SyncPayload.decode(entry.payload)
         val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
-            if (AegisDatabase.get.graphDao().findByName(name) != null) return@runBlocking
-            AegisDatabase.get.graphDao().insertEntity(
+            if (NewaxDatabase.get.graphDao().findByName(name) != null) return@runBlocking
+            NewaxDatabase.get.graphDao().insertEntity(
                 GraphEntity(
                     type = fields["type"]?.toIntOrNull() ?: 0,
                     canonicalName = name,
@@ -590,8 +590,8 @@ object SyncRuntime {
         val fields = SyncPayload.decode(entry.payload)
         val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
-            if (AegisDatabase.get.graphDao().predicateByName(name) != null) return@runBlocking
-            AegisDatabase.get.graphDao().insertPredicate(GraphPredicate(name = name))
+            if (NewaxDatabase.get.graphDao().predicateByName(name) != null) return@runBlocking
+            NewaxDatabase.get.graphDao().insertPredicate(GraphPredicate(name = name))
         }
     }
 
@@ -601,7 +601,7 @@ object SyncRuntime {
         val alias = fields["alias"]?.takeIf { it.isNotBlank() } ?: return
         val entityName = fields["entityName"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
-            val dao = AegisDatabase.get.graphDao()
+            val dao = NewaxDatabase.get.graphDao()
             if (dao.findEntityByAlias(alias) != null) return@runBlocking
             val entityId = dao.findByName(entityName)?.id ?: return@runBlocking
             dao.insertAlias(EntityAlias(entityId = entityId, alias = alias))
@@ -613,7 +613,7 @@ object SyncRuntime {
         val fields = SyncPayload.decode(entry.payload)
         val name = fields["name"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
-            val dao = AegisDatabase.get.personDao()
+            val dao = NewaxDatabase.get.personDao()
             val existing = dao.findByName(name)
             if (existing != null) {
                 dao.updateStats(
@@ -645,13 +645,13 @@ object SyncRuntime {
         val personName = fields["personName"]?.takeIf { it.isNotBlank() } ?: return
         val fact = fields["fact"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
-            val personDao = AegisDatabase.get.personDao()
+            val personDao = NewaxDatabase.get.personDao()
             val personId = personDao.findByName(personName)?.id
                 ?: personDao.insertIfAbsent(PersonEntity(name = personName)).let {
                     personDao.idForName(personName) ?: return@runBlocking
                 }
-            if (AegisDatabase.get.personFactDao().findExact(personId, fact) != null) return@runBlocking
-            AegisDatabase.get.personFactDao().insert(
+            if (NewaxDatabase.get.personFactDao().findExact(personId, fact) != null) return@runBlocking
+            NewaxDatabase.get.personFactDao().insert(
                 PersonFactEntity(
                     personId = personId,
                     fact = fact,
@@ -667,7 +667,7 @@ object SyncRuntime {
     /** Resolve (or create) an entity by canonical name — the edge materializer's ref resolver. */
     private fun entityIdFor(name: String): Long? = runBlocking {
         runCatching {
-            val dao = AegisDatabase.get.graphDao()
+            val dao = NewaxDatabase.get.graphDao()
             dao.findByName(name)?.id
                 ?: dao.insertEntity(GraphEntity(type = 0, canonicalName = name, createdAt = System.currentTimeMillis()))
         }.getOrNull()
@@ -688,7 +688,7 @@ object SyncRuntime {
         if (objectName == null && objectValue == null) return
         runBlocking {
             runCatching {
-                val dao = AegisDatabase.get.graphDao()
+                val dao = NewaxDatabase.get.graphDao()
                 val subjectId = entityIdFor(subject)
                 val predicateId = dao.predicateByName(predicate)?.id
                     ?: dao.insertPredicate(GraphPredicate(name = predicate))
@@ -724,7 +724,7 @@ object SyncRuntime {
         val pkg = fields["packageName"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
             runCatching {
-                AegisDatabase.get.appRegistryDao().upsertRecord(
+                NewaxDatabase.get.appRegistryDao().upsertRecord(
                     AppRecord(
                         packageName = pkg,
                         label = fields["label"] ?: pkg,
@@ -746,7 +746,7 @@ object SyncRuntime {
         val cap = fields["capability"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
             runCatching {
-                AegisDatabase.get.appRegistryDao().upsertLink(
+                NewaxDatabase.get.appRegistryDao().upsertLink(
                     com.newax.aegis.db.entity.AppCapabilityLink(
                         packageName = pkg,
                         capability = cap,
@@ -771,10 +771,10 @@ object SyncRuntime {
         val episodeId = fields["episodeId"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
             runCatching {
-                val dao = AegisDatabase.get.agentMemoryDao()
+                val dao = NewaxDatabase.get.agentMemoryDao()
                 if (entry.tombstone) {
                     dao.deleteEpisode(episodeId)
-                    com.newax.aegis.engine.embedding.VectorStore.removeEpisode(AegisDatabase.get, episodeId)
+                    com.newax.aegis.engine.embedding.VectorStore.removeEpisode(NewaxDatabase.get, episodeId)
                 } else {
                     val episode = Episode(
                         episodeId = episodeId,
@@ -788,7 +788,7 @@ object SyncRuntime {
                     )
                     dao.upsertEpisode(episode)
                     com.newax.aegis.engine.embedding.VectorStore.indexEpisode(
-                        AegisDatabase.get, episodeId, episode.summary, episode.lesson, episode.outcome
+                        NewaxDatabase.get, episodeId, episode.summary, episode.lesson, episode.outcome
                     )
                 }
             }
@@ -806,7 +806,7 @@ object SyncRuntime {
         val handoffId = fields["handoffId"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
             runCatching {
-                val dao = AegisDatabase.get.agentMemoryDao()
+                val dao = NewaxDatabase.get.agentMemoryDao()
                 if (entry.tombstone) {
                     dao.deleteHandoff(handoffId)
                     return@runCatching
@@ -846,10 +846,10 @@ object SyncRuntime {
         val entryId = fields["entryId"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
             runCatching {
-                val dao = AegisDatabase.get.agentMemoryDao()
+                val dao = NewaxDatabase.get.agentMemoryDao()
                 if (entry.tombstone) {
                     dao.deleteLibrary(entryId)
-                    com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, entryId)
+                    com.newax.aegis.engine.embedding.VectorStore.removeLibrary(NewaxDatabase.get, entryId)
                     return@runCatching
                 }
                 val existing = dao.libraryById(entryId)
@@ -864,10 +864,10 @@ object SyncRuntime {
                     dao.setLibraryStatus(entryId, status, System.currentTimeMillis())
                     if (status == LibraryStatus.ACTIVE) {
                         com.newax.aegis.engine.embedding.VectorStore.indexLibrary(
-                            AegisDatabase.get, entryId, existing.category, existing.title, existing.content
+                            NewaxDatabase.get, entryId, existing.category, existing.title, existing.content
                         )
                     } else if (status == LibraryStatus.REJECTED) {
-                        com.newax.aegis.engine.embedding.VectorStore.removeLibrary(AegisDatabase.get, entryId)
+                        com.newax.aegis.engine.embedding.VectorStore.removeLibrary(NewaxDatabase.get, entryId)
                     }
                 } else if (existing == null) {
                     val entry = LibraryEntry(
@@ -883,7 +883,7 @@ object SyncRuntime {
                     dao.upsertLibrary(entry)
                     if (entry.status == LibraryStatus.ACTIVE) {
                         com.newax.aegis.engine.embedding.VectorStore.indexLibrary(
-                            AegisDatabase.get, entryId, entry.category, entry.title, entry.content
+                            NewaxDatabase.get, entryId, entry.category, entry.title, entry.content
                         )
                     }
                 }
@@ -898,7 +898,7 @@ object SyncRuntime {
         val label = fields["label"]?.takeIf { it.isNotBlank() } ?: return
         runBlocking {
             runCatching {
-                val dao = AegisDatabase.get.triggerDao()
+                val dao = NewaxDatabase.get.triggerDao()
                 if (entry.tombstone) {
                     dao.allRules().firstOrNull { it.label == label }?.let { dao.deleteById(it.id) }
                     return@runCatching
@@ -965,10 +965,10 @@ object SyncRuntime {
     private fun materializeKv(entry: SyncEntry) {
         val localKey = SyncPolicy.localKey(entry.key) ?: return
         if (entry.tombstone) {
-            runBlocking { runCatching { AegisDatabase.get.kvStoreDao().delete(localKey) } }
+            runBlocking { runCatching { NewaxDatabase.get.kvStoreDao().delete(localKey) } }
         } else {
             runBlocking {
-                runCatching { AegisDatabase.get.kvStoreDao().put(KvStoreEntity(localKey, entry.payload.decodeToString())) }
+                runCatching { NewaxDatabase.get.kvStoreDao().put(KvStoreEntity(localKey, entry.payload.decodeToString())) }
             }
         }
     }
@@ -981,14 +981,14 @@ object SyncRuntime {
     }
 
     private fun kvGet(key: String): String? = runBlocking {
-        runCatching { AegisDatabase.get.kvStoreDao().get(key) }.getOrNull()
+        runCatching { NewaxDatabase.get.kvStoreDao().get(key) }.getOrNull()
     }
 
     private fun kvPut(key: String, value: String) {
-        runBlocking { runCatching { AegisDatabase.get.kvStoreDao().put(KvStoreEntity(key, value)) } }
+        runBlocking { runCatching { NewaxDatabase.get.kvStoreDao().put(KvStoreEntity(key, value)) } }
     }
 
     private fun kvDelete(key: String) {
-        runBlocking { runCatching { AegisDatabase.get.kvStoreDao().delete(key) } }
+        runBlocking { runCatching { NewaxDatabase.get.kvStoreDao().delete(key) } }
     }
 }

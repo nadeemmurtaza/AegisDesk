@@ -23,7 +23,7 @@ kotlin {
     // Apple targets — Track M2: the memory fabric now compiles for macOS + iOS
     // with a native storage driver (NativeSQLiteDriver over the OS libsqlite3 —
     // the "native driver" of the ARCHITECTURE.md platform matrix). appleMain
-    // holds the TimeUtils + AegisDatabaseConstructor actuals and the builder;
+    // holds the TimeUtils + NewaxDatabaseConstructor actuals and the builder;
     // per-target Room KSP configs below generate the native implementations.
     // Apple-target compiles run on a macOS host only (apple.yml); CI and this
     // Linux sandbox keep verifying jvm + android.

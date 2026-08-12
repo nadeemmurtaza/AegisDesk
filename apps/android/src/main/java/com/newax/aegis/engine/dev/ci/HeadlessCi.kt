@@ -1,14 +1,14 @@
 package com.newax.aegis.engine.dev.ci
 
 import android.content.Context
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.MemoryRecord
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
 import com.newax.aegis.db.entity.RecordType
 import com.newax.aegis.engine.compiler.ProcedureCompiler
 import com.newax.aegis.engine.dev.db.DatabaseInspector
-import com.newax.aegis.engine.dev.log.AegisLogger
+import com.newax.aegis.engine.dev.log.NewaxLogger
 import com.newax.aegis.engine.dev.search.SearchLaboratory
 import com.newax.aegis.engine.dev.trace.DecisionInspector
 import com.newax.aegis.engine.metrics.MetricsEngine
@@ -16,7 +16,7 @@ import kotlinx.coroutines.runBlocking
 
 object HeadlessCi {
 
-    suspend fun execute(context: Context, db: AegisDatabase?, cmd: String, arg1: String, arg2: String, arg3: String): String {
+    suspend fun execute(context: Context, db: NewaxDatabase?, cmd: String, arg1: String, arg2: String, arg3: String): String {
         return try {
             when (cmd) {
                 "ping" -> "pong"
@@ -28,14 +28,14 @@ object HeadlessCi {
                 "run_procedure" -> runProcedure(db, arg1)
                 "dump_trace" -> dumpTrace(arg1)
                 "dump_metrics" -> MetricsEngine.summary()
-                "dump_logs" -> AegisLogger.export().take(2000)
+                "dump_logs" -> NewaxLogger.export().take(2000)
                 "dump_db_stats" -> dumpDbStats(db)
                 "assert_record_count" -> assertRecordCount(db, arg1, arg2.toIntOrNull() ?: 0)
                 "assert_person_exists" -> assertPersonExists(db, arg1)
                 "clear_test_data" -> clearTestData(db)
                 "compile_procedure" -> compileProcedure(arg1)
                 "search" -> search(db, arg1, arg2)
-                "version" -> "AegisCI/1.0 db_version=${dbVersion(db)}"
+                "version" -> "NewaxCI/1.0 db_version=${dbVersion(db)}"
                 else -> "UNKNOWN_CMD:$cmd"
             }
         } catch (e: Exception) {
@@ -43,14 +43,14 @@ object HeadlessCi {
         }
     }
 
-    private fun resetTestState(db: AegisDatabase?): String {
+    private fun resetTestState(db: NewaxDatabase?): String {
         if (db == null) return "ERROR:db_null"
         DecisionInspector.clear()
-        AegisLogger.clear()
+        NewaxLogger.clear()
         return "OK:reset_test_state"
     }
 
-    private fun seedPerson(db: AegisDatabase?, name: String, facts: String): String {
+    private fun seedPerson(db: NewaxDatabase?, name: String, facts: String): String {
         if (db == null) return "ERROR:db_null"
         val personId = runBlocking { db.personDao().insertIfAbsent(PersonEntity(name = name, importanceScore = 70f)) }
         if (facts.isNotBlank()) {
@@ -64,7 +64,7 @@ object HeadlessCi {
         return "OK:person_id=$personId name=$name"
     }
 
-    private fun seedMemory(db: AegisDatabase?, content: String, subject: String, confidence: Int): String {
+    private fun seedMemory(db: NewaxDatabase?, content: String, subject: String, confidence: Int): String {
         if (db == null) return "ERROR:db_null"
         val id = runBlocking { db.memoryRecordDao().insert(MemoryRecord(
             type = RecordType.FACT,
@@ -76,14 +76,14 @@ object HeadlessCi {
         return "OK:memory_id=$id"
     }
 
-    private fun runQuery(db: AegisDatabase?, sql: String): String {
+    private fun runQuery(db: NewaxDatabase?, sql: String): String {
         if (db == null) return "ERROR:db_null"
         if (sql.isBlank()) return "ERROR:empty_sql"
         val result = runBlocking { DatabaseInspector.rawQuery(db, sql, 20) }
         return if (result.error != null) "ERROR:${result.error}" else "OK:${result.rowCount} rows cols=${result.columns}"
     }
 
-    private fun runProcedure(db: AegisDatabase?, procedureId: String): String {
+    private fun runProcedure(db: NewaxDatabase?, procedureId: String): String {
         if (db == null) return "ERROR:db_null"
         return try {
             val rawDb = db.openHelper.readableDatabase
@@ -119,26 +119,26 @@ object HeadlessCi {
         }
     }
 
-    private fun dumpDbStats(db: AegisDatabase?): String {
+    private fun dumpDbStats(db: NewaxDatabase?): String {
         if (db == null) return "ERROR:db_null"
         val stats = runBlocking { DatabaseInspector.tableStats(db) }
         return stats.joinToString("\n") { "${it.name}=${it.rowCount}" }
     }
 
-    private fun assertRecordCount(db: AegisDatabase?, table: String, expected: Int): String {
+    private fun assertRecordCount(db: NewaxDatabase?, table: String, expected: Int): String {
         if (db == null) return "ERROR:db_null"
         val result = runBlocking { DatabaseInspector.rawQuery(db, "SELECT COUNT(*) FROM $table", 1) }
         val actual = result.rows.firstOrNull()?.firstOrNull()?.toIntOrNull() ?: -1
         return if (actual == expected) "PASS:count=$actual" else "FAIL:expected=$expected actual=$actual"
     }
 
-    private fun assertPersonExists(db: AegisDatabase?, name: String): String {
+    private fun assertPersonExists(db: NewaxDatabase?, name: String): String {
         if (db == null) return "ERROR:db_null"
         val person = runBlocking { db.personDao().findByName(name) }
         return if (person != null) "PASS:person_id=${person.id}" else "FAIL:person_not_found name=$name"
     }
 
-    private fun clearTestData(db: AegisDatabase?): String {
+    private fun clearTestData(db: NewaxDatabase?): String {
         if (db == null) return "ERROR:db_null"
         val rawDb = db.openHelper.writableDatabase
         rawDb.execSQL("DELETE FROM memory_records WHERE source = 'ci'")
@@ -152,7 +152,7 @@ object HeadlessCi {
         return "OK:steps=${result.steps.size} conf=${(result.confidence * 100).toInt()}% warnings=${result.warnings.size}"
     }
 
-    private fun search(db: AegisDatabase?, query: String, strategy: String): String {
+    private fun search(db: NewaxDatabase?, query: String, strategy: String): String {
         if (db == null) return "ERROR:db_null"
         if (query.isBlank()) return "ERROR:empty_query"
         val result = runBlocking {
@@ -168,7 +168,7 @@ object HeadlessCi {
         return "OK:strategy=${result.strategy} count=${result.candidateCount} latency=${result.latencyMs}ms${result.error?.let { " err=$it" } ?: ""}"
     }
 
-    private fun dbVersion(db: AegisDatabase?): String = try {
+    private fun dbVersion(db: NewaxDatabase?): String = try {
         val cursor = db?.openHelper?.readableDatabase?.query("PRAGMA user_version")
         cursor?.use { c -> if (c.moveToFirst()) c.getInt(0).toString() else "?" } ?: "?"
     } catch (_: Exception) { "?" }

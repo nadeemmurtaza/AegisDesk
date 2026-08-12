@@ -39,7 +39,7 @@ fun DevConsoleScreen(vm: DevConsoleViewModel, onClose: () -> Unit) {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Aegis Dev Console",
+                        text = "Newax Dev Console",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )

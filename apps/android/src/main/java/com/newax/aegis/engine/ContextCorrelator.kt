@@ -1,6 +1,6 @@
 package com.newax.aegis.engine
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.graph.GraphStore
 import com.newax.aegis.memory.EncryptedMemory
 
@@ -147,7 +147,7 @@ object ContextCorrelator {
     private fun buildGraphContext(entities: ExtractedEntities, graph: KnowledgeGraph): String {
         val ids = (entities.names + entities.organizations).take(6)
         val sb  = StringBuilder()
-        val db  = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+        val db  = try { NewaxDatabase.get } catch (_: IllegalStateException) { null }
 
         // Normalized graph (primary — integer IDs, temporal, multi-hop)
         if (db != null) {

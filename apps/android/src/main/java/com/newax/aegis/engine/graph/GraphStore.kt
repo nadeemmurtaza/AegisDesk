@@ -2,7 +2,7 @@ package com.newax.aegis.engine.graph
 
 import kotlinx.coroutines.runBlocking
 import com.newax.aegis.SyncRuntime
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.EntityAlias
 import com.newax.aegis.db.entity.GraphBlob
 import com.newax.aegis.db.entity.GraphEdge
@@ -84,7 +84,7 @@ object GraphStore {
      * Find entity by exact canonical name or alias. Returns null if not found.
      * Does NOT create.
      */
-    fun resolve(db: AegisDatabase, name: String): Long? = runBlocking {
+    fun resolve(db: NewaxDatabase, name: String): Long? = runBlocking {
         val n = name.trim()
         db.graphDao().findByName(n)?.id
             ?: db.graphDao().findEntityByAlias(n)
@@ -95,7 +95,7 @@ object GraphStore {
      * from concurrent LLM extraction threads.
      */
     @Synchronized
-    fun resolveOrCreate(db: AegisDatabase, name: String, type: Int = EntityType.UNKNOWN): Long {
+    fun resolveOrCreate(db: NewaxDatabase, name: String, type: Int = EntityType.UNKNOWN): Long {
         return kotlinx.coroutines.runBlocking {
             val n = name.trim()
             db.graphDao().findByName(n)?.let { return@runBlocking it.id }
@@ -115,7 +115,7 @@ object GraphStore {
         }
     }
 
-    fun addAlias(db: AegisDatabase, entityId: Long, alias: String) {
+    fun addAlias(db: NewaxDatabase, entityId: Long, alias: String) {
         val trimmed = alias.trim()
         kotlinx.coroutines.runBlocking {
             db.graphDao().insertAlias(EntityAlias(entityId = entityId, alias = trimmed))
@@ -133,7 +133,7 @@ object GraphStore {
 
     /** Find or create a predicate by name. Synchronized for same reason as entities. */
     @Synchronized
-    fun predicate(db: AegisDatabase, name: String): Long {
+    fun predicate(db: NewaxDatabase, name: String): Long {
         return kotlinx.coroutines.runBlocking {
             val n = name.lowercase().trim().replace(' ', '_')
             db.graphDao().predicateByName(n)?.id
@@ -146,7 +146,7 @@ object GraphStore {
     // ── Edge operations ───────────────────────────────────────────────────────
 
     fun addEdge(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         subjectId: Long,
         predicateName: String,
         objectId: Long? = null,
@@ -193,7 +193,7 @@ object GraphStore {
      * Preserves history — old edges get valid_until stamped, not deleted.
      */
     fun updateEdge(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         subjectId: Long,
         predicateName: String,
         newObjectId: Long? = null,
@@ -236,13 +236,13 @@ object GraphStore {
 
     // ── Query helpers ─────────────────────────────────────────────────────────
 
-    fun edgesFrom(db: AegisDatabase, entityId: Long, includeExpired: Boolean = false): List<GraphEdge> =
+    fun edgesFrom(db: NewaxDatabase, entityId: Long, includeExpired: Boolean = false): List<GraphEdge> =
         kotlinx.coroutines.runBlocking {
             if (includeExpired) db.graphDao().allEdgesFrom(entityId)
             else db.graphDao().currentEdgesFrom(entityId)
         }
 
-    fun edgesTo(db: AegisDatabase, entityId: Long, includeExpired: Boolean = false): List<GraphEdge> =
+    fun edgesTo(db: NewaxDatabase, entityId: Long, includeExpired: Boolean = false): List<GraphEdge> =
         kotlinx.coroutines.runBlocking {
             if (includeExpired) db.graphDao().allEdgesTo(entityId)
             else db.graphDao().currentEdgesTo(entityId)
@@ -255,7 +255,7 @@ object GraphStore {
      * Returns nodes in BFS order with their outgoing edges at each level.
      */
     fun multihop(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         startId: Long,
         maxDepth: Int = 3,
         maxNodes: Int = 20
@@ -289,7 +289,7 @@ object GraphStore {
      * Build a compact text summary of graph edges for named entities.
      * Used by ContextCorrelator instead of raw tripleDao queries.
      */
-    fun contextFor(db: AegisDatabase, entityNames: List<String>): String {
+    fun contextFor(db: NewaxDatabase, entityNames: List<String>): String {
         if (entityNames.isEmpty()) return ""
         val dao = db.graphDao()
         val sb  = StringBuilder()
@@ -321,7 +321,7 @@ object GraphStore {
      * entities + edges in the graph store.
      * Returns index info for embedding each new edge.
      */
-    fun saveLlmTriples(db: AegisDatabase, triples: List<TripleEntity>): List<EdgeIndex> {
+    fun saveLlmTriples(db: NewaxDatabase, triples: List<TripleEntity>): List<EdgeIndex> {
         if (triples.isEmpty()) return emptyList()
         val result = mutableListOf<EdgeIndex>()
         for (triple in triples) {
@@ -369,7 +369,7 @@ object GraphStore {
      * subject+predicate are expired first to maintain temporal correctness.
      */
     fun saveEdge(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         from: String,
         relation: String,
         to: String,
@@ -382,7 +382,7 @@ object GraphStore {
 
     // ── Blob store ────────────────────────────────────────────────────────────
 
-    fun storeBlob(db: AegisDatabase, type: Int, content: String): Long =
+    fun storeBlob(db: NewaxDatabase, type: Int, content: String): Long =
         kotlinx.coroutines.runBlocking {
             db.graphDao().insertBlob(
                 GraphBlob(type = type, content = content, createdAt = System.currentTimeMillis())

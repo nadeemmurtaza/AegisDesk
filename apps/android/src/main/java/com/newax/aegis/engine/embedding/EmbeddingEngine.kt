@@ -22,7 +22,7 @@ import kotlin.math.sqrt
  */
 object EmbeddingEngine {
 
-    private const val TAG          = "AegisEmbedding"
+    private const val TAG          = "NewaxEmbedding"
     private const val MODEL_FILE   = "use_lite.tflite"
     private const val MODEL_URL    = "https://storage.googleapis.com/mediapipe-models/text_embedder/universal_sentence_encoder/float32/1/universal_sentence_encoder.tflite"
     private const val MIN_MODEL_SZ = 1_000_000L   // sanity: model must be > 1 MB

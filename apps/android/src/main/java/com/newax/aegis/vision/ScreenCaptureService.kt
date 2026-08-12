@@ -34,7 +34,7 @@ class ScreenCaptureService : Service() {
 
     companion object {
         const val ACTION_UNDERSTAND_SCREEN = "com.newax.aegis.action.UNDERSTAND_SCREEN"
-        private const val TAG = "AegisCapture"
+        private const val TAG = "NewaxCapture"
 
         @Volatile var projectionData: Intent? = null
         @Volatile var resultCode: Int = 0
@@ -56,7 +56,7 @@ class ScreenCaptureService : Service() {
         fun hasConsumer(): Boolean = activeConsumers.get() > 0
 
         private fun currentSourceApp(): String =
-            com.newax.aegis.accessibility.AegisAccessibilityService.instance?.currentPackage
+            com.newax.aegis.accessibility.NewaxAccessibilityService.instance?.currentPackage
                 ?.ifBlank { "unknown" } ?: "unknown"
     }
 
@@ -75,7 +75,7 @@ class ScreenCaptureService : Service() {
         val channel = NotificationChannel("vision", "Vision Service", NotificationManager.IMPORTANCE_LOW)
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         startForeground(1, NotificationCompat.Builder(this, "vision")
-            .setContentTitle("Aegis Vision")
+            .setContentTitle("Newax Vision")
             .setContentText("Capturing screen for visual context")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .build())

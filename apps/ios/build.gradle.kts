@@ -1,6 +1,5 @@
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
-    id("com.android.library")
 }
 
 kotlin {
@@ -9,7 +8,7 @@ kotlin {
     iosSimulatorArm64()
 
     cocoapods {
-        summary = "Aegis iOS App"
+        summary = "Newax Aegis iOS App"
         homepage = "https://github.com/nadeemmurtaza/AegisDesk"
         pod("Firebase/Core")
     }
@@ -33,17 +32,4 @@ kotlin {
             }
         }
     }
-}
-
-android {
-    compileSdk = 36
-    defaultConfig {
-        minSdk = 26
-        targetSdk = 36
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    namespace = "com.newax.aegis.ios"
 }

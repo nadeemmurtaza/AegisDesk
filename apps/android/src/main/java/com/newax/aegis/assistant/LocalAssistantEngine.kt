@@ -185,7 +185,7 @@ class LocalAssistantEngine {
             }
             norm == "start learning" || lower.contains("self learn") && lower.contains("start") -> {
                 AssistantReply(
-                    "Starting background self-learning. Aegis will scan contacts, SMS, call logs, images, and files in small batches every 20 minutes. All extracted facts will appear here as drafts for your approval before being added to memory.",
+                    "Starting background self-learning. Newax will scan contacts, SMS, call logs, images, and files in small batches every 20 minutes. All extracted facts will appear here as drafts for your approval before being added to memory.",
                     ProposedAction.StartLearning
                 )
             }

@@ -1,6 +1,6 @@
 package com.newax.aegis.engine.ai
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.manager.ProfileManager
 import com.newax.aegis.engine.registry.PermissionRegistry
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +34,7 @@ object ContextBuilder {
 
     suspend fun build(
         query: String,
-        db: AegisDatabase,
+        db: NewaxDatabase,
         recentConversation: List<Pair<String, String>> = emptyList(),
         includePeople: Boolean = true,
         includeFiles: Boolean = true,
@@ -80,12 +80,12 @@ object ContextBuilder {
     }
 
     private fun buildSystemPrompt(profileAdditions: String): String = buildString {
-        append("You are Aegis, an offline AI assistant. You have access to the user's private data. ")
+        append("You are Newax, an offline AI assistant. You have access to the user's private data. ")
         append("Be helpful, concise, and accurate. When you lack information, say so. ")
         if (profileAdditions.isNotBlank()) append(profileAdditions)
     }
 
-    private suspend fun buildMemorySection(db: AegisDatabase, query: String, limit: Int): String =
+    private suspend fun buildMemorySection(db: NewaxDatabase, query: String, limit: Int): String =
         withContext(Dispatchers.IO) {
             runCatching {
                 val records = db.memoryRecordDao().current(limit)
@@ -97,7 +97,7 @@ object ContextBuilder {
             }.getOrDefault("")
         }
 
-    private suspend fun buildPersonSection(db: AegisDatabase, query: String, limit: Int): String =
+    private suspend fun buildPersonSection(db: NewaxDatabase, query: String, limit: Int): String =
         withContext(Dispatchers.IO) {
             runCatching {
                 val lower = query.lowercase()
@@ -116,7 +116,7 @@ object ContextBuilder {
             }.getOrDefault("")
         }
 
-    private suspend fun buildFileSection(db: AegisDatabase, query: String, limit: Int): String =
+    private suspend fun buildFileSection(db: NewaxDatabase, query: String, limit: Int): String =
         withContext(Dispatchers.IO) {
             runCatching {
                 val files = db.fileDao().recentUniqueFiles(limit)

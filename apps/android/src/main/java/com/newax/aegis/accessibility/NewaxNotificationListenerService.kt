@@ -18,9 +18,9 @@ import com.newax.aegis.engine.TriggerEngine
  * SECURITY: raw text from high-sensitivity messages is NEVER written to logcat.
  * Sensitive content is always redacted before logging.
  */
-class AegisNotificationListenerService : NotificationListenerService() {
+class NewaxNotificationListenerService : NotificationListenerService() {
 
-    private val systemReceiver = com.newax.aegis.engine.AegisSystemReceiver()
+    private val systemReceiver = com.newax.aegis.engine.NewaxSystemReceiver()
     private var receiverRegistered = false
 
     override fun onCreate() {
@@ -146,7 +146,7 @@ class AegisNotificationListenerService : NotificationListenerService() {
 
     // Single companion object merging both state/helpers and configuration constants
     companion object {
-        private const val TAG      = "AegisInbox"
+        private const val TAG      = "NewaxInbox"
         private const val MAX_INBOX = 30
 
         data class ReplyAction(

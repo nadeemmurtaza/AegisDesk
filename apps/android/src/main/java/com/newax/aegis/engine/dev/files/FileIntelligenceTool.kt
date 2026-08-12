@@ -3,7 +3,7 @@ package com.newax.aegis.engine.dev.files
 import android.content.Context
 import android.provider.MediaStore
 import android.provider.OpenableColumns
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.files.FileIndexer
 import com.newax.aegis.engine.files.PHasher
 import com.newax.aegis.engine.files.TextExtractor
@@ -58,7 +58,7 @@ data class PipelineState(
 
 object FileIntelligenceTool {
 
-    suspend fun getStats(db: AegisDatabase): FileIndexStats = withContext(Dispatchers.IO) {
+    suspend fun getStats(db: NewaxDatabase): FileIndexStats = withContext(Dispatchers.IO) {
         val dao = db.fileDao()
         FileIndexStats(
             total = dao.totalFiles(),
@@ -72,7 +72,7 @@ object FileIntelligenceTool {
         )
     }
 
-    suspend fun reindexFile(path: String, context: Context, db: AegisDatabase): String = withContext(Dispatchers.IO) {
+    suspend fun reindexFile(path: String, context: Context, db: NewaxDatabase): String = withContext(Dispatchers.IO) {
         val file = File(path)
         if (!file.exists()) return@withContext "File not found: $path"
         val dao = db.fileDao()
@@ -117,7 +117,7 @@ object FileIntelligenceTool {
         PHashTestResult(pathA, pathB, hashA, hashB, distance, distance in 0 until threshold, threshold)
     }
 
-    suspend fun findDuplicates(db: AegisDatabase, limit: Int = 20): List<DuplicateGroup> = withContext(Dispatchers.IO) {
+    suspend fun findDuplicates(db: NewaxDatabase, limit: Int = 20): List<DuplicateGroup> = withContext(Dispatchers.IO) {
         val rawDb = db.openHelper.readableDatabase
         val groups = mutableListOf<DuplicateGroup>()
         runCatching {
@@ -135,14 +135,14 @@ object FileIntelligenceTool {
         groups
     }
 
-    suspend fun resolveDuplicate(keepPath: String, deletePath: String, db: AegisDatabase): String = withContext(Dispatchers.IO) {
+    suspend fun resolveDuplicate(keepPath: String, deletePath: String, db: NewaxDatabase): String = withContext(Dispatchers.IO) {
         val toDelete = db.fileDao().byPath(deletePath) ?: return@withContext "Not found: $deletePath"
         val canonical = db.fileDao().byPath(keepPath) ?: return@withContext "Not found: $keepPath"
         db.fileDao().markDuplicate(toDelete.id, canonical.id)
         "Marked ${toDelete.id} as duplicate of ${canonical.id}"
     }
 
-    fun pipelineState(context: Context, db: AegisDatabase): PipelineState {
+    fun pipelineState(context: Context, db: NewaxDatabase): PipelineState {
         val stats = runCatching {
             val dao = db.fileDao()
             runBlocking {

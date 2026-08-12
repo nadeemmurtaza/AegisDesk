@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.embedding
 
 import kotlinx.coroutines.runBlocking
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.EmbeddingEntity
 import com.newax.aegis.db.entity.TripleEntity
 import com.newax.aegis.engine.resource.JobPriority
@@ -39,7 +39,7 @@ object VectorStore {
     )
 
     /** Index a person fact by its DB row ID. No-op if engine not ready. */
-    fun indexFact(db: AegisDatabase, factId: Long, text: String) {
+    fun indexFact(db: NewaxDatabase, factId: Long, text: String) {
         val emb = EmbeddingEngine.embed(text) ?: return
         runBlocking {
             db.embeddingDao().upsert(
@@ -54,7 +54,7 @@ object VectorStore {
     }
 
     /** Index a knowledge graph triple as "subject predicate object" text. */
-    fun indexTriple(db: AegisDatabase, tripleId: Long, triple: TripleEntity) {
+    fun indexTriple(db: NewaxDatabase, tripleId: Long, triple: TripleEntity) {
         val text = "${triple.subject} ${triple.predicate.replace('_', ' ')} ${triple.objectValue}"
         val emb = EmbeddingEngine.embed(text) ?: return
         runBlocking {
@@ -70,7 +70,7 @@ object VectorStore {
     }
 
     /** Index a memory fact stored in EncryptedMemory (keyed by category + content hash). */
-    fun indexMemoryFact(db: AegisDatabase, category: String, fact: String) {
+    fun indexMemoryFact(db: NewaxDatabase, category: String, fact: String) {
         val emb = EmbeddingEngine.embed(fact) ?: return
         runBlocking {
             db.embeddingDao().upsert(
@@ -89,7 +89,7 @@ object VectorStore {
      * category + title so semantic recall can hit it. Only ACTIVE entries are
      * ever indexed (PENDING/REJECTED never enter the retrievable space).
      */
-    fun indexLibrary(db: AegisDatabase, entryId: String, category: String, title: String, content: String) {
+    fun indexLibrary(db: NewaxDatabase, entryId: String, category: String, title: String, content: String) {
         val emb = EmbeddingEngine.embed("[$category] $title: $content") ?: return
         runBlocking {
             db.embeddingDao().upsert(
@@ -104,12 +104,12 @@ object VectorStore {
     }
 
     /** Drop a library entry from the vector index (reject/tombstone). */
-    fun removeLibrary(db: AegisDatabase, entryId: String) {
+    fun removeLibrary(db: NewaxDatabase, entryId: String) {
         runBlocking { runCatching { db.embeddingDao().deleteBySource(TYPE_LIBRARY, "library:$entryId") } }
     }
 
     /** Index an episode (chronological, outcome + lesson) for semantic recall. */
-    fun indexEpisode(db: AegisDatabase, episodeId: String, summary: String, lesson: String, outcome: String) {
+    fun indexEpisode(db: NewaxDatabase, episodeId: String, summary: String, lesson: String, outcome: String) {
         val text = if (lesson.isBlank()) summary else "$summary — lesson ($outcome): $lesson"
         val emb = EmbeddingEngine.embed(text) ?: return
         runBlocking {
@@ -125,7 +125,7 @@ object VectorStore {
     }
 
     /** Drop an episode from the vector index (tombstone). */
-    fun removeEpisode(db: AegisDatabase, episodeId: String) {
+    fun removeEpisode(db: NewaxDatabase, episodeId: String) {
         runBlocking { runCatching { db.embeddingDao().deleteBySource(TYPE_EPISODE, "episode:$episodeId") } }
     }
 
@@ -133,7 +133,7 @@ object VectorStore {
      * Semantic search across all indexed embeddings.
      * Returns empty list if [EmbeddingEngine] not ready (graceful degradation).
      */
-    fun search(db: AegisDatabase, query: String, topK: Int = 6): List<SearchResult> {
+    fun search(db: NewaxDatabase, query: String, topK: Int = 6): List<SearchResult> {
         if (!EmbeddingEngine.isReady()) return emptyList()
         val queryEmb = EmbeddingEngine.embed(query) ?: return emptyList()
         val all = runBlocking { db.embeddingDao().getAll() }
@@ -151,7 +151,7 @@ object VectorStore {
     }
 
     /** Index a normalized graph edge as "subject predicate object" text. */
-    fun indexEdge(db: AegisDatabase, edgeId: Long, subjectName: String, predicateName: String, objectStr: String) {
+    fun indexEdge(db: NewaxDatabase, edgeId: Long, subjectName: String, predicateName: String, objectStr: String) {
         val text = "$subjectName ${predicateName.replace('_', ' ')} $objectStr"
         val emb = EmbeddingEngine.embed(text) ?: return
         runBlocking {
@@ -166,19 +166,19 @@ object VectorStore {
         }
     }
 
-    fun pruneOrphans(db: AegisDatabase) = runBlocking { db.embeddingDao().pruneOrphans() }
+    fun pruneOrphans(db: NewaxDatabase) = runBlocking { db.embeddingDao().pruneOrphans() }
 
     // ── Governor-gated async indexing ─────────────────────────────────────────
 
-    fun submitIndexFact(db: AegisDatabase, factId: Long, text: String) {
+    fun submitIndexFact(db: NewaxDatabase, factId: Long, text: String) {
         govSubmit("emb-fact-$factId") { indexFact(db, factId, text) }
     }
 
-    fun submitIndexEdge(db: AegisDatabase, edgeId: Long, subjectName: String, predicateName: String, objectStr: String) {
+    fun submitIndexEdge(db: NewaxDatabase, edgeId: Long, subjectName: String, predicateName: String, objectStr: String) {
         govSubmit("emb-edge-$edgeId") { indexEdge(db, edgeId, subjectName, predicateName, objectStr) }
     }
 
-    fun submitIndexMemory(db: AegisDatabase, category: String, fact: String) {
+    fun submitIndexMemory(db: NewaxDatabase, category: String, fact: String) {
         govSubmit("emb-mem-${fact.hashCode()}") { indexMemoryFact(db, category, fact) }
     }
 

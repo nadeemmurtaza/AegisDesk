@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.runBlocking
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.UiProcedure
 import com.newax.aegis.engine.procedure.ProcedureExecutor
 import com.newax.aegis.engine.procedure.StepSerializer
@@ -23,7 +23,7 @@ object AppIntelligence {
     // ── Resolve task → cheapest execution path ────────────────────────────────
 
     fun resolve(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         context: Context,
         capability: AppCapability,
         packageHint: String? = null,
@@ -71,7 +71,7 @@ object AppIntelligence {
     // ── Full execution (launch + procedure) ───────────────────────────────────
 
     suspend fun execute(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         context: Context,
         capability: AppCapability,
         packageHint: String? = null,
@@ -96,17 +96,17 @@ object AppIntelligence {
 
     // ── Procedure outcome tracking ─────────────────────────────────────────────
 
-    fun recordProcedureSuccess(db: AegisDatabase, procedureId: Long) {
+    fun recordProcedureSuccess(db: NewaxDatabase, procedureId: Long) {
         runBlocking { db.appRegistryDao().recordSuccess(procedureId, System.currentTimeMillis()) }
     }
 
-    fun recordProcedureFailure(db: AegisDatabase, procedureId: Long) {
+    fun recordProcedureFailure(db: NewaxDatabase, procedureId: Long) {
         runBlocking { db.appRegistryDao().recordFailure(procedureId, System.currentTimeMillis()) }
     }
 
     // ── Label → package lookup ─────────────────────────────────────────────────
 
-    fun packageForLabel(db: AegisDatabase, label: String): String? {
+    fun packageForLabel(db: NewaxDatabase, label: String): String? {
         val lower = label.lowercase()
         val records = runBlocking { db.appRegistryDao().allRecords() }
         return records
@@ -116,12 +116,12 @@ object AppIntelligence {
 
     // ── Capability query helpers ───────────────────────────────────────────────
 
-    fun capabilitiesFor(db: AegisDatabase, packageName: String): List<AppCapability> {
+    fun capabilitiesFor(db: NewaxDatabase, packageName: String): List<AppCapability> {
         val caps = runBlocking { db.appRegistryDao().capabilitiesForPackage(packageName) }
         return caps.mapNotNull { runCatching { AppCapability.valueOf(it) }.getOrNull() }
     }
 
-    fun packagesFor(db: AegisDatabase, capability: AppCapability): List<String> =
+    fun packagesFor(db: NewaxDatabase, capability: AppCapability): List<String> =
         runBlocking { db.appRegistryDao().packagesByCapability(capability.name) }
 
     // ── Private helpers ────────────────────────────────────────────────────────

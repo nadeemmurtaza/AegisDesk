@@ -1,8 +1,8 @@
 package com.newax.aegis.engine.learning
 
-import com.newax.aegis.db.AegisDatabase
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.db.NewaxDatabase
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -20,7 +20,7 @@ object MemoryCompiler {
         val durationMs: Long
     )
 
-    suspend fun compile(db: AegisDatabase): CompilationResult = withContext(Dispatchers.IO) {
+    suspend fun compile(db: NewaxDatabase): CompilationResult = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         val dao = db.memoryRecordDao()
         val now = System.currentTimeMillis()
@@ -59,7 +59,7 @@ object MemoryCompiler {
             summariesGenerated = bySubject.size,
             durationMs = System.currentTimeMillis() - startMs
         )
-        AegisEventBus.emit(AegisEvent.MemoryConsolidated(allRecords.size, result.durationMs))
+        NewaxEventBus.emit(NewaxEvent.MemoryConsolidated(allRecords.size, result.durationMs))
         result
     }
 
@@ -80,7 +80,7 @@ object MemoryCompiler {
         }
     }
 
-    suspend fun generateSubjectSummary(subject: String, db: AegisDatabase): String? =
+    suspend fun generateSubjectSummary(subject: String, db: NewaxDatabase): String? =
         withContext(Dispatchers.IO) {
             val records = db.memoryRecordDao().findBySubject(subject, 10)
             if (records.isEmpty()) return@withContext null

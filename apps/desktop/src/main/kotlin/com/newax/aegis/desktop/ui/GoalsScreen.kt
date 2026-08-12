@@ -112,7 +112,7 @@ fun GoalsScreen(
                     item {
                         EmptyState(
                             "No goals yet",
-                            "Type a goal above to see Aegis's plan — and why it might be blocked.",
+                            "Type a goal above to see Newax's plan — and why it might be blocked.",
                         )
                     }
                 } else {
@@ -192,7 +192,7 @@ private fun NewGoalCard(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Aegis decomposes the goal, then checks each skill's capabilities against the platform registry before calling it feasible.",
+                "Newax decomposes the goal, then checks each skill's capabilities against the platform registry before calling it feasible.",
                 fontSize = 12.sp,
                 color = TextTertiaryColor,
                 lineHeight = 17.sp

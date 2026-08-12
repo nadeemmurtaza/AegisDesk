@@ -72,10 +72,10 @@ class WindowsAppIndexTest {
             FakeBridge(
                 listOf(
                     AppIndexEntry("Zoom", "Communications", "C:\\a\\Zoom.lnk"),
-                    AppIndexEntry("Aegis", "Installed", "C:\\a\\Aegis.lnk"),
+                    AppIndexEntry("Newax", "Installed", "C:\\a\\Newax.lnk"),
                 )
             )
         )
-        assertEquals(listOf("Aegis", "Zoom"), index.all().map { it.name })
+        assertEquals(listOf("Newax", "Zoom"), index.all().map { it.name })
     }
 }

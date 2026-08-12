@@ -1,6 +1,6 @@
 package com.newax.aegis.engine
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import kotlinx.coroutines.runBlocking
 
 object MemoryIndexer {
@@ -41,7 +41,7 @@ object MemoryIndexer {
         }
 
         // Index normalized graph entities by canonical name
-        val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+        val db = try { NewaxDatabase.get } catch (_: IllegalStateException) { null }
         val allEntities = db?.let { runBlocking { it.graphDao().allEntities(10_000) } } ?: emptyList()
         allEntities.forEach { entity ->
             val entityRef = "ENTITY:${entity.id}"

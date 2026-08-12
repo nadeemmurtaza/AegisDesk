@@ -2,7 +2,7 @@ package com.newax.aegis.agents
 
 import android.content.Context
 import android.net.Uri
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.AgentSkill
 import com.newax.aegis.db.entity.SkillEntity
 import com.newax.aegis.db.entity.SkillSet
@@ -145,7 +145,7 @@ object SkillManager {
     )
 
     fun ensureSeeded() {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking {
             runCatching {
                 val dao = db.skillManagerDao()
@@ -227,17 +227,17 @@ object SkillManager {
     // ── skills ──────────────────────────────────────────────────────────────
 
     fun skills(): List<SkillEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.skillManagerDao().allSkills() }.getOrDefault(emptyList()) }
     }
 
     fun setEnabled(skillId: String, on: Boolean) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.skillManagerDao().setSkillEnabled(skillId, on) } }
     }
 
     fun uninstall(skillId: String): Boolean {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return false
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return false
         val skill = runBlocking { runCatching { db.skillManagerDao().skillById(skillId) }.getOrNull() } ?: return false
         if (skill.source == SOURCE_BUILTIN) return false
         val removed = runBlocking { runCatching { db.skillManagerDao().deleteSkill(skillId) }.getOrDefault(0) } > 0
@@ -252,7 +252,7 @@ object SkillManager {
         val manifest = entries.firstOrNull { it.first == MANIFEST_FILE }
             ?.let { parseSkillManifest(String(it.second, Charsets.UTF_8)) }
             ?: return "Import failed — invalid skill.json manifest"
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return "Import failed — database not ready"
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return "Import failed — database not ready"
 
         val root = File(skillsRoot(), "import-tmp-${System.currentTimeMillis()}").apply { mkdirs() }
         entries.filter { it.first != MANIFEST_FILE }.forEach { (name, bytes) ->
@@ -356,7 +356,7 @@ object SkillManager {
 
     /** The tool schemas an agent may use, exposed to the runtime (the model's tool list). */
     fun toolSchemasForAgent(agentId: String): List<String> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking {
             runCatching {
                 db.skillManagerDao().skillsForAgent(agentId).map { it.toolSchema }.filter { it.isNotBlank() && it != "{}" }
@@ -366,7 +366,7 @@ object SkillManager {
 
     /** What one agent knows how to do — the capability set the guard bridges against. */
     fun capabilitiesOf(agentId: String): Set<String> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptySet()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptySet()
         val agent = runBlocking { runCatching { db.agentRegistryDao().byId(agentId) }.getOrNull() } ?: return emptySet()
         return agent.capabilities.split(',').map { it.trim() }.filter { it.isNotBlank() }.toSet()
     }
@@ -379,7 +379,7 @@ object SkillManager {
      * agent may use without a grant row (the zero-policy-maintenance bypass).
      */
     fun canUse(agentId: String, skillId: String): Boolean {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return false
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return false
         return runBlocking {
             val skill = runCatching { db.skillManagerDao().skillById(skillId) }.getOrNull() ?: return@runBlocking false
             if (!skill.enabled) return@runBlocking false
@@ -389,55 +389,55 @@ object SkillManager {
     }
 
     fun grant(agentId: String, skillId: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.skillManagerDao().grantSkill(AgentSkill(agentId = agentId, skillId = skillId)) } }
     }
 
     fun revoke(agentId: String, skillId: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.skillManagerDao().revokeSkill(agentId, skillId) } }
     }
 
     fun skillsForAgent(agentId: String): List<SkillEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.skillManagerDao().skillsForAgent(agentId) }.getOrDefault(emptyList()) }
     }
 
     fun grantedSkillIds(agentId: String): Set<String> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptySet()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptySet()
         return runBlocking { runCatching { db.skillManagerDao().grantedSkillIds(agentId) }.getOrDefault(emptyList()) }.toSet()
     }
 
     // ── skill sets ──────────────────────────────────────────────────────────
 
     fun sets(): List<SkillSet> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.skillManagerDao().allSets() }.getOrDefault(emptyList()) }
     }
 
     fun createSet(setId: String, name: String, description: String) {
         if (setId.isBlank() || name.isBlank()) return
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.skillManagerDao().upsertSet(SkillSet(setId = setId, name = name, description = description)) } }
     }
 
     fun deleteSet(setId: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.skillManagerDao().deleteSet(setId) } }
     }
 
     fun addToSet(setId: String, skillId: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.skillManagerDao().addToSet(SkillSetMember(setId = setId, skillId = skillId)) } }
     }
 
     fun removeFromSet(setId: String, skillId: String) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.skillManagerDao().removeFromSet(setId, skillId) } }
     }
 
     fun skillsInSet(setId: String): List<SkillEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.skillManagerDao().skillsInSet(setId) }.getOrDefault(emptyList()) }
     }
 }

@@ -440,7 +440,7 @@ fun LearningSettingsSection(vm: MainViewModel) {
             title  = { Text("Reset scan progress?", fontWeight = FontWeight.SemiBold, color = LS_TextPri) },
             text   = {
                 Text(
-                    "All scan offsets and timestamps will be cleared. Aegis will re-scan everything from scratch. Existing drafts and memory are unaffected.",
+                    "All scan offsets and timestamps will be cleared. Newax will re-scan everything from scratch. Existing drafts and memory are unaffected.",
                     color = LS_TextSec, lineHeight = 20.sp
                 )
             },

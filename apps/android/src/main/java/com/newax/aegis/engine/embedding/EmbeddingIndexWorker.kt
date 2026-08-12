@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.*
 import kotlinx.coroutines.runBlocking
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import java.util.concurrent.TimeUnit
 
 /**
@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
  */
 class EmbeddingIndexWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) {
 
-    private val TAG        = "AegisEmbIdx"
+    private val TAG        = "NewaxEmbIdx"
     private val BATCH_SIZE = 50
 
     override fun doWork(): Result {
@@ -22,7 +22,7 @@ class EmbeddingIndexWorker(ctx: Context, params: WorkerParameters) : Worker(ctx,
             Log.d(TAG, "Engine not ready")
             return Result.success()
         }
-        val db = try { AegisDatabase.get } catch (_: Exception) { return Result.retry() }
+        val db = try { NewaxDatabase.get } catch (_: Exception) { return Result.retry() }
 
         val indexed   = runBlocking { db.embeddingDao().getSourceIds(VectorStore.TYPE_FACT) }.toSet()
         val allIds    = runBlocking { db.personFactDao().getAllIds() }
@@ -60,7 +60,7 @@ class EmbeddingIndexWorker(ctx: Context, params: WorkerParameters) : Worker(ctx,
             )
         }
 
-        fun isNeeded(db: AegisDatabase): Boolean = runBlocking {
+        fun isNeeded(db: NewaxDatabase): Boolean = runBlocking {
             db.personFactDao().getAllIds().size > db.embeddingDao().count()
         }
     }

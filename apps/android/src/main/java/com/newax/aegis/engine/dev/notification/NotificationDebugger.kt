@@ -5,7 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
-import com.newax.aegis.engine.dev.log.AegisLogger
+import com.newax.aegis.engine.dev.log.NewaxLogger
 import java.util.concurrent.CopyOnWriteArrayList
 
 data class NotificationRecord(
@@ -65,7 +65,7 @@ object NotificationDebugger {
         )
         received.add(record)
         if (received.size > MAX_RECORDS) received.removeAt(0)
-        AegisLogger.d("NotifDebugger", "RX [$packageName] $title: $text")
+        NewaxLogger.d("NotifDebugger", "RX [$packageName] $title: $text")
     }
 
     fun onNotificationPosted(record: NotificationRecord) {
@@ -94,11 +94,11 @@ object NotificationDebugger {
         return if (Build.VERSION.SDK_INT >= 23) nm.activeNotifications.size else -1
     }
 
-    fun postTestNotification(context: Context, title: String = "Aegis Test", text: String = "Debug notification") {
+    fun postTestNotification(context: Context, title: String = "Newax Test", text: String = "Debug notification") {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "aegis_debug"
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(NotificationChannel(channelId, "Aegis Debug", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(channelId, "Newax Debug", NotificationManager.IMPORTANCE_LOW))
         }
         val builder = Notification.Builder(context, channelId)
             .setContentTitle(title)
@@ -106,7 +106,7 @@ object NotificationDebugger {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setAutoCancel(true)
         nm.notify(9999, builder.build())
-        AegisLogger.i("NotifDebugger", "Test notification posted")
+        NewaxLogger.i("NotifDebugger", "Test notification posted")
     }
 
     fun cancelTestNotification(context: Context) {

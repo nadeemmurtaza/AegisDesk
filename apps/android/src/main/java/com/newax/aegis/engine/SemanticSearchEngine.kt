@@ -1,6 +1,6 @@
 package com.newax.aegis.engine
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.graph.GraphStore
 import kotlinx.coroutines.runBlocking
 import kotlin.math.ln
@@ -69,7 +69,7 @@ object SemanticSearchEngine {
 
         data class Hit(val label: String, val text: String, val preRanked: Boolean = false, var score: Double = 0.0)
         val candidates = mutableListOf<Hit>()
-        val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+        val db = try { NewaxDatabase.get } catch (_: IllegalStateException) { null }
 
         // Room FTS — person facts (SQL-ranked, highest priority)
         if (db != null) {
@@ -176,13 +176,13 @@ object SemanticSearchEngine {
                 }
                 idStr.startsWith("TRIPLE:") -> {
                     val id = idStr.substringAfter("TRIPLE:").toLongOrNull() ?: continue
-                    val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+                    val db = try { NewaxDatabase.get } catch (_: IllegalStateException) { null }
                     val t  = db?.let { runBlocking { it.tripleDao().byId(id) } }
                     if (t != null) result.append("Triple [${t.subject}]: ${t.predicate.replace('_', ' ')} → ${t.objectValue}\n")
                 }
                 idStr.startsWith("ENTITY:") -> {
                     val id = idStr.substringAfter("ENTITY:").toLongOrNull() ?: continue
-                    val db = try { AegisDatabase.get } catch (_: IllegalStateException) { null }
+                    val db = try { NewaxDatabase.get } catch (_: IllegalStateException) { null }
                     val e  = db?.let { runBlocking { it.graphDao().entityById(id) } }
                     if (e != null) {
                         runBlocking {

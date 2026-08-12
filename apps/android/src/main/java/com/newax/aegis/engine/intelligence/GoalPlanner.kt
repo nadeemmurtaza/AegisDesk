@@ -5,8 +5,8 @@ import com.newax.aegis.PolicyHolder
 import com.newax.aegis.assistant.ActionOrigin
 import com.newax.aegis.assistant.ProposedAction
 import com.newax.aegis.authority.PolicyEvaluation
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import com.newax.aegis.engine.state.GoalState
 import com.newax.aegis.engine.state.StateMachines
 import com.newax.aegis.platform.CapabilityResolution
@@ -130,7 +130,7 @@ object GoalPlanner {
     private val plans = ConcurrentHashMap<String, PlanResult>()
 
     /**
-     * Persistence sink, wired at bootstrap (AegisApplication). Fired after every
+     * Persistence sink, wired at bootstrap (NewaxApplication). Fired after every
      * mutating call so the latest state is durably captured; the Android store
      * encodes the snapshot list to JSON and writes it to the kv_store table.
      */
@@ -222,7 +222,7 @@ object GoalPlanner {
         graphs[goal.id] = graph
         stateMachines[goal.id] = StateMachines.goal()
 
-        AegisEventBus.emit(AegisEvent.GoalCreated(goal.id, description))
+        NewaxEventBus.emit(NewaxEvent.GoalCreated(goal.id, description))
 
         val result = PlanResult(
             goal = goal,
@@ -277,7 +277,7 @@ object GoalPlanner {
         val sm = stateMachines[goalId] ?: return false
         val ok = sm.transition(GoalState.COMPLETED)
         if (ok) {
-            AegisEventBus.emit(AegisEvent.GoalCompleted(goalId))
+            NewaxEventBus.emit(NewaxEvent.GoalCompleted(goalId))
             notifyChanged()
         }
         return ok

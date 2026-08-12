@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.planner
 
 import android.content.Context
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.CalendarQueries
 import com.newax.aegis.engine.CommunicationLog
 import com.newax.aegis.engine.ContactsManager
@@ -24,7 +24,7 @@ object DeterministicResolver {
 
     fun resolve(
         plan: QueryPlanner.QueryPlan,
-        db: AegisDatabase,
+        db: NewaxDatabase,
         memory: EncryptedMemory,
         context: Context
     ): List<ResolvedResult> {
@@ -54,7 +54,7 @@ object DeterministicResolver {
         memory.relevant(q).forEach { out += ResolvedResult(it, KV_EXACT, 0.80f) }
     }
 
-    private fun resolveContacts(plan: QueryPlanner.QueryPlan, db: AegisDatabase, context: Context, out: MutableList<ResolvedResult>) {
+    private fun resolveContacts(plan: QueryPlanner.QueryPlan, db: NewaxDatabase, context: Context, out: MutableList<ResolvedResult>) {
         for (name in plan.entityNames.take(3)) {
             // PersonRegistry first (graph alias resolution), then ContactsManager fallback
             val entityId = PersonRegistry.resolve(db, name)
@@ -80,7 +80,7 @@ object DeterministicResolver {
             .forEach { ev -> out += ResolvedResult("Event: ${ev.formatted("MMM dd HH:mm")}", CALENDAR, 0.90f) }
     }
 
-    private fun resolveFts(plan: QueryPlanner.QueryPlan, db: AegisDatabase, out: MutableList<ResolvedResult>) {
+    private fun resolveFts(plan: QueryPlanner.QueryPlan, db: NewaxDatabase, out: MutableList<ResolvedResult>) {
         val q = plan.keywords.joinToString(" ").trim()
         if (q.isBlank()) return
         try { kotlinx.coroutines.runBlocking { db.personFactDao().searchFts(q, 5) }.forEach { out += ResolvedResult(it.fact, FTS_BM25, 0.72f) } }
@@ -89,13 +89,13 @@ object DeterministicResolver {
             .forEach { log -> out += ResolvedResult("[${log.contact}] ${log.summary}", FTS_BM25, 0.65f) }
     }
 
-    private fun resolveGraph(plan: QueryPlanner.QueryPlan, db: AegisDatabase, out: MutableList<ResolvedResult>) {
+    private fun resolveGraph(plan: QueryPlanner.QueryPlan, db: NewaxDatabase, out: MutableList<ResolvedResult>) {
         if (plan.entityNames.isEmpty()) return
         val ctx = GraphStore.contextFor(db, plan.entityNames)
         if (ctx.isNotBlank()) out += ResolvedResult(ctx, GRAPH_TRAVERSAL, 0.75f)
     }
 
-    private fun resolveMultihop(plan: QueryPlanner.QueryPlan, db: AegisDatabase, out: MutableList<ResolvedResult>) {
+    private fun resolveMultihop(plan: QueryPlanner.QueryPlan, db: NewaxDatabase, out: MutableList<ResolvedResult>) {
         for (name in plan.entityNames.take(2)) {
             val entityId = GraphStore.resolve(db, name) ?: continue
             val hops = GraphStore.multihop(db, entityId, maxDepth = 3, maxNodes = 15)
@@ -112,7 +112,7 @@ object DeterministicResolver {
         }
     }
 
-    private fun resolveVector(plan: QueryPlanner.QueryPlan, db: AegisDatabase, out: MutableList<ResolvedResult>) {
+    private fun resolveVector(plan: QueryPlanner.QueryPlan, db: NewaxDatabase, out: MutableList<ResolvedResult>) {
         val q = (plan.entityNames + plan.keywords).joinToString(" ").trim()
         if (q.isBlank()) return
         VectorStore.search(db, q, 5).forEach { r ->
@@ -126,7 +126,7 @@ object DeterministicResolver {
         if (!r.startsWith("No instant")) out += ResolvedResult(r, PREFIX_TRIE, 0.60f)
     }
 
-    private fun resolveTemporal(plan: QueryPlanner.QueryPlan, db: AegisDatabase, out: MutableList<ResolvedResult>) {
+    private fun resolveTemporal(plan: QueryPlanner.QueryPlan, db: NewaxDatabase, out: MutableList<ResolvedResult>) {
         val tf = plan.temporalFilter ?: return
         kotlinx.coroutines.runBlocking { db.memoryRecordDao().findByTimeRange(tf.fromMs, tf.untilMs, 10) }
             .forEach { rec -> out += ResolvedResult(rec.content, TEMPORAL_FILTER, 0.70f, rec.id) }

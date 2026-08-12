@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.dev.db
 
 import android.database.Cursor
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -43,7 +43,7 @@ object DatabaseInspector {
         "file_objects", "file_entity_links", "embeddings", "triples"
     )
 
-    suspend fun tableStats(db: AegisDatabase): List<TableStats> = withContext(Dispatchers.IO) {
+    suspend fun tableStats(db: NewaxDatabase): List<TableStats> = withContext(Dispatchers.IO) {
         val rawDb = db.openHelper.readableDatabase
         KNOWN_TABLES.mapNotNull { table ->
             runCatching {
@@ -58,7 +58,7 @@ object DatabaseInspector {
         }
     }
 
-    suspend fun rawQuery(db: AegisDatabase, sql: String, limit: Int = 200): QueryResult =
+    suspend fun rawQuery(db: NewaxDatabase, sql: String, limit: Int = 200): QueryResult =
         withContext(Dispatchers.IO) {
             val start = System.currentTimeMillis()
             return@withContext try {
@@ -88,7 +88,7 @@ object DatabaseInspector {
             }
         }
 
-    suspend fun detectOrphans(db: AegisDatabase): OrphanReport = withContext(Dispatchers.IO) {
+    suspend fun detectOrphans(db: NewaxDatabase): OrphanReport = withContext(Dispatchers.IO) {
         val rawDb = db.openHelper.readableDatabase
         fun count(sql: String): Int = runCatching {
             rawDb.query(sql).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
@@ -102,7 +102,7 @@ object DatabaseInspector {
         )
     }
 
-    suspend fun indexHealth(db: AegisDatabase): List<IndexHealth> = withContext(Dispatchers.IO) {
+    suspend fun indexHealth(db: NewaxDatabase): List<IndexHealth> = withContext(Dispatchers.IO) {
         val rawDb = db.openHelper.readableDatabase
         val results = mutableListOf<IndexHealth>()
         runCatching {
@@ -123,7 +123,7 @@ object DatabaseInspector {
         results
     }
 
-    suspend fun sqlCipherState(db: AegisDatabase): String = withContext(Dispatchers.IO) {
+    suspend fun sqlCipherState(db: NewaxDatabase): String = withContext(Dispatchers.IO) {
         runCatching {
             val rawDb = db.openHelper.readableDatabase
             val cursor = rawDb.query("PRAGMA cipher_version")
@@ -133,7 +133,7 @@ object DatabaseInspector {
         }.getOrDefault("Unable to query SQLCipher state")
     }
 
-    suspend fun migrationHistory(db: AegisDatabase): String = withContext(Dispatchers.IO) {
+    suspend fun migrationHistory(db: NewaxDatabase): String = withContext(Dispatchers.IO) {
         runCatching {
             val rawDb = db.openHelper.readableDatabase
             val cursor = rawDb.query("PRAGMA user_version")
@@ -143,7 +143,7 @@ object DatabaseInspector {
         }.getOrDefault("Unable to query migration history")
     }
 
-    suspend fun memoryRecordSample(db: AegisDatabase, limit: Int = 20): List<Map<String, String>> =
+    suspend fun memoryRecordSample(db: NewaxDatabase, limit: Int = 20): List<Map<String, String>> =
         withContext(Dispatchers.IO) {
             db.memoryRecordDao().current(limit).map { r ->
                 mapOf(
@@ -158,10 +158,10 @@ object DatabaseInspector {
             }
         }
 
-    suspend fun graphEdgeSample(db: AegisDatabase, limit: Int = 20): QueryResult =
+    suspend fun graphEdgeSample(db: NewaxDatabase, limit: Int = 20): QueryResult =
         rawQuery(db, "SELECT id, subjectId, predicateId, objectId, objectValue, confidence FROM edges WHERE validUntil IS NULL ORDER BY id DESC LIMIT $limit", limit)
 
-    suspend fun personSnapshotSample(db: AegisDatabase, limit: Int = 10): QueryResult =
+    suspend fun personSnapshotSample(db: NewaxDatabase, limit: Int = 10): QueryResult =
         rawQuery(db, "SELECT * FROM person_snapshots ORDER BY snapshotUpdatedMs DESC LIMIT $limit", limit)
 
     fun formatTableStats(stats: List<TableStats>): String = buildString {

@@ -278,9 +278,9 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                         Spacer(Modifier.height(6.dp))
                         Text(
                             if (learnerRunning.value)
-                                "Aegis is scanning in the background.\nNew facts will appear here for your review."
+                                "Newax is scanning in the background.\nNew facts will appear here for your review."
                             else
-                                "Press ▶ to start self-learning.\nAegis will scan your data and extract facts for approval.",
+                                "Press ▶ to start self-learning.\nNewax will scan your data and extract facts for approval.",
                             fontSize  = 13.sp,
                             color     = TextTer_D,
                             lineHeight = 20.sp,

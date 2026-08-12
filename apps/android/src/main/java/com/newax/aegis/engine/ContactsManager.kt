@@ -23,7 +23,7 @@ import com.newax.aegis.memory.EncryptedMemory
 class ContactsManager(private val context: Context, private val memory: EncryptedMemory) {
 
     private val cr = context.contentResolver
-    private val TAG = "AegisContacts"
+    private val TAG = "NewaxContacts"
 
     data class ContactSummary(
         val contactId: String,

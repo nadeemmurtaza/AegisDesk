@@ -2,7 +2,7 @@ package com.newax.aegis.agents
 
 import android.content.Context
 import com.newax.aegis.SyncRuntime
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.*
 import com.newax.aegis.memory.AgentMemory
 import kotlinx.coroutines.runBlocking
@@ -86,7 +86,7 @@ object LearningEngine {
 
     private fun context(): Context = requireNotNull(appContext) { "LearningEngine.init(context) not called" }
 
-    private fun db(): AegisDatabase? = runCatching { AegisDatabase.get }.getOrNull()
+    private fun db(): NewaxDatabase? = runCatching { NewaxDatabase.get }.getOrNull()
 
     // ── tuning (kv_store) ───────────────────────────────────────────────────
 
@@ -282,7 +282,7 @@ object LearningEngine {
 
     /** Deterministic-protocol fix staging: the system found repeated failures → candidate mutation. */
     private fun stageDeterministicFix(
-        database: AegisDatabase, skillId: String, method: SkillEvolution, error: String, now: Long
+        database: NewaxDatabase, skillId: String, method: SkillEvolution, error: String, now: Long
     ) {
         val skill = runBlocking { runCatching { database.skillManagerDao().skillById(skillId) }.getOrNull() }
         val methodId = "fix-${now / 1000}"
@@ -524,7 +524,7 @@ object LearningEngine {
      *     exploit/explore picker feeds into prompts once the row is ACTIVE.
      * Every path resolves inside the package dir (zip-slip guard, R12).
      */
-    private fun deployMutation(database: AegisDatabase, record: StagingRecord, now: Long): Boolean {
+    private fun deployMutation(database: NewaxDatabase, record: StagingRecord, now: Long): Boolean {
         val skill = runBlocking { runCatching { database.skillManagerDao().skillById(record.skillId) }.getOrNull() }
         val payload = runCatching { JSONObject(record.payloadJson) }.getOrNull() ?: return false
         val methodId = payload.optString("methodId").ifBlank { "mutated" }
@@ -548,7 +548,7 @@ object LearningEngine {
     }
 
     /** NEW_SKILL: install a full package (manifest + files) from the staging payload. */
-    private fun deployNewSkill(database: AegisDatabase, record: StagingRecord, now: Long): Boolean {
+    private fun deployNewSkill(database: NewaxDatabase, record: StagingRecord, now: Long): Boolean {
         val payload = runCatching { JSONObject(record.payloadJson) }.getOrNull() ?: return false
         val manifestJson = payload.optString("manifest").ifBlank { return false }
         val manifest = SkillManager.parseSkillManifest(manifestJson) ?: return false
@@ -581,7 +581,7 @@ object LearningEngine {
     }
 
     /** MEMORY_RULE: the staging approval IS the validation gate → promote straight to ACTIVE library. */
-    private fun deployMemoryRule(database: AegisDatabase, record: StagingRecord, now: Long): Boolean {
+    private fun deployMemoryRule(database: NewaxDatabase, record: StagingRecord, now: Long): Boolean {
         val payload = runCatching { JSONObject(record.payloadJson) }.getOrNull() ?: return false
         val content = payload.optString("content").ifBlank { return false }
         val category = payload.optString("category").ifBlank { "learned" }

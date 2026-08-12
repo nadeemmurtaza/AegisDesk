@@ -2,7 +2,7 @@ package com.newax.aegis.agents
 
 import android.content.Context
 import android.net.Uri
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.AgentEntity
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -42,7 +42,7 @@ object AgentRegistry {
     @Volatile
     private var appContext: Context? = null
 
-    /** Call once at app start (after AegisDatabase.init). */
+    /** Call once at app start (after NewaxDatabase.init). */
     fun init(context: Context) {
         if (appContext != null) return
         appContext = context.applicationContext
@@ -113,7 +113,7 @@ object AgentRegistry {
     )
 
     fun ensureSeeded() {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking {
             runCatching {
                 val dao = db.agentRegistryDao()
@@ -135,23 +135,23 @@ object AgentRegistry {
     // ── lifecycle ────────────────────────────────────────────────────────────
 
     fun agents(): List<AgentEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.agentRegistryDao().all() }.getOrDefault(emptyList()) }
     }
 
     fun enabledAgents(): List<AgentEntity> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.agentRegistryDao().enabled() }.getOrDefault(emptyList()) }
     }
 
     fun setEnabled(agentId: String, on: Boolean) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking { runCatching { db.agentRegistryDao().setEnabled(agentId, on) } }
     }
 
     /** Only imported agents can be uninstalled; built-ins are disabled instead. */
     fun uninstall(agentId: String): Boolean {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return false
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return false
         val agent = runBlocking { runCatching { db.agentRegistryDao().byId(agentId) }.getOrNull() } ?: return false
         if (agent.source == SOURCE_BUILTIN) return false
         val removed = runBlocking { runCatching { db.agentRegistryDao().delete(agentId) }.getOrDefault(0) } > 0
@@ -170,7 +170,7 @@ object AgentRegistry {
         val context = context()
         val manifestAndFiles = extractZip(context, uri) ?: return "Import failed — not a valid agent zip (needs agent.json)"
         val (manifest, packageDir) = manifestAndFiles
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return "Import failed — database not ready"
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return "Import failed — database not ready"
 
         val existing = runBlocking { runCatching { db.agentRegistryDao().byId(manifest.id) }.getOrNull() }
         val upgraded = existing != null && compareVersions(manifest.version, existing.version) > 0

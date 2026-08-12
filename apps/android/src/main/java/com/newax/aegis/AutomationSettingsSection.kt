@@ -101,7 +101,7 @@ fun AutomationSettingsSection(vm: MainViewModel) {
             override fun onAuthenticationFailed() {}
         }).authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Aegis Automation Security")
+                .setTitle("Newax Automation Security")
                 .setSubtitle("Verify identity to change automation settings")
                 .setNegativeButtonText("Cancel")
                 .build()
@@ -268,7 +268,7 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                         )
                     }
                     Spacer(Modifier.height(14.dp))
-                    Text("Account: Aegis:AegisDevice", fontSize = 11.sp, color = TextTer)
+                    Text("Account: Newax:NewaxDevice", fontSize = 11.sp, color = TextTer)
                     Spacer(Modifier.height(14.dp))
                     OutlinedTextField(
                         value = setupCode,

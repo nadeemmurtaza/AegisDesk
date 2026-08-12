@@ -1,5 +1,5 @@
 /**
- * Entry point for the Aegis macOS body — the macOS member of the 4-device mesh
+ * Entry point for the Newax macOS body — the macOS member of the 4-device mesh
  * (docs/SYNC_DESIGN.md §2, Track M).
  *
  * Default mode: opens a Compose Desktop window with the sync surface — the
@@ -41,7 +41,7 @@ private fun windowMain() {
     application {
         Window(
             onCloseRequest = ::exitApplication,
-            title = "Aegis — macOS · Device Sync",
+            title = "Newax Aegis — macOS · Device Sync",
             state = rememberWindowState(size = DpSize(980.dp, 720.dp)),
         ) {
             SyncScreen()
@@ -53,18 +53,19 @@ private fun windowMain() {
 private suspend fun cliMain() {
     DesktopSync.start("macOS " + System.getProperty("os.name"))
     println()
-    println("  Aegis macOS — device sync shell")
-    println("  commands: sync | sync code | sync pair <code> | sync unpair <id> |")
-    println("            sync peer <id> <host:port> | sync memory | exit")
+    println("  Newax Aegis macOS — device sync shell")
+    println("  commands: newax sync | newax sync code | newax sync pair <code> | newax sync unpair <id> |")
+    println("            newax sync peer <id> <host:port> | newax sync memory | exit")
     println()
     while (true) {
         print("  > ")
         val line = readLine()?.trim() ?: break
         if (line.isBlank() || line.equals("exit", ignoreCase = true)) break
-        if (line.equals("sync", ignoreCase = true) || line.startsWith("sync ", ignoreCase = true)) {
-            printSyncCommand(if (line.length > 4) line.substring(4).trim() else "")
+        val cmd = if (line.startsWith("newax ", ignoreCase = true)) line.substring(6).trim() else line
+        if (cmd.equals("sync", ignoreCase = true) || cmd.startsWith("sync ", ignoreCase = true)) {
+            printSyncCommand(if (cmd.length > 4) cmd.substring(4).trim() else "")
         } else {
-            println("    unknown — try \"sync\" for status")
+            println("    unknown — try \"newax sync\" for status")
         }
     }
     DesktopSync.stop()
@@ -87,7 +88,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("pair ", ignoreCase = true) -> {
             val code = arg.substring(5).trim()
             if (code.isEmpty()) {
-                println("    usage: sync pair <their-code>")
+                println("    usage: newax sync pair <their-code>")
             } else {
                 val sas = DesktopSync.sasFor(DesktopSync.pairingCode(), code)
                 if (sas == null) {
@@ -112,7 +113,7 @@ private fun printSyncCommand(arg: String) {
         arg.startsWith("peer ", ignoreCase = true) -> {
             val parts = arg.substring(5).trim().split(Regex("\\s+"))
             if (parts.size != 2) {
-                println("    usage: sync peer <deviceId> <host:port>")
+                println("    usage: newax sync peer <deviceId> <host:port>")
             } else {
                 DesktopSync.setPeerAddress(parts[0], parts[1])
                 println("    ✓ direct address stored for ${parts[0]}")
@@ -129,7 +130,7 @@ private fun printSyncCommand(arg: String) {
                 }
             }
         }
-        else -> println("    commands: (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory")
+        else -> println("    commands: newax sync (empty|status), code, pair <code>, unpair <id>, peer <id> <host:port>, memory")
     }
     println()
 }

@@ -1,6 +1,6 @@
 package com.newax.aegis.engine.learning
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -18,7 +18,7 @@ object ForgettingEngine {
         val durationMs: Long
     )
 
-    suspend fun run(db: AegisDatabase): ForgettingResult = withContext(Dispatchers.IO) {
+    suspend fun run(db: NewaxDatabase): ForgettingResult = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         val dao = db.memoryRecordDao()
         val now = System.currentTimeMillis()

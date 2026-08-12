@@ -154,10 +154,10 @@ fun PolicyHistoryScreen(padding: PaddingValues, onOpenActionClass: (String) -> U
         if (uri != null) {
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "text/csv"
-                putExtra(Intent.EXTRA_SUBJECT, "Aegis policy audit CSV")
+                putExtra(Intent.EXTRA_SUBJECT, "Newax policy audit CSV")
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                clipData = ClipData.newRawUri("Aegis policy audit CSV", uri)
+                clipData = ClipData.newRawUri("Newax policy audit CSV", uri)
             }
             context.startActivity(Intent.createChooser(send, "Share policy export CSV"))
         }
@@ -336,7 +336,7 @@ fun PolicyHistoryScreen(padding: PaddingValues, onOpenActionClass: (String) -> U
                         Spacer(Modifier.height(14.dp))
                         Text("No policy decisions yet", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextSec)
                         Spacer(Modifier.height(4.dp))
-                        Text("Decisions appear here when Aegis evaluates an action", fontSize = 13.sp, color = TextTer)
+                        Text("Decisions appear here when Newax evaluates an action", fontSize = 13.sp, color = TextTer)
                     }
                 }
             }

@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.dev.profiler
 
 import android.os.Debug
-import com.newax.aegis.engine.dev.log.AegisLogger
+import com.newax.aegis.engine.dev.log.NewaxLogger
 import java.io.File
 
 data class HeapSnapshot(
@@ -37,7 +37,7 @@ object HeapProfiler {
             val file = File(outputPath)
             file.parentFile?.mkdirs()
             Debug.dumpHprofData(file.absolutePath)
-            AegisLogger.i("HeapProfiler", "HPROF dumped to $outputPath")
+            NewaxLogger.i("HeapProfiler", "HPROF dumped to $outputPath")
             "OK:${file.absolutePath} size=${file.length() / 1024}KB"
         } catch (e: Exception) {
             "ERROR:${e.message}"
@@ -50,7 +50,7 @@ object HeapProfiler {
             Debug.startMethodTracing(outputPath, bufferSizeMb * 1024 * 1024)
             traceActive = true
             traceFile = outputPath
-            AegisLogger.i("HeapProfiler", "Method tracing started: $outputPath")
+            NewaxLogger.i("HeapProfiler", "Method tracing started: $outputPath")
             "OK:tracing_started path=$outputPath"
         } catch (e: Exception) {
             "ERROR:${e.message}"
@@ -64,7 +64,7 @@ object HeapProfiler {
             traceActive = false
             val path = traceFile ?: "?"
             traceFile = null
-            AegisLogger.i("HeapProfiler", "Method tracing stopped: $path")
+            NewaxLogger.i("HeapProfiler", "Method tracing stopped: $path")
             "OK:trace_saved path=$path"
         } catch (e: Exception) {
             "ERROR:${e.message}"

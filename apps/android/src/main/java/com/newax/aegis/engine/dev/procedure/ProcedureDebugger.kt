@@ -2,8 +2,8 @@ package com.newax.aegis.engine.dev.procedure
 
 import android.content.Context
 import android.view.accessibility.AccessibilityNodeInfo
-import com.newax.aegis.accessibility.AegisAccessibilityService
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.accessibility.NewaxAccessibilityService
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.grounding.ScreenGrounder
 import com.newax.aegis.engine.procedure.ProcedureExecutor
 import com.newax.aegis.engine.procedure.ProcedureStep
@@ -51,7 +51,7 @@ object ProcedureDebugger {
         context: Context,
         execute: Boolean = false
     ): StepDebugResult {
-        val svc = AegisAccessibilityService.instance
+        val svc = NewaxAccessibilityService.instance
         val root = svc?.getRootNode()
         val hashBefore = root?.let { hashTree(it) } ?: ""
         val start = System.currentTimeMillis()
@@ -99,7 +99,7 @@ object ProcedureDebugger {
         steps: List<ProcedureStep>,
         context: Context,
         execute: Boolean = false,
-        db: AegisDatabase? = null,
+        db: NewaxDatabase? = null,
         procedureId: Long? = null
     ): ProcedureDebugSession {
         val start = System.currentTimeMillis()
@@ -126,7 +126,7 @@ object ProcedureDebugger {
     }
 
     fun inspectCurrentScreen(): List<GroundingCandidate> {
-        val root = AegisAccessibilityService.instance?.getRootNode() ?: return emptyList()
+        val root = NewaxAccessibilityService.instance?.getRootNode() ?: return emptyList()
         return collectAllNodes(root).map { node ->
             GroundingCandidate(
                 text = node.text?.toString() ?: "",
@@ -141,7 +141,7 @@ object ProcedureDebugger {
     }
 
     fun groundTarget(target: String): List<GroundingCandidate> {
-        val root = AegisAccessibilityService.instance?.getRootNode() ?: return emptyList()
+        val root = NewaxAccessibilityService.instance?.getRootNode() ?: return emptyList()
         return findCandidates(root, target)
     }
 

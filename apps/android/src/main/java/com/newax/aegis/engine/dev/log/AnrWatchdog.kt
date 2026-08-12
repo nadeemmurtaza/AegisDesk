@@ -28,7 +28,7 @@ object AnrWatchdog {
                 if (ticker.get() == before) {
                     val blockedMs = timeoutMs
                     CrashReporter.recordAnr("main", blockedMs)
-                    AegisLogger.e("AnrWatchdog", "ANR detected: main thread blocked for ${blockedMs}ms")
+                    NewaxLogger.e("AnrWatchdog", "ANR detected: main thread blocked for ${blockedMs}ms")
                 }
             }
         }, "AnrWatchdog").also { it.isDaemon = true }

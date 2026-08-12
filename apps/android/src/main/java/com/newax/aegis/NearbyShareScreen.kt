@@ -135,7 +135,7 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
 
     fun startNearby() {
         error = null
-        status = "Advertising + listening — other Aegis devices nearby will appear below"
+        status = "Advertising + listening — other Newax devices nearby will appear below"
         discovery.startAdvertising(ProximityProfile(discovery.deviceId, discovery.displayName))
         discovery.startScanning(object : ProximityListener {
             override fun onPeerFound(endpoint: ProximityEndpoint) {
@@ -313,7 +313,7 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                         .padding(18.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Turn on Nearby sharing to see Aegis devices around you.", fontSize = 13.sp, color = TextTer)
+                    Text("Turn on Nearby sharing to see Newax devices around you.", fontSize = 13.sp, color = TextTer)
                 }
             }
         } else if (nearby.isEmpty()) {

@@ -1,6 +1,6 @@
 package com.newax.aegis.agents
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.SkillApproval
 import com.newax.aegis.db.entity.SkillApprovalStatus
 import com.newax.aegis.db.entity.SkillEntity
@@ -59,7 +59,7 @@ object SkillGuard {
         requestContext: String = "",
         untrustedSource: Boolean = false
     ): Decision {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return Decision.Denied("database-unavailable")
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return Decision.Denied("database-unavailable")
 
         val skill = runBlocking { runCatching { db.skillManagerDao().skillById(skillId) }.getOrNull() }
             ?: return Decision.Denied("skill-not-found")
@@ -115,7 +115,7 @@ object SkillGuard {
 
     /** The human Allow/Deny decision on a paused request. */
     fun decideApproval(approvalId: String, allow: Boolean) {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return
         runBlocking {
             runCatching {
                 db.skillManagerDao().setApprovalStatus(
@@ -128,7 +128,7 @@ object SkillGuard {
     }
 
     fun pendingApprovals(): List<SkillApproval> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking {
             runCatching {
                 val dao = db.skillManagerDao()
@@ -139,7 +139,7 @@ object SkillGuard {
     }
 
     fun recentApprovals(limit: Int = 50): List<SkillApproval> {
-        val db = runCatching { AegisDatabase.get }.getOrNull() ?: return emptyList()
+        val db = runCatching { NewaxDatabase.get }.getOrNull() ?: return emptyList()
         return runBlocking { runCatching { db.skillManagerDao().recentApprovals(limit) }.getOrDefault(emptyList()) }
     }
 

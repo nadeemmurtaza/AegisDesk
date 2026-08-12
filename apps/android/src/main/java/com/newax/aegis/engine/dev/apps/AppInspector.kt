@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.HabitTracker
 import com.newax.aegis.engine.apps.AppCapability
 import com.newax.aegis.engine.apps.AppIntelligence
@@ -45,7 +45,7 @@ object AppInspector {
 
     private val versionCache = mutableMapOf<String, Pair<String, Long>>()
 
-    suspend fun listInstalled(context: Context, db: AegisDatabase, includeSystem: Boolean = false): List<InstalledApp> =
+    suspend fun listInstalled(context: Context, db: NewaxDatabase, includeSystem: Boolean = false): List<InstalledApp> =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
             val packages = pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)
@@ -76,7 +76,7 @@ object AppInspector {
                 .sortedByDescending { it.openCount }
         }
 
-    suspend fun inspect(packageName: String, context: Context, db: AegisDatabase): InstalledApp? =
+    suspend fun inspect(packageName: String, context: Context, db: NewaxDatabase): InstalledApp? =
         withContext(Dispatchers.IO) {
             val pm = context.packageManager
             val pkg = runCatching { pm.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS) }.getOrNull() ?: return@withContext null
@@ -120,7 +120,7 @@ object AppInspector {
         AppDeepLinks(packageName, schemes.toList(), hosts.toList(), activities)
     }
 
-    suspend fun learnedProcedures(packageName: String, db: AegisDatabase): List<Map<String, String>> =
+    suspend fun learnedProcedures(packageName: String, db: NewaxDatabase): List<Map<String, String>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val rawDb = db.openHelper.readableDatabase
@@ -158,7 +158,7 @@ object AppInspector {
         return changes
     }
 
-    suspend fun capabilitiesSummary(db: AegisDatabase): Map<String, List<String>> = withContext(Dispatchers.IO) {
+    suspend fun capabilitiesSummary(db: NewaxDatabase): Map<String, List<String>> = withContext(Dispatchers.IO) {
         val rawDb = db.openHelper.readableDatabase
         val result = mutableMapOf<String, MutableList<String>>()
         runCatching {

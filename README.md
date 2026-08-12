@@ -1,4 +1,4 @@
-# Aegis v0.4 — offline-first Android personal assistant
+# Newax Aegis — offline-first Android personal assistant
 
 A native Kotlin/Jetpack Compose MVP that can read the current accessibility tree, propose UI actions, require approval, and then tap/type/send on the user's behalf.
 
@@ -24,7 +24,7 @@ A native Kotlin/Jetpack Compose MVP that can read the current accessibility tree
 1. Open this folder in Android Studio (JDK 17).
 2. Let Android Studio install SDK 35 and sync Gradle.
 3. Run on a physical Android 8+ device.
-4. In Aegis, tap **Screen access**, enable Aegis, and return to the app.
+4. In Newax Aegis, tap **Screen access**, enable Newax Aegis, and return to the app.
 5. Optionally tap **Inbox** and grant notification access.
 6. Tap **Import model** and select an official Gemma `.litertlm` bundle already downloaded to the phone.
 7. Wait for **Offline AI ready**, then chat naturally or try `open WhatsApp then tap Search then type Ali`.
@@ -44,7 +44,7 @@ On non-Windows hosts the Win32-backed capabilities report `NOT_SUPPORTED` instea
 
 ## Honest capability boundary
 
-“Offline AI chat” requires separately licensed model weights that are too large to bundle in the APK. Aegis now includes the LiteRT-LM runtime and importer; the user selects the downloaded `.litertlm` bundle once, it is verified and copied into private storage, and subsequent natural-language chat runs through the on-device model. Deterministic commands remain available if initialization fails.
+“Offline AI chat” requires separately licensed model weights that are too large to bundle in the APK. Newax Aegis now includes the LiteRT-LM runtime and importer; the user selects the downloaded `.litertlm` bundle once, it is verified and copied into private storage, and subsequent natural-language chat runs through the on-device model. Deterministic commands remain available if initialization fails.
 
 For this build, use the conservative settings in `MODEL_SETUP_S21.md`. The current Google-recommended production direction is LiteRT-LM; the older MediaPipe LLM API is compatibility-only. Model weights remain a separate user import because of size and model-license acceptance.
 

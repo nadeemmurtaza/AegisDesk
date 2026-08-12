@@ -86,9 +86,9 @@ object TotpManager {
     }
 
     /** Returns the otpauth URI for Google Authenticator enrollment. */
-    fun otpauthUri(accountName: String = "AegisDevice"): String {
+    fun otpauthUri(accountName: String = "NewaxDevice"): String {
         val secret = prefs?.getString(KEY_SECRET, null) ?: return ""
-        return "otpauth://totp/Aegis:$accountName?secret=$secret&issuer=Aegis&algorithm=SHA1&digits=$DIGITS&period=$TIME_STEP"
+        return "otpauth://totp/Newax:$accountName?secret=$secret&issuer=Newax&algorithm=SHA1&digits=$DIGITS&period=$TIME_STEP"
     }
 
     /** Generates a QR code Bitmap from the current otpauth URI. Null if not enrolled. */

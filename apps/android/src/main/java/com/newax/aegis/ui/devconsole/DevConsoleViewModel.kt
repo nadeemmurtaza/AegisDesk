@@ -7,7 +7,7 @@ import android.content.Context
 import android.database.Cursor
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.FileObject
 import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.engine.dev.DevLogger
@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
 
 class DevConsoleViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val db     = AegisDatabase.get
+    private val db     = NewaxDatabase.get
     private val memory = EncryptedMemory(app)
     private var poller: Job? = null
 

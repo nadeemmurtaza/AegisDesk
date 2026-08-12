@@ -1,8 +1,8 @@
 package com.newax.aegis.engine.intelligence
 
 import com.newax.aegis.assistant.ProposedAction
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import java.util.concurrent.ConcurrentHashMap
 
 data class SkillDefinition(
@@ -66,12 +66,12 @@ object SkillRegistry {
             val durationMs = System.currentTimeMillis() - startMs
             s.successes++
             s.totalMs += durationMs
-            AegisEventBus.emit(AegisEvent.SkillInvoked(id, true, durationMs))
+            NewaxEventBus.emit(NewaxEvent.SkillInvoked(id, true, durationMs))
             Result.success(result)
         } catch (e: Exception) {
             val durationMs = System.currentTimeMillis() - startMs
             s.totalMs += durationMs
-            AegisEventBus.emit(AegisEvent.SkillInvoked(id, false, durationMs))
+            NewaxEventBus.emit(NewaxEvent.SkillInvoked(id, false, durationMs))
             Result.failure(e)
         }
     }

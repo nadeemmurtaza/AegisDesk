@@ -10,7 +10,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.DbKeyManager
 import com.newax.aegis.db.migration.LegacyMigrationWorker
 import com.newax.aegis.memory.SecureKeyVault
@@ -31,7 +31,7 @@ import java.io.StringWriter
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
-class AegisApplication : Application() {
+class NewaxApplication : Application() {
 
     private val memoryPressureCallbacks = object : ComponentCallbacks2 {
         override fun onTrimMemory(level: Int) {
@@ -70,7 +70,7 @@ class AegisApplication : Application() {
         // until MainViewModel initializes AutomationSettings — the safe default.
         PolicyHolder.init(this)
         DbKeyManager.migrateFromMemoryIfNeeded(memory)
-        AegisDatabase.init(com.newax.aegis.db.getAegisDatabase(this, DbKeyManager.getOrCreate()))
+        NewaxDatabase.init(com.newax.aegis.db.getNewaxDatabase(this, DbKeyManager.getOrCreate()))
         // Multi-agent registry (docs/AGENTS_DESIGN.md): seeds the built-in
         // agents (coding/planning/research/organizer) so routing works out of
         // the box before any package import.
@@ -91,30 +91,30 @@ class AegisApplication : Application() {
         // Goals survive restarts (Track A5): every planner mutation persists a JSON
         // snapshot to the existing kv_store table (no schema change), and restore
         // rehydrates the planner before any screen or executor reads it.
-        val goalStore = DbGoalSnapshotStore(AegisDatabase.get.kvStoreDao())
+        val goalStore = DbGoalSnapshotStore(NewaxDatabase.get.kvStoreDao())
         GoalPlanner.onChange = goalStore::save
         goalStore.restore()
         // Execution audit trail (Track A8): every goal run is recorded for the
         // Goals screen's "Recent runs" section; persisted to kv_store like goals.
-        ExecutionAuditHolder.init(AegisDatabase.get.kvStoreDao())
+        ExecutionAuditHolder.init(NewaxDatabase.get.kvStoreDao())
         // Policy-decision history (Track A2 follow-up): every evaluation across
         // sessions, persisted to kv_store like the execution audit. Records made
         // before the DB was ready are merged in by initAuditPersistence.
-        PolicyHolder.initAuditPersistence(AegisDatabase.get.kvStoreDao())
-        CoreTriggerEngine.start(this, AegisDatabase.get) { _, _ -> }
+        PolicyHolder.initAuditPersistence(NewaxDatabase.get.kvStoreDao())
+        CoreTriggerEngine.start(this, NewaxDatabase.get) { _, _ -> }
         // One-shot migration from legacy EncryptedSharedPreferences storage
-        if (runBlocking { AegisDatabase.get.kvStoreDao().get("migration_v1_done") } != "1") {
+        if (runBlocking { NewaxDatabase.get.kvStoreDao().get("migration_v1_done") } != "1") {
             LegacyMigrationWorker.schedule(this)
         }
         // Load USE model from disk if already downloaded; try to download if not
         EmbeddingEngine.init(this)
         if (!EmbeddingEngine.isReady()) {
             EmbeddingEngine.downloadModelIfNeeded(this) { success ->
-                if (success && EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
+                if (success && EmbeddingIndexWorker.isNeeded(NewaxDatabase.get)) {
                     EmbeddingIndexWorker.schedule(this)
                 }
             }
-        } else if (EmbeddingIndexWorker.isNeeded(AegisDatabase.get)) {
+        } else if (EmbeddingIndexWorker.isNeeded(NewaxDatabase.get)) {
             EmbeddingIndexWorker.schedule(this)
         }
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->

@@ -24,7 +24,7 @@ import androidx.work.WorkerParameters
  */
 class ContactScannerWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
-        Log.i("AegisScanner", "Nightly contact scan started")
+        Log.i("NewaxScanner", "Nightly contact scan started")
         return try {
             val projection = arrayOf(
                 ContactsContract.Contacts._ID,
@@ -55,13 +55,13 @@ class ContactScannerWorker(appContext: Context, workerParams: WorkerParameters) 
             // A count, not a list: contact names are user data and there is no reason to
             // push them through the model to produce a summary.
             Log.i(
-                "AegisScanner",
+                "NewaxScanner",
                 "Contact scan: $total contacts, $duplicateGroups duplicate name group(s), $noPhone without a number"
             )
             ContactHygiene.publish(ContactHygiene.Report(total, duplicateGroups, noPhone))
             Result.success()
         } catch (e: Exception) {
-            Log.w("AegisScanner", "Contact scan failed: ${e.javaClass.simpleName}")
+            Log.w("NewaxScanner", "Contact scan failed: ${e.javaClass.simpleName}")
             Result.retry()
         }
     }

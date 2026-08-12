@@ -162,7 +162,7 @@ object FileIntelligence {
 
     fun findBestIndexed(
         context: Context,
-        db: com.newax.aegis.db.AegisDatabase,
+        db: com.newax.aegis.db.NewaxDatabase,
         query: String,
         limit: Int = 8
     ): List<FileRecord> {
@@ -182,7 +182,7 @@ object FileIntelligence {
 
     fun recentIndexed(
         context: Context,
-        db: com.newax.aegis.db.AegisDatabase,
+        db: com.newax.aegis.db.NewaxDatabase,
         limit: Int = 20
     ): List<FileRecord> {
         val dbResults = runBlocking { db.fileDao().recentUniqueFiles(limit) }

@@ -3,8 +3,8 @@ package com.newax.aegis.engine.procedure
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import com.newax.aegis.accessibility.AegisAccessibilityService
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.accessibility.NewaxAccessibilityService
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.grounding.ScreenGrounder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -27,10 +27,10 @@ object ProcedureExecutor {
     suspend fun execute(
         steps: List<ProcedureStep>,
         context: Context,
-        db: AegisDatabase? = null,
+        db: NewaxDatabase? = null,
         procedureId: Long? = null
     ): ExecutionResult {
-        val svc = AegisAccessibilityService.instance
+        val svc = NewaxAccessibilityService.instance
             ?: return ExecutionResult(false, 0, steps.size, 0, "Accessibility service not running")
 
         var completed = 0
@@ -76,13 +76,13 @@ object ProcedureExecutor {
     suspend fun executeFromJson(
         stepsJson: String,
         context: Context,
-        db: AegisDatabase? = null,
+        db: NewaxDatabase? = null,
         procedureId: Long? = null
     ): ExecutionResult = execute(StepSerializer.deserialize(stepsJson), context, db, procedureId)
 
     // ── Step execution ────────────────────────────────────────────────────────
 
-    private suspend fun executeStep(step: ProcedureStep, svc: AegisAccessibilityService, context: Context): Boolean {
+    private suspend fun executeStep(step: ProcedureStep, svc: NewaxAccessibilityService, context: Context): Boolean {
         return when (step) {
 
             is ProcedureStep.Tap -> {
@@ -207,14 +207,14 @@ object ProcedureExecutor {
 
     // ── Pre/Post condition check ──────────────────────────────────────────────
 
-    private fun checkCondition(target: String, svc: AegisAccessibilityService): Boolean {
+    private fun checkCondition(target: String, svc: NewaxAccessibilityService): Boolean {
         val root = svc.getRootNode() ?: return false
         val grounded = ScreenGrounder.findTarget(root, target)
         if (grounded != null && grounded.confidence >= 0.4f) return true
         return root.findAccessibilityNodeInfosByText(target)?.isNotEmpty() == true
     }
 
-    private suspend fun tryRepair(step: ProcedureStep, svc: AegisAccessibilityService, context: Context): Boolean {
+    private suspend fun tryRepair(step: ProcedureStep, svc: NewaxAccessibilityService, context: Context): Boolean {
         if (step !is ProcedureStep.Tap) return false
         val root = svc.getRootNode() ?: return false
         val words = step.target.split(Regex("\\W+")).filter { it.length > 1 }
@@ -227,7 +227,7 @@ object ProcedureExecutor {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private suspend fun waitSettle(svc: AegisAccessibilityService) {
+    private suspend fun waitSettle(svc: NewaxAccessibilityService) {
         var prev = ""
         var stableFor = 0L
         val deadline = System.currentTimeMillis() + STEP_TIMEOUT_MS
@@ -244,7 +244,7 @@ object ProcedureExecutor {
         }
     }
 
-    private suspend fun tryDismissBlockingDialog(svc: AegisAccessibilityService) {
+    private suspend fun tryDismissBlockingDialog(svc: NewaxAccessibilityService) {
         val root = svc.getRootNode() ?: return
         val dialogs = listOf("Allow", "OK", "Continue", "Skip", "Dismiss", "Accept", "Got it")
         for (label in dialogs) {

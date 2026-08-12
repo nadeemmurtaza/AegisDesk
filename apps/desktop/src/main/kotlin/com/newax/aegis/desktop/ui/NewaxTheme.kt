@@ -36,6 +36,6 @@ private val AppColorScheme = lightColorScheme(
 
 /** The desktop app theme — REFINED_THEME.md tokens wired into Material 3. */
 @Composable
-fun AegisTheme(content: @Composable () -> Unit) {
+fun NewaxTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = AppColorScheme, content = content)
 }

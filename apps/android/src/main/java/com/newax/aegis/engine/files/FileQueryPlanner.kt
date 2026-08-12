@@ -2,7 +2,7 @@ package com.newax.aegis.engine.files
 
 import android.content.Context
 import kotlinx.coroutines.runBlocking
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.FileObject
 import com.newax.aegis.engine.person.PersonRegistry
 import java.util.Calendar
@@ -167,7 +167,7 @@ object FileQueryPlanner {
         )
     }
 
-    fun execute(q: FileQuery, db: AegisDatabase, context: Context, limit: Int = 10): List<FileObject> {
+    fun execute(q: FileQuery, db: NewaxDatabase, context: Context, limit: Int = 10): List<FileObject> {
         val results = mutableListOf<FileObject>()
         val seen = mutableSetOf<Long>()
 
@@ -219,7 +219,7 @@ object FileQueryPlanner {
 
     /** Combined query: "Send Ali the latest NEWAX invoice" */
     fun executeFileTask(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         context: Context,
         fileQuery: String,
         fromPerson: String? = null,

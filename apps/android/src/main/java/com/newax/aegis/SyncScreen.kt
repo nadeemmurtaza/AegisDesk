@@ -279,7 +279,7 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                     OutlinedButton(
                         onClick = {
                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            cm.setPrimaryClip(ClipData.newPlainText("Aegis pairing code", pairingCode))
+                            cm.setPrimaryClip(ClipData.newPlainText("Newax pairing code", pairingCode))
                             pairMessage = "Pairing code copied"
                         },
                         modifier = Modifier.fillMaxWidth(),

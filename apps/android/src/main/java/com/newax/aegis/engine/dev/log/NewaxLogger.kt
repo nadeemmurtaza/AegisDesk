@@ -17,7 +17,7 @@ data class LogEntry(
     val threadName: String
 )
 
-object AegisLogger {
+object NewaxLogger {
 
     private const val RING_SIZE = 2000
     private val counter = AtomicLong(0)

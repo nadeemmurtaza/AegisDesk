@@ -15,7 +15,7 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
 /**
- * Builds, encrypts, exports, imports, and restores Aegis backups.
+ * Builds, encrypts, exports, imports, and restores Newax backups.
  *
  * Backup flow:
  *   memory + settings → JSON → GZIP → AES-256-GCM (password) → .aeb file
@@ -23,7 +23,7 @@ import java.util.zip.GZIPOutputStream
  * Restore flow:
  *   .aeb file → AES-256-GCM decrypt → GUNZIP → JSON → restore each store
  *
- * File extension: .aeb (Aegis Encrypted Backup)
+ * File extension: .aeb (Newax Encrypted Backup)
  * No data touches disk in plaintext — the encrypted blob is the only output.
  */
 object BackupManager {

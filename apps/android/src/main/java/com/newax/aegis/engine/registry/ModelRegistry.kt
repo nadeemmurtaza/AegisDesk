@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.registry
 
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import com.newax.aegis.engine.state.ModelState
 import com.newax.aegis.engine.state.StateMachines
 import java.util.concurrent.ConcurrentHashMap
@@ -46,8 +46,8 @@ object ModelRegistry {
         stats[model.id] = ModelStats(model.id)
         stateMachines[model.id] = StateMachines.model { from, to ->
             when (to) {
-                ModelState.READY -> AegisEventBus.emit(AegisEvent.ModelLoaded(model.id, model.sizeBytes))
-                ModelState.UNLOADED -> AegisEventBus.emit(AegisEvent.ModelUnloaded(model.id))
+                ModelState.READY -> NewaxEventBus.emit(NewaxEvent.ModelLoaded(model.id, model.sizeBytes))
+                ModelState.UNLOADED -> NewaxEventBus.emit(NewaxEvent.ModelUnloaded(model.id))
                 else -> Unit
             }
         }

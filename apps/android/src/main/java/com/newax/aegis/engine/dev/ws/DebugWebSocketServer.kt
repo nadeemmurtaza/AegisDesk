@@ -1,9 +1,9 @@
 package com.newax.aegis.engine.dev.ws
 
 import android.content.Context
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.dev.db.DatabaseInspector
-import com.newax.aegis.engine.dev.log.AegisLogger
+import com.newax.aegis.engine.dev.log.NewaxLogger
 import com.newax.aegis.engine.dev.profiler.ResourceProfiler
 import com.newax.aegis.engine.dev.trace.DecisionInspector
 import com.newax.aegis.engine.metrics.MetricsEngine
@@ -25,16 +25,16 @@ object DebugWebSocketServer {
     private var serverSocket: ServerSocket? = null
     private val scope = CoroutineScope(Dispatchers.IO)
     private var appContext: Context? = null
-    private var database: AegisDatabase? = null
+    private var database: NewaxDatabase? = null
 
-    fun start(context: Context, db: AegisDatabase, port: Int = DEFAULT_PORT) {
+    fun start(context: Context, db: NewaxDatabase, port: Int = DEFAULT_PORT) {
         if (running.getAndSet(true)) return
         appContext = context.applicationContext
         database = db
         scope.launch {
             try {
                 serverSocket = ServerSocket(port)
-                AegisLogger.i("DebugServer", "HTTP debug server started on port $port")
+                NewaxLogger.i("DebugServer", "HTTP debug server started on port $port")
                 while (running.get()) {
                     try {
                         val client = serverSocket?.accept() ?: break
@@ -42,7 +42,7 @@ object DebugWebSocketServer {
                     } catch (_: Exception) { if (!running.get()) break }
                 }
             } catch (e: Exception) {
-                AegisLogger.e("DebugServer", "Server error: ${e.message}")
+                NewaxLogger.e("DebugServer", "Server error: ${e.message}")
             }
         }
     }
@@ -72,9 +72,9 @@ object DebugWebSocketServer {
             val path = parts.getOrElse(1) { "/" }
 
             val body = when {
-                path == "/" || path == "/ping" -> json("status", "ok", "server", "AegisDebug/1.0")
+                path == "/" || path == "/ping" -> json("status", "ok", "server", "NewaxDebug/1.0")
                 path == "/metrics" -> MetricsEngine.summary().let { json("metrics", it) }
-                path == "/logs" -> jsonArray("logs", AegisLogger.recent(50).map { e -> "${e.level.name} [${e.tag}] ${e.message}" })
+                path == "/logs" -> jsonArray("logs", NewaxLogger.recent(50).map { e -> "${e.level.name} [${e.tag}] ${e.message}" })
                 path == "/traces" -> jsonArray("traces", DecisionInspector.recent(10).map { t -> "${t.id}: ${t.queryText.take(40)} ok=${t.success}" })
                 path.startsWith("/query") -> handleQuery(path)
                 path == "/db/stats" -> handleDbStats()
@@ -91,7 +91,7 @@ object DebugWebSocketServer {
             writer.println(body)
             writer.flush()
         } catch (e: Exception) {
-            AegisLogger.w("DebugServer", "Client error: ${e.message}")
+            NewaxLogger.w("DebugServer", "Client error: ${e.message}")
         } finally {
             client.close()
         }

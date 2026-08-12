@@ -3,7 +3,7 @@ package com.newax.aegis.engine.dev.jobs
 import android.app.job.JobInfo
 import android.app.job.JobScheduler
 import android.content.Context
-import com.newax.aegis.engine.dev.log.AegisLogger
+import com.newax.aegis.engine.dev.log.NewaxLogger
 import java.util.concurrent.CopyOnWriteArrayList
 
 data class ScheduledJobInfo(
@@ -31,7 +31,7 @@ data class WorkManagerJobInfo(
     val progress: String
 )
 
-data class AegisJobRecord(
+data class NewaxJobRecord(
     val label: String,
     val resourceClass: String,
     val priority: String,
@@ -43,7 +43,7 @@ data class AegisJobRecord(
 
 object JobInspector {
 
-    private val jobHistory = CopyOnWriteArrayList<AegisJobRecord>()
+    private val jobHistory = CopyOnWriteArrayList<NewaxJobRecord>()
     private const val MAX_HISTORY = 200
 
     fun scheduledJobs(context: Context): List<ScheduledJobInfo> {
@@ -84,7 +84,7 @@ object JobInspector {
 
     fun recordJobStart(label: String, resourceClass: String, priority: String): String {
         val id = "${label}_${System.currentTimeMillis()}"
-        jobHistory.add(AegisJobRecord(label, resourceClass, priority, System.currentTimeMillis(), null, null, 0L))
+        jobHistory.add(NewaxJobRecord(label, resourceClass, priority, System.currentTimeMillis(), null, null, 0L))
         if (jobHistory.size > MAX_HISTORY) jobHistory.removeAt(0)
         return id
     }
@@ -96,15 +96,15 @@ object JobInspector {
         jobHistory[idx] = job.copy(endMs = System.currentTimeMillis(), success = success, durationMs = System.currentTimeMillis() - job.startMs)
     }
 
-    fun recentJobs(n: Int = 50): List<AegisJobRecord> = jobHistory.takeLast(n)
-    fun failedJobs(): List<AegisJobRecord> = jobHistory.filter { it.success == false }
-    fun runningJobs(): List<AegisJobRecord> = jobHistory.filter { it.endMs == null }
+    fun recentJobs(n: Int = 50): List<NewaxJobRecord> = jobHistory.takeLast(n)
+    fun failedJobs(): List<NewaxJobRecord> = jobHistory.filter { it.success == false }
+    fun runningJobs(): List<NewaxJobRecord> = jobHistory.filter { it.endMs == null }
 
     fun report(context: Context): String = buildString {
         val scheduled = scheduledJobs(context)
         append("JobScheduler: ${scheduled.size} pending jobs\n")
         scheduled.forEach { j -> append("  [${j.jobId}] ${j.service.substringAfterLast('.')} periodic=${j.isPeriodic}\n") }
-        append("Aegis job history: ${jobHistory.size} (${runningJobs().size} running, ${failedJobs().size} failed)\n")
+        append("Newax job history: ${jobHistory.size} (${runningJobs().size} running, ${failedJobs().size} failed)\n")
         val wm = workManagerJobs(context)
         if (wm.isNotEmpty()) {
             append("WorkManager: ${wm.size} jobs\n")

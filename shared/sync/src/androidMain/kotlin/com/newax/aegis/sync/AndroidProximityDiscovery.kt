@@ -39,7 +39,7 @@ class AndroidProximityDiscovery(
     private val p2p = P2pProximityChannel(context)
     private val identity: StoredIdentity by lazy {
         platformKeyStore().loadIdentity()?.let { return@lazy it }
-        val created = Identity.generate(crypto, "Aegis " + android.os.Build.MODEL)
+        val created = Identity.generate(crypto, "Newax " + android.os.Build.MODEL)
         platformKeyStore().saveIdentity(created)
         created
     }

@@ -1,7 +1,7 @@
 package com.newax.aegis.engine.manager
 
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import com.newax.aegis.engine.intelligence.SkillRegistry
 import com.newax.aegis.engine.registry.WorkflowDefinition
 import com.newax.aegis.engine.registry.WorkflowRegistry
@@ -29,7 +29,7 @@ object WorkflowManager {
         initialInputs: Map<String, Any> = emptyMap()
     ): Result<Map<String, Any>> {
         val run = WorkflowRegistry.startRun(workflow.id)
-        AegisEventBus.emit(AegisEvent.WorkflowStarted(run.id, workflow.name))
+        NewaxEventBus.emit(NewaxEvent.WorkflowStarted(run.id, workflow.name))
 
         val context = initialInputs.toMutableMap()
         var currentRun = run
@@ -54,7 +54,7 @@ object WorkflowManager {
                     copy(status = "failed", completedMs = System.currentTimeMillis(),
                         error = "Step '${step.name}' failed: ${result.exceptionOrNull()?.message}")
                 }
-                AegisEventBus.emit(AegisEvent.WorkflowCompleted(run.id, false))
+                NewaxEventBus.emit(NewaxEvent.WorkflowCompleted(run.id, false))
                 return Result.failure(result.exceptionOrNull() ?: RuntimeException("Step ${step.name} failed"))
             }
 
@@ -69,7 +69,7 @@ object WorkflowManager {
             copy(status = "completed", completedMs = System.currentTimeMillis(),
                 stepResults = context.mapValues { (_, v) -> v })
         }
-        AegisEventBus.emit(AegisEvent.WorkflowCompleted(run.id, true))
+        NewaxEventBus.emit(NewaxEvent.WorkflowCompleted(run.id, true))
         return Result.success(context)
     }
 

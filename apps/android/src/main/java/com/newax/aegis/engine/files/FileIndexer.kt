@@ -7,7 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.runBlocking
 import android.provider.MediaStore
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.FileEntityLink
 import com.newax.aegis.db.entity.FileObject
 import com.newax.aegis.db.entity.FileTextContent
@@ -25,15 +25,15 @@ object FileIndexer {
 
     // ── MediaStore scan ───────────────────────────────────────────────────────
 
-    fun scanAll(context: Context, db: AegisDatabase) {
+    fun scanAll(context: Context, db: NewaxDatabase) {
         scanMediaStore(context, db, sinceMs = 0)
     }
 
-    fun scanDelta(context: Context, db: AegisDatabase, sinceMs: Long) {
+    fun scanDelta(context: Context, db: NewaxDatabase, sinceMs: Long) {
         scanMediaStore(context, db, sinceMs)
     }
 
-    private fun scanMediaStore(context: Context, db: AegisDatabase, sinceMs: Long) = runBlocking {
+    private fun scanMediaStore(context: Context, db: NewaxDatabase, sinceMs: Long) = runBlocking {
         val projection = arrayOf(
             MediaStore.Files.FileColumns._ID,
             MediaStore.Files.FileColumns.DISPLAY_NAME,
@@ -107,7 +107,7 @@ object FileIndexer {
 
     // ── Content Observer for live updates ────────────────────────────────────
 
-    fun startWatching(context: Context, db: AegisDatabase) {
+    fun startWatching(context: Context, db: NewaxDatabase) {
         val handler = Handler(Looper.getMainLooper())
         val observer = object : ContentObserver(handler) {
             override fun onChange(selfChange: Boolean) {
@@ -125,7 +125,7 @@ object FileIndexer {
     // ── Indexing pipeline stages ──────────────────────────────────────────────
 
     /** Stage 0: hash + dedup (immediate, lightweight) */
-    private fun scheduleHashAndDedup(context: Context, db: AegisDatabase, fileId: Long, path: String, mime: String) {
+    private fun scheduleHashAndDedup(context: Context, db: NewaxDatabase, fileId: Long, path: String, mime: String) {
         ResourceGovernor.fire("hash-$fileId", ResourceClass.LIGHT, JobPriority.P3_INDEXING) {
             val f = File(path)
             if (!f.exists() || f.length() > 200_000_000L) return@fire  // skip >200MB
@@ -146,7 +146,7 @@ object FileIndexer {
     }
 
     /** Stage 1: text extraction (idle, LIGHT) */
-    fun runTextExtraction(context: Context, db: AegisDatabase, limit: Int = 20) = runBlocking {
+    fun runTextExtraction(context: Context, db: NewaxDatabase, limit: Int = 20) = runBlocking {
         val files = db.fileDao().needsTextExtraction(limit)
         files.forEach { fo ->
             val f = File(fo.path)
@@ -164,7 +164,7 @@ object FileIndexer {
     }
 
     /** Stage 2: entity extraction (idle, LIGHT) */
-    fun runEntityExtraction(db: AegisDatabase, limit: Int = 20) = runBlocking {
+    fun runEntityExtraction(db: NewaxDatabase, limit: Int = 20) = runBlocking {
         val files = db.fileDao().needsEntityExtraction(limit)
         files.forEach { fo ->
             val text = db.fileDao().textContent(fo.id)?.text ?: fo.filename
@@ -180,7 +180,7 @@ object FileIndexer {
     }
 
     /** Stage 3: visual indexing — pHash + thumbnail (idle + charging) */
-    fun runVisualIndexing(context: Context, db: AegisDatabase, limit: Int = 20) = runBlocking {
+    fun runVisualIndexing(context: Context, db: NewaxDatabase, limit: Int = 20) = runBlocking {
         val files = db.fileDao().needsVisualIndex(limit)
         val thumbDir = File(context.cacheDir, THUMBNAIL_DIR_NAME).apply { mkdirs() }
         files.forEach { fo ->
@@ -195,7 +195,7 @@ object FileIndexer {
 
     // ── Graph integration ─────────────────────────────────────────────────────
 
-    private fun registerInGraph(db: AegisDatabase, fileId: Long, path: String, mime: String) = runBlocking {
+    private fun registerInGraph(db: NewaxDatabase, fileId: Long, path: String, mime: String) = runBlocking {
         val filename = File(path).name
         val nodeType = when {
             mime.startsWith("image/") -> GraphStore.EntityType.FILE
@@ -206,13 +206,13 @@ object FileIndexer {
         db.fileDao().setGraphEntityId(fileId, entityId)
     }
 
-    fun linkFileToEntity(db: AegisDatabase, fileId: Long, entityId: Long, predicate: String) = runBlocking {
+    fun linkFileToEntity(db: NewaxDatabase, fileId: Long, entityId: Long, predicate: String) = runBlocking {
         val fo = db.fileDao().byId(fileId) ?: return@runBlocking
         val fileEntityId = fo.graphEntityId ?: return@runBlocking
         GraphStore.saveEdge(db, "file:${File(fo.path).name}", predicate, entityId.toString(), "file_indexer")
     }
 
-    fun linkFileToEntityByName(db: AegisDatabase, fileId: Long, entityName: String, predicate: String) = runBlocking {
+    fun linkFileToEntityByName(db: NewaxDatabase, fileId: Long, entityName: String, predicate: String) = runBlocking {
         val fo = db.fileDao().byId(fileId) ?: return@runBlocking
         GraphStore.saveEdge(db, "file:${File(fo.path).name}", predicate, entityName, "file_indexer")
     }
@@ -261,7 +261,7 @@ object FileIndexer {
 
     // ── Opportunistic task registration ───────────────────────────────────────
 
-    fun registerOpportunisticTasks(context: Context, db: AegisDatabase) {
+    fun registerOpportunisticTasks(context: Context, db: NewaxDatabase) {
         com.newax.aegis.engine.resource.OpportunisticScheduler.register {
             runTextExtraction(context, db, 30)
         }

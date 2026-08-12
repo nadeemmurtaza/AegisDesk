@@ -21,7 +21,7 @@ class MigrationTest {
     @get:Rule
     val helper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
-        AegisDatabase::class.java,
+        NewaxDatabase::class.java,
         emptyList(),
         FrameworkSQLiteOpenHelperFactory()
     )
@@ -30,56 +30,56 @@ class MigrationTest {
     @Throws(IOException::class)
     fun migrate1To2() {
         helper.createDatabase(TEST_DB, 1).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 2, true, AegisDatabase.MIGRATION_1_2)
+        helper.runMigrationsAndValidate(TEST_DB, 2, true, NewaxDatabase.MIGRATION_1_2)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate2To3() {
         helper.createDatabase(TEST_DB, 2).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 3, true, AegisDatabase.MIGRATION_2_3)
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, NewaxDatabase.MIGRATION_2_3)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate3To4() {
         helper.createDatabase(TEST_DB, 3).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 4, true, AegisDatabase.MIGRATION_3_4)
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, NewaxDatabase.MIGRATION_3_4)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate4To5() {
         helper.createDatabase(TEST_DB, 4).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 5, true, AegisDatabase.MIGRATION_4_5)
+        helper.runMigrationsAndValidate(TEST_DB, 5, true, NewaxDatabase.MIGRATION_4_5)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate5To6() {
         helper.createDatabase(TEST_DB, 5).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 6, true, AegisDatabase.MIGRATION_5_6)
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, NewaxDatabase.MIGRATION_5_6)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate6To7() {
         helper.createDatabase(TEST_DB, 6).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 7, true, AegisDatabase.MIGRATION_6_7)
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, NewaxDatabase.MIGRATION_6_7)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate7To8() {
         helper.createDatabase(TEST_DB, 7).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 8, true, AegisDatabase.MIGRATION_7_8)
+        helper.runMigrationsAndValidate(TEST_DB, 8, true, NewaxDatabase.MIGRATION_7_8)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate8To9() {
         helper.createDatabase(TEST_DB, 8).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 9, true, AegisDatabase.MIGRATION_8_9)
+        helper.runMigrationsAndValidate(TEST_DB, 9, true, NewaxDatabase.MIGRATION_8_9)
     }
 
     @Test
@@ -89,7 +89,7 @@ class MigrationTest {
             execSQL("INSERT INTO file_objects (path, filename, extension, mimeType, sizeBytes, indexState) VALUES ('test.pdf', 'test.pdf', 'pdf', 'application/pdf', 1024, 0)")
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 10, true, AegisDatabase.MIGRATION_9_10)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 10, true, NewaxDatabase.MIGRATION_9_10)
         val cursor = db.query("SELECT contentUriString, mediaStoreId FROM file_objects WHERE path = 'test.pdf'")
         assert(cursor.moveToFirst())
         assert(cursor.getString(0) == "")
@@ -104,7 +104,7 @@ class MigrationTest {
             execSQL("INSERT INTO ui_procedures (packageName, versionRange, taskCapability, steps, confidence, successCount, failureCount, lastRunMs, needsValidation) VALUES ('com.test', '*', 'SEND_MESSAGE', '[]', 80, 0, 0, 0, 0)")
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 11, true, AegisDatabase.MIGRATION_10_11)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 11, true, NewaxDatabase.MIGRATION_10_11)
         val cursor = db.query("SELECT prerequisites, recoveryPaths, successConditions FROM ui_procedures WHERE packageName = 'com.test'")
         assert(cursor.moveToFirst())
         assert(cursor.getString(0) == "")
@@ -125,7 +125,7 @@ class MigrationTest {
             execSQL("INSERT INTO person_facts (personId, fact, category, confidence, source, timestampMs) VALUES (1, 'lives in Karachi', 'personal', 0.9, 'test', 0)")
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 12, true, AegisDatabase.MIGRATION_11_12)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 12, true, NewaxDatabase.MIGRATION_11_12)
         val cursor = db.query(
             "SELECT rowid FROM person_facts_fts WHERE person_facts_fts MATCH 'Karachi'"
         )
@@ -146,7 +146,7 @@ class MigrationTest {
             execSQL("INSERT INTO memory_records (type, content, category, subject, source, confidence, importance, createdAt, updatedAt) VALUES (1, 'sync substrate test', 'personal', 'Ayesha', 'test', 80, 50, 0, 0)")
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 13, true, AegisDatabase.MIGRATION_12_13)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 13, true, NewaxDatabase.MIGRATION_12_13)
 
         // Existing rows carry the pre-sync baseline defaults (never win a merge).
         // Column names are verbatim property names (Room convention — no snake_case).
@@ -184,42 +184,42 @@ class MigrationTest {
     @Throws(IOException::class)
     fun migrate13To14() {
         helper.createDatabase(TEST_DB, 13).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 14, true, AegisDatabase.MIGRATION_13_14)
+        helper.runMigrationsAndValidate(TEST_DB, 14, true, NewaxDatabase.MIGRATION_13_14)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate14To15() {
         helper.createDatabase(TEST_DB, 14).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 15, true, AegisDatabase.MIGRATION_14_15)
+        helper.runMigrationsAndValidate(TEST_DB, 15, true, NewaxDatabase.MIGRATION_14_15)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate15To16() {
         helper.createDatabase(TEST_DB, 15).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 16, true, AegisDatabase.MIGRATION_15_16)
+        helper.runMigrationsAndValidate(TEST_DB, 16, true, NewaxDatabase.MIGRATION_15_16)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate16To17() {
         helper.createDatabase(TEST_DB, 16).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 17, true, AegisDatabase.MIGRATION_16_17)
+        helper.runMigrationsAndValidate(TEST_DB, 17, true, NewaxDatabase.MIGRATION_16_17)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate17To18() {
         helper.createDatabase(TEST_DB, 17).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 18, true, AegisDatabase.MIGRATION_17_18)
+        helper.runMigrationsAndValidate(TEST_DB, 18, true, NewaxDatabase.MIGRATION_17_18)
     }
 
     @Test
     @Throws(IOException::class)
     fun migrate18To19() {
         helper.createDatabase(TEST_DB, 18).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 19, true, AegisDatabase.MIGRATION_18_19)
+        helper.runMigrationsAndValidate(TEST_DB, 19, true, NewaxDatabase.MIGRATION_18_19)
     }
 
     @Test
@@ -228,18 +228,18 @@ class MigrationTest {
         helper.createDatabase(TEST_DB, 1).apply { close() }
         helper.runMigrationsAndValidate(
             TEST_DB, 13, true,
-            AegisDatabase.MIGRATION_1_2,
-            AegisDatabase.MIGRATION_2_3,
-            AegisDatabase.MIGRATION_3_4,
-            AegisDatabase.MIGRATION_4_5,
-            AegisDatabase.MIGRATION_5_6,
-            AegisDatabase.MIGRATION_6_7,
-            AegisDatabase.MIGRATION_7_8,
-            AegisDatabase.MIGRATION_8_9,
-            AegisDatabase.MIGRATION_9_10,
-            AegisDatabase.MIGRATION_10_11,
-            AegisDatabase.MIGRATION_11_12,
-            AegisDatabase.MIGRATION_12_13
+            NewaxDatabase.MIGRATION_1_2,
+            NewaxDatabase.MIGRATION_2_3,
+            NewaxDatabase.MIGRATION_3_4,
+            NewaxDatabase.MIGRATION_4_5,
+            NewaxDatabase.MIGRATION_5_6,
+            NewaxDatabase.MIGRATION_6_7,
+            NewaxDatabase.MIGRATION_7_8,
+            NewaxDatabase.MIGRATION_8_9,
+            NewaxDatabase.MIGRATION_9_10,
+            NewaxDatabase.MIGRATION_10_11,
+            NewaxDatabase.MIGRATION_11_12,
+            NewaxDatabase.MIGRATION_12_13
         )
     }
 
@@ -249,24 +249,24 @@ class MigrationTest {
         helper.createDatabase(TEST_DB, 1).apply { close() }
         helper.runMigrationsAndValidate(
             TEST_DB, 19, true,
-            AegisDatabase.MIGRATION_1_2,
-            AegisDatabase.MIGRATION_2_3,
-            AegisDatabase.MIGRATION_3_4,
-            AegisDatabase.MIGRATION_4_5,
-            AegisDatabase.MIGRATION_5_6,
-            AegisDatabase.MIGRATION_6_7,
-            AegisDatabase.MIGRATION_7_8,
-            AegisDatabase.MIGRATION_8_9,
-            AegisDatabase.MIGRATION_9_10,
-            AegisDatabase.MIGRATION_10_11,
-            AegisDatabase.MIGRATION_11_12,
-            AegisDatabase.MIGRATION_12_13,
-            AegisDatabase.MIGRATION_13_14,
-            AegisDatabase.MIGRATION_14_15,
-            AegisDatabase.MIGRATION_15_16,
-            AegisDatabase.MIGRATION_16_17,
-            AegisDatabase.MIGRATION_17_18,
-            AegisDatabase.MIGRATION_18_19
+            NewaxDatabase.MIGRATION_1_2,
+            NewaxDatabase.MIGRATION_2_3,
+            NewaxDatabase.MIGRATION_3_4,
+            NewaxDatabase.MIGRATION_4_5,
+            NewaxDatabase.MIGRATION_5_6,
+            NewaxDatabase.MIGRATION_6_7,
+            NewaxDatabase.MIGRATION_7_8,
+            NewaxDatabase.MIGRATION_8_9,
+            NewaxDatabase.MIGRATION_9_10,
+            NewaxDatabase.MIGRATION_10_11,
+            NewaxDatabase.MIGRATION_11_12,
+            NewaxDatabase.MIGRATION_12_13,
+            NewaxDatabase.MIGRATION_13_14,
+            NewaxDatabase.MIGRATION_14_15,
+            NewaxDatabase.MIGRATION_15_16,
+            NewaxDatabase.MIGRATION_16_17,
+            NewaxDatabase.MIGRATION_17_18,
+            NewaxDatabase.MIGRATION_18_19
         )
     }
 
@@ -280,7 +280,7 @@ class MigrationTest {
     @Throws(IOException::class)
     fun syncDaosRoundTrip() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val db = Room.inMemoryDatabaseBuilder(context, AegisDatabase::class.java).build()
+        val db = Room.inMemoryDatabaseBuilder(context, NewaxDatabase::class.java).build()
         try {
             val journalDao = db.syncJournalDao()
             val vectorDao = db.syncVectorDao()
@@ -328,7 +328,7 @@ class MigrationTest {
     @Throws(IOException::class)
     fun validateCurrentSchema() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val db = Room.inMemoryDatabaseBuilder(context, AegisDatabase::class.java).build()
+        val db = Room.inMemoryDatabaseBuilder(context, NewaxDatabase::class.java).build()
         db.close()
     }
 }

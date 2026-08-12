@@ -1,6 +1,6 @@
-// AegisDesk — Freebuff preview server.
+// Newax Aegis — Freebuff preview server (repo: AegisDesk).
 //
-// Aegis is a native Android (Kotlin / Jetpack Compose) app: it cannot run in a
+// Newax Aegis is a native Android (Kotlin / Jetpack Compose) app: it cannot run in a
 // browser, and the Gradle build needs JDK 17 + the Android SDK (see the GitHub
 // Actions workflow). This tiny dependency-free Node server gives the Freebuff
 // preview a useful page to show: project info, the build commands, the README,
@@ -57,7 +57,7 @@ function renderIndex() {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AegisDesk — Preview</title>
+<title>Newax Aegis — Preview</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -125,7 +125,7 @@ function renderIndex() {
   <header>
     <div class="logo">A</div>
     <div>
-      <h1>AegisDesk</h1>
+      <h1>Newax Aegis</h1>
       <p class="sub">Offline-first Android personal assistant — Kotlin / Jetpack Compose</p>
     </div>
   </header>
@@ -141,7 +141,7 @@ function renderIndex() {
   <div class="card">
     <div class="tag">PREVIEW NOTE</div>
     <h2>Why this page instead of the app?</h2>
-    <p>Aegis is a <strong>native Android app</strong> — it runs on a physical device (Android 8+)
+    <p>Newax Aegis is a <strong>native Android app</strong> — it runs on a physical device (Android 8+)
     through the Accessibility Service and cannot render in a browser. This server exists so the
     Freebuff preview has a useful landing page: it documents the project, the build commands, and
     lets you download the debug APK once built.</p>
@@ -161,7 +161,7 @@ function renderIndex() {
     <h2>Run it on a device</h2>
     <ul>
       <li>Install the APK on a physical Android 8+ phone.</li>
-      <li>Open Aegis → <strong>Screen access</strong>, enable the service, and return.</li>
+      <li>Open Newax Aegis → <strong>Screen access</strong>, enable the service, and return.</li>
       <li>Optionally grant <strong>notification access</strong> (Inbox).</li>
       <li>Tap <strong>Import model</strong> and pick an official Gemma <code>.litertlm</code> pack (e.g. Gemma 3 1B INT4 on a Galaxy S21 8 GB) to enable offline AI chat.</li>
     </ul>
@@ -175,7 +175,7 @@ function renderIndex() {
     </ul>
   </div>
 
-  <footer>Preview server for AegisDesk · no data leaves the device · offline-first</footer>
+  <footer>Preview server for Newax Aegis · no data leaves the device · offline-first</footer>
 </div>
 </body>
 </html>`;

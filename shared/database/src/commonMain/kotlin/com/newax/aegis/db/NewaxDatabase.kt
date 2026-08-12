@@ -62,8 +62,8 @@ import androidx.sqlite.execSQL
     version = 19,
     exportSchema = true
 )
-@ConstructedBy(AegisDatabaseConstructor::class)
-abstract class AegisDatabase : RoomDatabase() {
+@ConstructedBy(NewaxDatabaseConstructor::class)
+abstract class NewaxDatabase : RoomDatabase() {
 
     abstract fun personDao(): PersonDao
     abstract fun personMentionDao(): PersonMentionDao
@@ -87,9 +87,9 @@ abstract class AegisDatabase : RoomDatabase() {
     abstract fun evolutionDao(): EvolutionDao
 
     companion object {
-        @Volatile private var INSTANCE: AegisDatabase? = null
-        val get: AegisDatabase get() = INSTANCE ?: error("Not initialized")
-        fun init(db: AegisDatabase) { INSTANCE = db }
+        @Volatile private var INSTANCE: NewaxDatabase? = null
+        val get: NewaxDatabase get() = INSTANCE ?: error("Not initialized")
+        fun init(db: NewaxDatabase) { INSTANCE = db }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(connection: SQLiteConnection) {
@@ -940,8 +940,8 @@ abstract class AegisDatabase : RoomDatabase() {
 }
 
 @Suppress("NO_ACTUAL_FOR_EXPECT", "EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
-expect object AegisDatabaseConstructor : RoomDatabaseConstructor<AegisDatabase> {
-    override fun initialize(): AegisDatabase
+expect object NewaxDatabaseConstructor : RoomDatabaseConstructor<NewaxDatabase> {
+    override fun initialize(): NewaxDatabase
 }
 
 

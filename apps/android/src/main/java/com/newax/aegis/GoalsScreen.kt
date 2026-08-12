@@ -39,8 +39,8 @@ import com.newax.aegis.engine.audit.ExecutionAuditHolder
 import com.newax.aegis.engine.audit.ExecutionCsv
 import com.newax.aegis.engine.audit.RunOutcome
 import java.io.File
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import com.newax.aegis.engine.execution.GoalExecutor
 import com.newax.aegis.engine.intelligence.Goal
 import com.newax.aegis.engine.intelligence.GoalPlanner
@@ -128,8 +128,8 @@ fun GoalsScreen(
 
     // Live updates: task transitions, blocked goals, and completions re-read the snapshot.
     LaunchedEffect(Unit) {
-        AegisEventBus.flow
-            .filter { it is AegisEvent.TaskUpdated || it is AegisEvent.GoalBlocked || it is AegisEvent.GoalCompleted }
+        NewaxEventBus.flow
+            .filter { it is NewaxEvent.TaskUpdated || it is NewaxEvent.GoalBlocked || it is NewaxEvent.GoalCompleted }
             .collect { refreshKey++ }
     }
 
@@ -187,7 +187,7 @@ fun GoalsScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Aegis decomposes the goal, then checks each skill's capabilities against the platform registry before calling it feasible.",
+                        "Newax decomposes the goal, then checks each skill's capabilities against the platform registry before calling it feasible.",
                         fontSize = 12.sp,
                         color    = TextTer,
                         lineHeight = 17.sp
@@ -249,7 +249,7 @@ fun GoalsScreen(
                     Text("No goals yet", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextSec)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Type a goal above to see Aegis's plan — and why it might be blocked.",
+                        "Type a goal above to see Newax's plan — and why it might be blocked.",
                         fontSize = 13.sp,
                         color    = TextTer,
                         modifier = Modifier.padding(horizontal = 32.dp)
@@ -639,10 +639,10 @@ private fun AuditExportControls() {
                         if (uri != null) {
                             val send = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/csv"
-                                putExtra(Intent.EXTRA_SUBJECT, "Aegis execution audit CSV")
+                                putExtra(Intent.EXTRA_SUBJECT, "Newax execution audit CSV")
                                 putExtra(Intent.EXTRA_STREAM, uri)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                clipData = ClipData.newRawUri("Aegis execution audit CSV", uri)
+                                clipData = ClipData.newRawUri("Newax execution audit CSV", uri)
                             }
                             context.startActivity(Intent.createChooser(send, "Share execution audit CSV"))
                         }

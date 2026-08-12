@@ -31,7 +31,7 @@ class EvolutionWorker(appContext: Context, params: WorkerParameters) : Worker(ap
     }
 
     companion object {
-        private const val TAG = "AegisEvolution"
+        private const val TAG = "NewaxEvolution"
         private const val WORK_NAME = "aegis_evolution_fuzzer"
         private const val INTERVAL_HOURS = 6L
 

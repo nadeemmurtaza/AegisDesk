@@ -1,6 +1,6 @@
-# Aegis sync relay
+# Newax Aegis sync relay
 
-The internet leg of the Aegis 4-device sync mesh (docs/SYNC_DESIGN.md §10): a
+The internet leg of the Newax Aegis 4-device sync mesh (docs/SYNC_DESIGN.md §10): a
 stateless, **E2E-blind** WebSocket rendezvous + ciphertext relay. It sees only
 device ids, routing grants, and opaque frames — never keys, never plaintext,
 never parses payload contents. Pair-aware: a frame is forwarded only from a

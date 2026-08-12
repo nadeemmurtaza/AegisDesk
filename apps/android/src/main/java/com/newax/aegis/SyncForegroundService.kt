@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
  * inside the 15-minute [SyncWorker] window. The periodic worker stays as a
  * catch-up net when the service is stopped (battery saver, OEM kill, manual).
  *
- * Lifecycle: started from bootstrap (AegisApplication) when auto-sync is on
+ * Lifecycle: started from bootstrap (NewaxApplication) when auto-sync is on
  * and from the Sync screen when the toggle flips on; the loop self-stops when
  * the toggle flips off (idle until the next start). START_STICKY so the
  * system restarts us after a kill; the loop is resilient (backoff + transport
@@ -65,7 +65,7 @@ class SyncForegroundService : Service() {
 
     private fun buildNotification(): Notification =
         NotificationCompat.Builder(this, "sync")
-            .setContentTitle("Aegis device sync")
+            .setContentTitle("Newax device sync")
             .setContentText("Listening for paired devices — encrypted sync active")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)

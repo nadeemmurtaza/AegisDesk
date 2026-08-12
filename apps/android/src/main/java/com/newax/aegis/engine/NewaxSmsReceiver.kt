@@ -13,7 +13,7 @@ import android.util.Log
  *
  * Raw SMS body is NEVER written to logcat — only redacted text.
  */
-class AegisSmsReceiver : BroadcastReceiver() {
+class NewaxSmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
@@ -74,6 +74,6 @@ class AegisSmsReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        private const val TAG = "AegisSms"
+        private const val TAG = "NewaxSms"
     }
 }

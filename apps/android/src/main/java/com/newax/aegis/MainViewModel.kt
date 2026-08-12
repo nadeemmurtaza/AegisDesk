@@ -16,7 +16,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.speech.tts.TextToSpeech
 import java.util.Locale
-import com.newax.aegis.accessibility.AegisAccessibilityService
+import com.newax.aegis.accessibility.NewaxAccessibilityService
 import com.newax.aegis.assistant.*
 import com.newax.aegis.model.ModelRequest
 import com.newax.aegis.model.ModelState
@@ -24,7 +24,7 @@ import com.newax.aegis.platform.android.LiteRtModelProvider
 import com.newax.aegis.engine.AutomationSettings
 import com.newax.aegis.engine.ContactsManager
 import com.newax.aegis.engine.TotpManager
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.embedding.VectorMemorySearch
 import com.newax.aegis.engine.learning.DraftStore
 import com.newax.aegis.engine.learning.LlmFactExtractor
@@ -47,7 +47,7 @@ import com.newax.aegis.engine.procedure.StepSerializer
 import com.newax.aegis.engine.planner.DeterministicResolver
 import com.newax.aegis.engine.planner.QueryPlanner
 import com.newax.aegis.engine.model.ModelManager
-import com.newax.aegis.engine.resource.AegisJob
+import com.newax.aegis.engine.resource.NewaxJob
 import com.newax.aegis.engine.resource.JobPriority
 import com.newax.aegis.engine.resource.OpportunisticScheduler
 import com.newax.aegis.engine.resource.ResourceClass
@@ -69,7 +69,7 @@ import java.util.Calendar
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val engine = LocalAssistantEngine()
     val memory = EncryptedMemory(application)
-    val db = AegisDatabase.get
+    val db = NewaxDatabase.get
     private val modelImporter = ModelImporter(application)
     private var modelProvider: LiteRtModelProvider? = null
 
@@ -94,7 +94,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         else                                                      -> 0
     }
 
-    val messages = mutableStateListOf(ChatMessage("Aegis is ready in offline basic mode.", false))
+    val messages = mutableStateListOf(ChatMessage("Newax is ready in offline basic mode.", false))
     var pendingAction by mutableStateOf<ProposedAction?>(null); private set
     var biometricAuthRequested by mutableStateOf(false)
     private val queuedActions = ArrayDeque<ProposedAction>()
@@ -529,7 +529,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     // ─────────────────────────────────────────────────────────
                     val resultDeferred = CompletableDeferred<String>()
-                    val llmJob = AegisJob(
+                    val llmJob = NewaxJob(
                         id            = ResourceGovernor.newId(),
                         label         = "llm-inference",
                         resourceClass = ResourceClass.CRITICAL,
@@ -537,11 +537,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ramBudgetMb   = 512,
                         cancellable   = true
                     ) {
-                        val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty().take(2000)
+                        val screen = NewaxAccessibilityService.instance?.screenSummary().orEmpty().take(2000)
                         val ocrText = com.newax.aegis.vision.ScreenCaptureService.latestOcrResult.value
                             ?.let { com.newax.aegis.vision.OcrEngine.formatForContext(it) }
                             .orEmpty().take(1000)
-                        val unread = com.newax.aegis.accessibility.AegisNotificationListenerService.getInboxSummary()
+                        val unread = com.newax.aegis.accessibility.NewaxNotificationListenerService.getInboxSummary()
                         val conversationHistory = messages
                             .takeLast(10)
                             .filter { !it.text.startsWith("[System") && !it.text.startsWith("Processing background") }
@@ -613,7 +613,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         return@launch
                     }
 
-                    val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty()
+                    val screen = NewaxAccessibilityService.instance?.screenSummary().orEmpty()
                     val firstLine = replyText.trim().lineSequence().firstOrNull()?.trim().orEmpty()
                     if (firstLine.isNotBlank() && engine.canHandle(firstLine)) {
                         val commandReply = engine.generateReply(firstLine, screen, VectorMemorySearch.search(db, memory, firstLine))
@@ -644,7 +644,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             return
         }
-        val screen = AegisAccessibilityService.instance?.screenSummary().orEmpty()
+        val screen = NewaxAccessibilityService.instance?.screenSummary().orEmpty()
         val parts = text.split(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE)).map { it.trim() }.filter { it.isNotEmpty() }
         val replies = parts.mapIndexed { index, part ->
             // Per-step agent dominance (docs/AGENTS_DESIGN.md): each step's
@@ -748,7 +748,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             createCalendarEvent(action.title, action.time); true
         }
         is ProposedAction.ReplyNotification -> {
-            val success = com.newax.aegis.accessibility.AegisNotificationListenerService.replyToNotification(getApplication(), action.key, action.text)
+            val success = com.newax.aegis.accessibility.NewaxNotificationListenerService.replyToNotification(getApplication(), action.key, action.text)
             withContext(Dispatchers.Main) {
                 if (success) messages += ChatMessage("Replied to notification.", false)
                 else messages += ChatMessage("Failed to reply (notification might be gone or doesn't support replies).", false)
@@ -1105,11 +1105,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 withContext(Dispatchers.Main) { context.startActivity(intent) }
                 val finalizeAction = ProposedAction.Type("FINALIZE_POST|${action.altTag}")
-                AegisAccessibilityService.instance?.execute(finalizeAction)
+                NewaxAccessibilityService.instance?.execute(finalizeAction)
                 true
             } catch (_: Exception) { false }
         }
-        else -> withContext(Dispatchers.Main) { AegisAccessibilityService.instance?.execute(action) == true }
+        else -> withContext(Dispatchers.Main) { NewaxAccessibilityService.instance?.execute(action) == true }
     }
 
     private suspend fun queryCalendar(timeframe: String) {

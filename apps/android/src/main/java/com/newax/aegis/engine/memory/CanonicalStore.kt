@@ -1,6 +1,6 @@
 package com.newax.aegis.engine.memory
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.MemoryRecord
 import com.newax.aegis.db.entity.RecordType
 import com.newax.aegis.engine.TypeaheadTrie
@@ -9,7 +9,7 @@ import com.newax.aegis.engine.embedding.VectorStore
 object CanonicalStore {
 
     fun write(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         content: String,
         type: Int = RecordType.FACT,
         category: String = "",
@@ -53,7 +53,7 @@ object CanonicalStore {
         return recordId
     }
 
-    fun invalidate(db: AegisDatabase, recordId: Long) {
+    fun invalidate(db: NewaxDatabase, recordId: Long) {
         kotlinx.coroutines.runBlocking { db.memoryRecordDao().invalidate(recordId, System.currentTimeMillis()) }
     }
 

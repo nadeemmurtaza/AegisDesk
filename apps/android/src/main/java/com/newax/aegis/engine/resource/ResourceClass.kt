@@ -25,7 +25,7 @@ sealed class JobResult<out T> {
     object ResourceDenied : JobResult<Nothing>()
 }
 
-data class AegisJob(
+data class NewaxJob(
     val id: String,
     val label: String,
     val resourceClass: ResourceClass,

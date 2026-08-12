@@ -1,49 +1,49 @@
 package com.newax.aegis.engine.learning
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.LearningDraftEntity
 
 /**
  * Persistent draft store backed by Room + SQLCipher.
  * Each draft is a row in `learning_drafts`; no JSON blob, no single-lock serialization.
  * Public API mirrors the old EncryptedMemory-based version — callers need only swap
- * the first parameter from `EncryptedMemory` to `AegisDatabase`.
+ * the first parameter from `EncryptedMemory` to `NewaxDatabase`.
  */
 object DraftStore {
 
     private const val MAX_STORED = 500
 
-    fun addDraft(db: AegisDatabase, draft: LearningDraft) {
+    fun addDraft(db: NewaxDatabase, draft: LearningDraft) {
         kotlinx.coroutines.runBlocking { db.learningDraftDao().insert(draft.toEntity()) }
         pruneIfNeeded(db)
     }
 
-    fun addDrafts(db: AegisDatabase, drafts: List<LearningDraft>) {
+    fun addDrafts(db: NewaxDatabase, drafts: List<LearningDraft>) {
         if (drafts.isEmpty()) return
         kotlinx.coroutines.runBlocking { db.learningDraftDao().insertAll(drafts.map { it.toEntity() }) }
         pruneIfNeeded(db)
     }
 
-    fun pending(db: AegisDatabase): List<LearningDraft> =
+    fun pending(db: NewaxDatabase): List<LearningDraft> =
         kotlinx.coroutines.runBlocking { db.learningDraftDao().getPending().map { it.toDraft() } }
 
-    fun all(db: AegisDatabase): List<LearningDraft> =
+    fun all(db: NewaxDatabase): List<LearningDraft> =
         kotlinx.coroutines.runBlocking { db.learningDraftDao().getAll().map { it.toDraft() } }
 
-    fun getById(db: AegisDatabase, id: String): LearningDraft? =
+    fun getById(db: NewaxDatabase, id: String): LearningDraft? =
         kotlinx.coroutines.runBlocking { db.learningDraftDao().findById(id)?.toDraft() }
 
-    fun approveDraft(db: AegisDatabase, id: String): LearningDraft? {
+    fun approveDraft(db: NewaxDatabase, id: String): LearningDraft? {
         return kotlinx.coroutines.runBlocking {
             db.learningDraftDao().updateStatus(id, "APPROVED")
             db.learningDraftDao().findById(id)?.toDraft()
         }
     }
 
-    fun rejectDraft(db: AegisDatabase, id: String) =
+    fun rejectDraft(db: NewaxDatabase, id: String) =
         kotlinx.coroutines.runBlocking { db.learningDraftDao().updateStatus(id, "REJECTED") }
 
-    fun approveAll(db: AegisDatabase): List<LearningDraft> {
+    fun approveAll(db: NewaxDatabase): List<LearningDraft> {
         return kotlinx.coroutines.runBlocking {
             val pending = db.learningDraftDao().getPending().map { it.toDraft() }
             db.learningDraftDao().approveAll()
@@ -51,15 +51,15 @@ object DraftStore {
         }
     }
 
-    fun rejectAll(db: AegisDatabase) =
+    fun rejectAll(db: NewaxDatabase) =
         kotlinx.coroutines.runBlocking { db.learningDraftDao().rejectAll() }
 
-    fun pendingCount(db: AegisDatabase): Int =
+    fun pendingCount(db: NewaxDatabase): Int =
         kotlinx.coroutines.runBlocking { db.learningDraftDao().pendingCount() }
 
     data class DraftStats(val total: Int, val pending: Int, val approved: Int, val rejected: Int)
 
-    fun stats(db: AegisDatabase): DraftStats = kotlinx.coroutines.runBlocking {
+    fun stats(db: NewaxDatabase): DraftStats = kotlinx.coroutines.runBlocking {
         DraftStats(
             total    = db.learningDraftDao().total(),
             pending  = db.learningDraftDao().countByStatus("PENDING"),
@@ -68,10 +68,10 @@ object DraftStore {
         )
     }
 
-    fun pruneOld(db: AegisDatabase) =
+    fun pruneOld(db: NewaxDatabase) =
         kotlinx.coroutines.runBlocking { db.learningDraftDao().clearNonPending() }
 
-    fun clearOld(db: AegisDatabase, keepPending: Boolean = true) {
+    fun clearOld(db: NewaxDatabase, keepPending: Boolean = true) {
         kotlinx.coroutines.runBlocking {
             if (keepPending) db.learningDraftDao().clearNonPending()
             else db.learningDraftDao().clearAll()
@@ -80,7 +80,7 @@ object DraftStore {
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
-    private fun pruneIfNeeded(db: AegisDatabase) {
+    private fun pruneIfNeeded(db: NewaxDatabase) {
         kotlinx.coroutines.runBlocking {
             val total = db.learningDraftDao().total()
             if (total > MAX_STORED) {

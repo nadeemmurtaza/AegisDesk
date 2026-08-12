@@ -3,7 +3,7 @@ package com.newax.aegis.engine.files
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.FileObject
 import com.newax.aegis.engine.apps.AppCapability
 import com.newax.aegis.engine.apps.AppIntelligence
@@ -35,14 +35,14 @@ object WorldRegistry {
 
     // ── File resolution ────────────────────────────────────────────────────────
 
-    fun resolveFiles(context: Context, db: AegisDatabase, query: String, limit: Int = 10): List<FileObject> {
+    fun resolveFiles(context: Context, db: NewaxDatabase, query: String, limit: Int = 10): List<FileObject> {
         val q = FileQueryPlanner.plan(query)
         return FileQueryPlanner.execute(q, db, context, limit)
     }
 
     // ── Cross-domain: file + person + app ────────────────────────────────────
 
-    fun resolveFileTask(context: Context, db: AegisDatabase, request: FileTaskQuery): FileTaskResult? {
+    fun resolveFileTask(context: Context, db: NewaxDatabase, request: FileTaskQuery): FileTaskResult? {
         // 1. Resolve files
         val files = FileQueryPlanner.executeFileTask(db, context, request.fileQuery, request.personIdentifier, limit = 5)
         if (files.isEmpty()) return null
@@ -80,7 +80,7 @@ object WorldRegistry {
 
     // ── Graph linking ─────────────────────────────────────────────────────────
 
-    fun linkFileToPerson(db: AegisDatabase, fileId: Long, personIdentifier: String, predicate: String = "sent_by") = runBlocking {
+    fun linkFileToPerson(db: NewaxDatabase, fileId: Long, personIdentifier: String, predicate: String = "sent_by") = runBlocking {
         val personId = PersonRegistry.resolve(db, personIdentifier) ?: return@runBlocking
         val fo = db.fileDao().recentFiles(1).firstOrNull() ?: return@runBlocking
         fo.graphEntityId?.let { fileEntityId ->
@@ -89,20 +89,20 @@ object WorldRegistry {
         }
     }
 
-    fun linkFileToProject(db: AegisDatabase, fileId: Long, projectId: String, predicate: String = "belongs_to") = runBlocking {
+    fun linkFileToProject(db: NewaxDatabase, fileId: Long, projectId: String, predicate: String = "belongs_to") = runBlocking {
         val fo = db.fileDao().recentFiles(1).firstOrNull() ?: return@runBlocking
         GraphStore.saveEdge(db, "file:${fo.filename}", predicate, "project:$projectId", "world_registry")
     }
 
     // ── Find similar images ───────────────────────────────────────────────────
 
-    fun findSimilarImages(db: AegisDatabase, queryHash: String, maxDistance: Int = 10, limit: Int = 10): List<FileObject> = runBlocking {
+    fun findSimilarImages(db: NewaxDatabase, queryHash: String, maxDistance: Int = 10, limit: Int = 10): List<FileObject> = runBlocking {
         val allHashes = db.fileDao().allPHashes()
         val similar = PHasher.findSimilar(queryHash, allHashes.map { Pair(it.id, it.pHash) }, maxDistance, limit)
         similar.mapNotNull { (id, _) -> db.fileDao().byId(id) }
     }
 
-    fun findSimilarImagesById(db: AegisDatabase, fileId: Long, limit: Int = 10): List<FileObject> = runBlocking {
+    fun findSimilarImagesById(db: NewaxDatabase, fileId: Long, limit: Int = 10): List<FileObject> = runBlocking {
         val fo = db.fileDao().byId(fileId) ?: return@runBlocking emptyList()
         if (fo.pHash.isBlank()) return@runBlocking emptyList()
         findSimilarImages(db, fo.pHash, limit = limit)
@@ -110,7 +110,7 @@ object WorldRegistry {
 
     // ── Duplicate report ──────────────────────────────────────────────────────
 
-    fun duplicateSummary(db: AegisDatabase): String = runBlocking {
+    fun duplicateSummary(db: NewaxDatabase): String = runBlocking {
         val count = db.fileDao().duplicateCount()
         val total = db.fileDao().totalFiles()
         "$count duplicate files found out of $total total."

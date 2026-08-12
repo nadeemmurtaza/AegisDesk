@@ -1,6 +1,6 @@
 package com.newax.aegis.desktopsync
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.db.entity.AppRecord
 import com.newax.aegis.db.entity.EntityAlias
 import com.newax.aegis.db.entity.GraphEdge
@@ -9,7 +9,7 @@ import com.newax.aegis.db.entity.GraphPredicate
 import com.newax.aegis.db.entity.PersonEntity
 import com.newax.aegis.db.entity.PersonFactEntity
 import com.newax.aegis.db.entity.TriggerRule
-import com.newax.aegis.db.getAegisDatabase
+import com.newax.aegis.db.getNewaxDatabase
 import com.newax.aegis.db.sync.RoomJournalStore
 import com.newax.aegis.db.sync.SyncPayload
 import com.newax.aegis.db.sync.toEntity
@@ -141,7 +141,7 @@ object DesktopSync {
 
     /** The opened Room DB — set in [start], used by materialize. */
     @Volatile
-    private var database: AegisDatabase? = null
+    private var database: NewaxDatabase? = null
 
     @Volatile
     private var identityHolder: StoredIdentity? = null
@@ -160,8 +160,8 @@ object DesktopSync {
         Thread {
             try {
                 val me = this.identity(displayName)
-                val db = getAegisDatabase(File(home, ".aegis/sync.db"))
-                AegisDatabase.init(db)
+                val db = getNewaxDatabase(File(home, ".aegis/sync.db"))
+                NewaxDatabase.init(db)
                 database = db
                 val journalStore = RoomJournalStore(
                     db.syncJournalDao(),

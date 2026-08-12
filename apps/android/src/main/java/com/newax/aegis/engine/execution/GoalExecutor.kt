@@ -4,14 +4,14 @@ import android.content.Context
 import com.newax.aegis.PlatformCapabilitiesHolder
 import com.newax.aegis.PolicyHolder
 import com.newax.aegis.assistant.ActionOrigin
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.apps.AppCapability
 import com.newax.aegis.engine.audit.ExecutionAuditEntry
 import com.newax.aegis.engine.audit.ExecutionAuditHolder
 import com.newax.aegis.engine.audit.RunOutcome
 import com.newax.aegis.engine.audit.TaskRunRecord
-import com.newax.aegis.engine.bus.AegisEvent
-import com.newax.aegis.engine.bus.AegisEventBus
+import com.newax.aegis.engine.bus.NewaxEvent
+import com.newax.aegis.engine.bus.NewaxEventBus
 import com.newax.aegis.engine.intelligence.GoalPlanner
 import com.newax.aegis.engine.intelligence.SkillRegistry
 import com.newax.aegis.engine.intelligence.TaskFailureKind
@@ -54,7 +54,7 @@ object GoalExecutor {
             ?: return@withContext Result.failure(IllegalStateException("No plan for goal $goalId"))
 
         GoalPlanner.activate(goalId)
-        val db = runCatching { AegisDatabase.get }.getOrNull()
+        val db = runCatching { NewaxDatabase.get }.getOrNull()
         val tasks = graph.topologicalOrder()
             .filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.FAILED }
 
@@ -118,7 +118,7 @@ object GoalExecutor {
         task: TaskNode,
         carry: MutableMap<String, Any>,
         context: Context,
-        db: AegisDatabase?
+        db: NewaxDatabase?
     ): Result<ExecutionTier?> {
         val skillId = task.skillId
         if (skillId == null) {
@@ -231,12 +231,12 @@ object GoalExecutor {
 
     private fun markRunning(goalId: String, task: TaskNode) {
         GoalPlanner.updateTask(goalId, task.id, TaskStatus.RUNNING)
-        AegisEventBus.emit(AegisEvent.TaskUpdated(goalId, task.id, TaskStatus.RUNNING.name, null))
+        NewaxEventBus.emit(NewaxEvent.TaskUpdated(goalId, task.id, TaskStatus.RUNNING.name, null))
     }
 
     private fun finishCompleted(goalId: String, task: TaskNode, message: String) {
         GoalPlanner.updateTask(goalId, task.id, TaskStatus.COMPLETED, message)
-        AegisEventBus.emit(AegisEvent.TaskUpdated(goalId, task.id, TaskStatus.COMPLETED.name, message))
+        NewaxEventBus.emit(NewaxEvent.TaskUpdated(goalId, task.id, TaskStatus.COMPLETED.name, message))
     }
 
     private fun finishFailed(
@@ -246,13 +246,13 @@ object GoalExecutor {
         kind: TaskFailureKind? = null
     ): Result<Nothing> {
         GoalPlanner.updateTask(goalId, task.id, TaskStatus.FAILED, reason, kind)
-        AegisEventBus.emit(AegisEvent.TaskUpdated(goalId, task.id, TaskStatus.FAILED.name, reason))
+        NewaxEventBus.emit(NewaxEvent.TaskUpdated(goalId, task.id, TaskStatus.FAILED.name, reason))
         return Result.failure(IllegalStateException(reason))
     }
 
     private fun blockGoal(goalId: String, reason: String) {
         GoalPlanner.block(goalId)
-        AegisEventBus.emit(AegisEvent.GoalBlocked(goalId, reason))
+        NewaxEventBus.emit(NewaxEvent.GoalBlocked(goalId, reason))
     }
 
     private val INTENT_VERBS = setOf(
@@ -277,7 +277,7 @@ object GoalExecutor {
      * (label or package). Returns null when the index has no match, in which case
      * the raw target still flows downstream and launch fails honestly.
      */
-    private suspend fun resolvePackage(db: AegisDatabase, target: String): String? {
+    private suspend fun resolvePackage(db: NewaxDatabase, target: String): String? {
         val q = target.trim().lowercase()
         if (q.isEmpty()) return null
         val records = db.appRegistryDao().allRecords()

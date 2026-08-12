@@ -1,6 +1,6 @@
 package com.newax.aegis.engine.dev.people
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.engine.graph.GraphStore
 import com.newax.aegis.engine.person.PersonRegistry
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +49,7 @@ data class MergeProposal(
 
 object PersonInspector {
 
-    suspend fun inspect(entityId: Long, db: AegisDatabase): PersonProfile? = withContext(Dispatchers.IO) {
+    suspend fun inspect(entityId: Long, db: NewaxDatabase): PersonProfile? = withContext(Dispatchers.IO) {
         val person = db.personDao().findById(entityId) ?: return@withContext null
         val facts = db.personFactDao().forPerson(entityId).map {
             PersonFact(it.id, it.category, it.fact, it.confidence, it.source)
@@ -111,12 +111,12 @@ object PersonInspector {
         )
     }
 
-    suspend fun inspectByName(name: String, db: AegisDatabase): PersonProfile? = withContext(Dispatchers.IO) {
+    suspend fun inspectByName(name: String, db: NewaxDatabase): PersonProfile? = withContext(Dispatchers.IO) {
         val entityId = PersonRegistry.resolve(db, name) ?: return@withContext null
         inspect(entityId, db)
     }
 
-    suspend fun findMergeCandidates(db: AegisDatabase, minSharedFacts: Int = 2): List<MergeProposal> = withContext(Dispatchers.IO) {
+    suspend fun findMergeCandidates(db: NewaxDatabase, minSharedFacts: Int = 2): List<MergeProposal> = withContext(Dispatchers.IO) {
         val people = db.personDao().getTopPeople(100)
         val proposals = mutableListOf<MergeProposal>()
         for (i in people.indices) {
@@ -139,7 +139,7 @@ object PersonInspector {
         proposals.sortedByDescending { it.confidence }
     }
 
-    suspend fun listAll(db: AegisDatabase, limit: Int = 50): List<Map<String, String>> = withContext(Dispatchers.IO) {
+    suspend fun listAll(db: NewaxDatabase, limit: Int = 50): List<Map<String, String>> = withContext(Dispatchers.IO) {
         db.personDao().getTopPeople(limit).map { p ->
             val mentions = db.personMentionDao().totalMentions(p.id)
             mapOf(
@@ -151,7 +151,7 @@ object PersonInspector {
         }
     }
 
-    suspend fun evidenceSummary(entityId: Long, db: AegisDatabase): String = withContext(Dispatchers.IO) {
+    suspend fun evidenceSummary(entityId: Long, db: NewaxDatabase): String = withContext(Dispatchers.IO) {
         val facts = db.personFactDao().forPerson(entityId)
         val mentions = db.personMentionDao().totalMentions(entityId)
         val sources = db.personMentionDao().sourceCount(entityId)

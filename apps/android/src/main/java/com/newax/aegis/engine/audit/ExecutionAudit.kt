@@ -149,7 +149,7 @@ class ExecutionAuditStore(private val dao: KvStoreDao) {
 }
 
 /**
- * Process-wide holder for the audit trail, wired at bootstrap (AegisApplication).
+ * Process-wide holder for the audit trail, wired at bootstrap (NewaxApplication).
  * The executor records each run; the Goals screen reads [recent] for "Recent runs".
  * Safe before [init] (tests, early bootstrap): record is a no-op and recent is empty.
  */

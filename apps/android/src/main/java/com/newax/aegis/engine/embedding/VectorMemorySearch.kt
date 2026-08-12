@@ -1,6 +1,6 @@
 package com.newax.aegis.engine.embedding
 
-import com.newax.aegis.db.AegisDatabase
+import com.newax.aegis.db.NewaxDatabase
 import com.newax.aegis.memory.AgentMemory
 import com.newax.aegis.memory.EncryptedMemory
 
@@ -27,7 +27,7 @@ object VectorMemorySearch {
      * library + lessons.
      */
     fun search(
-        db: AegisDatabase,
+        db: NewaxDatabase,
         memory: EncryptedMemory,
         query: String,
         limit: Int = 8
