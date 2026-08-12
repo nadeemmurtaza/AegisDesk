@@ -38,8 +38,9 @@ class AntiEntropyTest {
 
     private fun entry(
         opId: String, deviceId: String, wall: Long, counter: Long,
-        kind: SyncEntry.Kind = SyncEntry.Kind.RECORD, table: String = "persons", key: String = "1"
-    ) = SyncEntry.of(opId, deviceId, Hlc(wall, counter), kind, table, key)
+        kind: SyncEntry.Kind = SyncEntry.Kind.RECORD, table: String = "persons", key: String = "1",
+        tombstone: Boolean = false
+    ) = SyncEntry.of(opId, deviceId, Hlc(wall, counter), kind, table, key, tombstone = tombstone)
 
     @Test
     fun outboundDeltaIsBoundedByPeerWatermark() {
@@ -110,9 +111,14 @@ class AntiEntropyTest {
         i.syncWith(m)
         assertEquals(setOf("e1", "e2", "e3"), i.opIds())
 
-        // A comes online and pulls from I — I, M, W all have the data.
+        // A comes online and pulls from I — I, M, A all have the data.
         a.syncWith(i)
         assertEquals(setOf("e1", "e2", "e3"), a.opIds())
+
+        // W comes back online and re-syncs with M — it catches e3 (its earlier
+        // watermark for M was never advanced, so M resends everything).
+        w.syncWith(m)
+        assertEquals(setOf("e1", "e2", "e3"), w.opIds())
 
         // Every device converges to the identical journal content.
         val expected = listOf("e1", "e2", "e3")
@@ -140,7 +146,7 @@ class AntiEntropyTest {
             val local = RecordResolver.resolve(device.journal) as RecordState.Live
             assertEquals(winner.opId, local.entry.opId)
         }
-        assertEquals("m1", winner.opId) // deviceId tie-break is deterministic
+        assertEquals("w1", winner.opId) // max (hlc, deviceId) wins — "w" > "m"
     }
 
     @Test

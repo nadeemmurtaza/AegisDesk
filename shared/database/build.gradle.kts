@@ -49,12 +49,14 @@ kotlin {
             implementation("androidx.sqlite:sqlite-ktx:2.4.0")
             implementation("androidx.room:room-ktx:2.7.0-alpha13")
         }
-        val appleMain by getting {
-            dependencies {
-                // The native storage driver: OS-provided SQLite on macOS/iOS.
-                // linkerOpts below pull in the system libsqlite3 at link time.
-                implementation("androidx.sqlite:sqlite-framework:2.5.0-alpha13")
-            }
+        // TEMP-GUARD (Linux host test run): KGP disables Apple targets here so
+        // appleMain does not exist; findByName + null-safe is equivalent where
+        // it does. REVERTED after the run.
+        val appleMain = sourceSets.findByName("appleMain")
+        appleMain?.dependencies {
+            // The native storage driver: OS-provided SQLite on macOS/iOS.
+            // linkerOpts below pull in the system libsqlite3 at link time.
+            implementation("androidx.sqlite:sqlite-framework:2.5.0-alpha13")
         }
     }
 

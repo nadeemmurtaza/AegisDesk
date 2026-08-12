@@ -72,19 +72,24 @@ object SessionCrypto {
         if (hello.deviceId != peer.deviceId) {
             return ResponderResult.Failure(HandshakeError.DeviceIdMismatch(peer.deviceId, hello.deviceId))
         }
-        val t1 = Sha256.digest((LABEL + "I" + my.identity.deviceId).encodeToByteArray() + hello.ephemeralPublicKey)
+        // t1 is the INITIATOR's transcript — its id (hello.deviceId), not mine.
+        val t1 = Sha256.digest((LABEL + "I" + hello.deviceId).encodeToByteArray() + hello.ephemeralPublicKey)
         if (!crypto.verify(peer.signPublicKey, t1, hello.signature)) {
             return ResponderResult.Failure(HandshakeError.InvalidSignature("helloI"))
         }
         val myEph = crypto.newEcdhKeyPair()
         val t2 = Sha256.digest(t1 + (LABEL + "R" + my.identity.deviceId).encodeToByteArray() + myEph.publicKey)
-        val ikm = tripleDh(
+        val dh = tripleDh(
             crypto,
             ephPriv = myEph.privateKey,
             longTermPriv = my.ecdhPrivateKey,
             peerEphPub = hello.ephemeralPublicKey,
             peerLongTermPub = peer.ecdhPublicKey
         )
+        // tripleDh yields [ee, myEph·peerLT, myLT·peerEph]. As the responder the
+        // last two are the initiator's (se, es) — the canonical [ee, es, se]
+        // requires swapping them so both sides derive identical session keys.
+        val ikm = dh.copyOfRange(0, 32) + dh.copyOfRange(64, 96) + dh.copyOfRange(32, 64)
         val keys = derive(crypto, t2, ikm, hello.deviceId, my.identity.deviceId)
         val helloR = HelloR(my.identity.deviceId, myEph.publicKey, crypto.sign(my.signPrivateKey, t2))
         return ResponderResult.Success(
@@ -167,13 +172,15 @@ object SessionCrypto {
     // ── internals ─────────────────────────────────────────────────────────────
 
     /**
-     * Triple-DH in a canonical order so both sides concatenate identically:
+     * Triple-DH in canonical order so both sides concatenate identically:
      *   dh1 = eph · peerEph   (ee)
      *   dh2 = eph · peerLT    (es — my ephemeral, their long-term)
      *   dh3 = LT · peerEph    (se — my long-term, their ephemeral)
-     * The responder passes its own ephemeral as [ephPriv] and the initiator's
-     * long-term as [peerLongTermPub]; the initiator the mirror image — the
-     * shared secrets coincide pairwise, so the concatenation is identical.
+     *
+     * The INITIATOR's output is already canonical. The RESPONDER's (eph=its
+     * own ephemeral) yields [ee, se, es] — its two middle secrets are the
+     * initiator's swapped — so the responder reassembles [dh1, dh3, dh2]
+     * before key derivation. Only then do both sides derive identical keys.
      */
     private fun tripleDh(
         crypto: Crypto,

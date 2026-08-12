@@ -1,10 +1,12 @@
 package com.newax.aegis.sync
 
+import com.newax.aegis.sync.Pairing.PairingRequest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PairingTest {
 
@@ -63,7 +65,7 @@ class PairingTest {
         assertNull(PairingRequest.decode("aegis-pair-v1|1|name|zz|zz|zz"))          // bad hex
         assertNull(PairingRequest.decode("aegis-pair-v1|1|name|00|00"))             // wrong field count
         assertNull(PairingRequest.decode("aegis-pair-v1|9|name|00|00|00"))          // unsupported version
-        assertNull(PairingRequest.decode("aegis-pair-v1|1|na\\|me|00|00|00"))       // dangling escape
+        assertNull(PairingRequest.decode("aegis-pair-v1|1|name|00|00|00\\"))       // dangling escape
     }
 
     @Test

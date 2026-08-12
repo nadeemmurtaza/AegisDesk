@@ -153,26 +153,31 @@ object WireCodec {
 
     // ── field splitting with escaping (a raw SEP never splits inside a field) ──
 
-    /** Split into exactly [max] fields; SEPs inside escaped fields are ignored. */
+    /**
+     * Split into exactly [max] fields. Escapes are preserved VERBATIM (backslash
+     * + following char) so field boundaries are still found, and [unescape]
+     * resolves them exactly once afterwards — never unescape split output twice.
+     */
     private fun split(line: String, max: Int): List<String>? {
         val fields = mutableListOf<String>()
         val current = StringBuilder()
-        var escaped = false
-        for (ch in line) {
-            if (escaped) {
+        var i = 0
+        while (i < line.length) {
+            val ch = line[i]
+            if (ch == ESC) {
+                if (i + 1 >= line.length) return null // dangling escape — malformed
+                current.append(ch).append(line[i + 1])
+                i += 2
+            } else if (ch == SEP) {
+                if (fields.size == max - 1) return null // an (max+1)-th field appeared
+                fields.add(current.toString())
+                current.setLength(0)
+                i++
+            } else {
                 current.append(ch)
-                escaped = false
-            } else when (ch) {
-                ESC -> escaped = true
-                SEP -> {
-                    if (fields.size == max - 1) return null // an (max+1)-th field appeared
-                    fields.add(current.toString())
-                    current.setLength(0)
-                }
-                else -> current.append(ch)
+                i++
             }
         }
-        if (escaped) return null // dangling escape — malformed
         fields.add(current.toString())
         if (fields.size != max) return null
         return fields

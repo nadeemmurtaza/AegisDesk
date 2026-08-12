@@ -123,7 +123,7 @@ class WireCodecTest {
     fun hexRoundTrip() {
         val bytes = byteArrayOf(0, 1, 2, 15, 16, 127, -1, -128, 90)
         val encoded = Hex.encode(bytes)
-        assertEquals("0001020f107fff8090".lowercase(), encoded)
+        assertEquals("0001020f107fff805a".lowercase(), encoded) // last byte 90 = 0x5a
         assertContentEquals(bytes, Hex.decode(encoded)!!)
         assertNull(Hex.decode("abc"))
         assertNull(Hex.decode("zz"))

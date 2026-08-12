@@ -29,11 +29,11 @@ class RelayTransportTest {
     fun relayConvergenceEndToEnd() {
         val relay = when (val launch = NodeRelay.start()) {
             is NodeRelay.Launch.Unavailable -> {
-                assumeTrue(false, launch.reason)
+                assumeTrue(launch.reason, false)
                 return
             }
             is NodeRelay.Launch.Failed -> {
-                assumeTrue(false, launch.reason)
+                assumeTrue(launch.reason, false)
                 return
             }
             is NodeRelay.Launch.Running -> launch.relay
@@ -102,11 +102,11 @@ class RelayTransportTest {
     fun relayRejectsUnpairedInitiator() {
         val relay = when (val launch = NodeRelay.start()) {
             is NodeRelay.Launch.Unavailable -> {
-                assumeTrue(false, launch.reason)
+                assumeTrue(launch.reason, false)
                 return
             }
             is NodeRelay.Launch.Failed -> {
-                assumeTrue(false, launch.reason)
+                assumeTrue(launch.reason, false)
                 return
             }
             is NodeRelay.Launch.Running -> launch.relay
@@ -186,13 +186,14 @@ internal class NodeRelay private constructor(
         }
     }
 
-    companion object {
+    /** Launch outcome of [start] — declared on the class so `NodeRelay.Launch.X` resolves as a type path. */
+    sealed interface Launch {
+        data class Running(val relay: NodeRelay) : Launch
+        data class Failed(val reason: String) : Launch
+        data class Unavailable(val reason: String) : Launch
+    }
 
-        sealed interface Launch {
-            data class Running(val relay: NodeRelay) : Launch
-            data class Failed(val reason: String) : Launch
-            data class Unavailable(val reason: String) : Launch
-        }
+    companion object {
 
         fun start(): Launch {
             val node = findExecutable("node") ?: return Launch.Unavailable("node not on PATH")

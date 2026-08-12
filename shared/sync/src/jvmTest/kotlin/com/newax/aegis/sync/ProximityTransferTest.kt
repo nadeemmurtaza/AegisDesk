@@ -43,7 +43,7 @@ class ProximityTransferTest {
         val data = content(150_000) // 3 chunks of 64 KiB
 
         val senderThread = runSender(sender, senderKeys, receiverKeys.publicKey, "photo.jpg", data)
-        val result = ProximityTransfer.receive(crypto, receiver, receiverKeys, "dev-receiver") { true }
+        val result = ProximityTransfer.receive(crypto, receiver, receiverKeys, "dev-receiver", accept = { true })
 
         val received = assertIs<ProximityTransfer.Result.Received>(result)
         assertEquals("photo.jpg", received.fileName)
@@ -60,7 +60,7 @@ class ProximityTransferTest {
         val receiverKeys = crypto.newEcdhKeyPair()
 
         val senderThread = runSender(sender, senderKeys, receiverKeys.publicKey, "note.txt", ByteArray(0))
-        val result = ProximityTransfer.receive(crypto, receiver, receiverKeys, "dev-receiver") { true }
+        val result = ProximityTransfer.receive(crypto, receiver, receiverKeys, "dev-receiver", accept = { true })
 
         val received = assertIs<ProximityTransfer.Result.Received>(result)
         assertEquals(0, received.content.size)
@@ -76,7 +76,7 @@ class ProximityTransferTest {
 
         // Sealed to the real receiver; the eavesdropper tries to read it.
         val senderThread = runSender(sender, senderKeys, realReceiver.publicKey, "secret.pdf", content(10_000))
-        val result = ProximityTransfer.receive(crypto, receiver, eavesdropper, "dev-eavesdropper") { true }
+        val result = ProximityTransfer.receive(crypto, receiver, eavesdropper, "dev-eavesdropper", accept = { true })
 
         val failed = assertIs<ProximityTransfer.Result.Failed>(result)
         assertEquals("init", failed.stage)
@@ -92,11 +92,17 @@ class ProximityTransferTest {
         val receiverKeys = crypto.newEcdhKeyPair()
 
         val senderThread = runSender(sender, senderKeys, receiverKeys.publicKey, "doc.pdf", content(70_000))
-        val result = ProximityTransfer.receive(crypto, raw.second, receiverKeys, "dev-receiver") { true }
+        val result = ProximityTransfer.receive(crypto, raw.second, receiverKeys, "dev-receiver", accept = { true })
 
         val failed = assertIs<ProximityTransfer.Result.Failed>(result)
         assertEquals("chunk", failed.stage)
-        assertTrue("tampered" in failed.reason, "reason should name the tamper, got: ${failed.reason}")
+        // The flipped byte lands in the hex envelope, so the chunk is rejected
+        // either as malformed (envelope parse) or tampered (AEAD) — both mean
+        // the corrupted chunk never reached the receiver's buffer.
+        assertTrue(
+            "malformed" in failed.reason || "tampered" in failed.reason,
+            "reason should name the tamper, got: ${failed.reason}"
+        )
         senderThread.join(5_000)
     }
 
@@ -110,13 +116,13 @@ class ProximityTransferTest {
 
         val senderThread = Thread {
             senderResult.set(
-                ProximityTransfer.send(crypto, sender, senderKeys, receiverKeys.publicKey, "pic.png", data)
+                ProximityTransfer.send(crypto, sender, senderKeys, receiverKeys.publicKey, "dev-sender", "pic.png", data)
             )
         }.apply {
             isDaemon = true
             start()
         }
-        val result = ProximityTransfer.receive(crypto, receiver, receiverKeys, "dev-receiver") { false }
+        val result = ProximityTransfer.receive(crypto, receiver, receiverKeys, "dev-receiver", accept = { false })
 
         val failed = assertIs<ProximityTransfer.Result.Failed>(result)
         assertEquals("init", failed.stage)
@@ -139,7 +145,7 @@ class ProximityTransferTest {
 
         val senderThread = Thread {
             ProximityTransfer.send(
-                crypto, sender, senderKeys, receiverKeys.publicKey, "vid.mp4", data,
+                crypto, sender, senderKeys, receiverKeys.publicKey, "dev-sender", "vid.mp4", data,
                 object : ProximityTransfer.Progress {
                     override fun onChunk(index: Int, of: Int) {
                         sentChunks.incrementAndGet()
