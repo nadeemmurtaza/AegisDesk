@@ -1,0 +1,12 @@
+# Ignore all build artifacts but keep folder structure
+*
+!.gitignore
+
+# Track folder structure only
+android/.keep
+windows/.keep
+macos/.keep
+agents/.keep
+skills/.keep
+llm/.keep
+shared/.keep

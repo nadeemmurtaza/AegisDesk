@@ -15,3 +15,10 @@ keystore.properties
 
 .kotlin/
 
+# Build artifacts output folder (structure tracked, contents ignored)
+!artifacts/
+artifacts/*
+!artifacts/.gitignore
+!artifacts/README.md
+!artifacts/**/.keep
+
