@@ -27,10 +27,11 @@ kotlin {
     // per-target Room KSP configs below generate the native implementations.
     // Apple-target compiles run on a macOS host only (apple.yml); CI and this
     // Linux sandbox keep verifying jvm + android.
-    iosX64()
+    // Intel x64 Apple targets are dropped: androidx.sqlite:sqlite-framework
+    // 2.7.0 publishes no iosX64/macosX64 variants, and the KMP dependency
+    // checker fails the whole build when a declared target cannot resolve.
     iosArm64()
     iosSimulatorArm64()
-    macosX64()
     macosArm64()
 
     // KGP no longer applies the shared hierarchy template implicitly — create
@@ -42,17 +43,29 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":shared:core"))
-            // The sync engine's types (SyncEntry, Hlc, JournalStore) — the
-            // RoomJournalStore wiring slice maps them onto the DAOs. sync does
-            // NOT depend on database (Track I can't use Room), so this is the
-            // one-directional edge the design doc's "wiring slice" describes.
-            implementation(project(":shared:sync"))
             api("androidx.room:room-runtime:2.8.4")
             api("androidx.sqlite:sqlite-bundled:2.7.0")
             // required for coroutines Flow, etc in KMP
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
         }
+        // RoomJournalStore is JVM+Android only — shared:sync deliberately
+        // declares no Apple targets (the Keychain/CryptoKit actuals are a
+        // Mac/Xcode job, docs/SYNC_DESIGN.md §15), so any commonMain
+        // dependency on sync would break the Apple compiles of this module.
+        // Apple builds exclude this source set and stay sync-free.
+        val desktopAndroidMain by creating {
+            dependsOn(commonMain)
+            dependencies {
+                // The sync engine's types (SyncEntry, Hlc, JournalStore) — the
+                // RoomJournalStore wiring slice maps them onto the DAOs. sync
+                // does NOT depend on database (Track I can't use Room), so this
+                // is the one-directional edge the design doc's "wiring slice"
+                // describes.
+                implementation(project(":shared:sync"))
+            }
+        }
+        androidMain.dependsOn(desktopAndroidMain)
         androidMain.dependencies {
             // SQLCipher for Android — the successor artifact (the old
             // android-database-sqlcipher coordinate is deprecated). The API is
@@ -61,6 +74,9 @@ kotlin {
             implementation("net.zetetic:sqlcipher-android:4.17.0")
             implementation("androidx.sqlite:sqlite-ktx:2.7.0")
             implementation("androidx.room:room-ktx:2.8.4")
+        }
+        val desktopMain by getting {
+            dependsOn(desktopAndroidMain)
         }
         val appleMain = sourceSets.findByName("appleMain")
         appleMain?.dependencies {
@@ -91,9 +107,7 @@ dependencies {
     add("kspDesktop", "androidx.room:room-compiler:2.8.4")
     // Apple targets — per-target KSP for Room's codegen on native (R5: new
     // target = per-target KSP config added at the same moment).
-    add("kspIosX64", "androidx.room:room-compiler:2.8.4")
     add("kspIosArm64", "androidx.room:room-compiler:2.8.4")
     add("kspIosSimulatorArm64", "androidx.room:room-compiler:2.8.4")
-    add("kspMacosX64", "androidx.room:room-compiler:2.8.4")
     add("kspMacosArm64", "androidx.room:room-compiler:2.8.4")
 }

@@ -47,19 +47,19 @@ jobs:
         run: chmod +x gradlew
 
       - name: Compile shared:core for every target (expect/actual gate)
-        run: ./gradlew :shared:core:compileKotlinJvm :shared:core:assembleDebug --stacktrace
+        run: ./gradlew :shared:core:compileKotlinJvm :shared:core:assemble --stacktrace
 
       # platform-api is the capability contract (platform-free commonMain). jvmTest runs
-      # the commonTest contract tests on the JVM target; assembleDebug compiles the
-      # androidTarget. Same task naming as shared:core.
+      # the commonTest contract tests on the JVM target; assemble compiles the
+      # androidTarget (the AGP 9 KMP library plugin has no per-variant assembleDebug).
       - name: Compile shared:platform-api per target + run contract tests
-        run: ./gradlew :shared:platform-api:compileKotlinJvm :shared:platform-api:assembleDebug :shared:platform-api:jvmTest --stacktrace
+        run: ./gradlew :shared:platform-api:compileKotlinJvm :shared:platform-api:assemble :shared:platform-api:jvmTest --stacktrace
 
-      # desktopJar = jvm("desktop") compile + its Room KSP; assembleDebug = androidTarget
+      # desktopJar = jvm("desktop") compile + its Room KSP; assemble = androidTarget
       # compile + its Room KSP. Task naming is compileKotlin<Target>/<target>Jar — NOT
       # compileDesktopKotlin (KGP convention; compileKotlinJvm confirmed for shared:core).
       - name: Compile shared:database per target (expect/actual + Room KSP gate)
-        run: ./gradlew :shared:database:desktopJar :shared:database:assembleDebug --stacktrace
+        run: ./gradlew :shared:database:desktopJar :shared:database:assemble --stacktrace
 
       - name: "Build Android app — invariant: Android stays green"
         run: ./gradlew :apps:android:assembleDebug :apps:android:testDebugUnitTest --stacktrace

@@ -18,10 +18,10 @@ kotlin {
     // (expect-free commonMain) now compile for macOS + iOS. Apple-target
     // compiles run on a macOS host only; CI and this Linux sandbox keep
     // verifying jvm + android.
-    iosX64()
+    // Intel x64 Apple targets are dropped: the KMP dependency checker fails
+    // when a declared Apple target cannot resolve a shared dependency variant.
     iosArm64()
     iosSimulatorArm64()
-    macosX64()
     macosArm64()
 
     // KGP no longer applies the shared hierarchy template implicitly — keep the

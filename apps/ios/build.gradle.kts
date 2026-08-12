@@ -3,7 +3,8 @@ plugins {
 }
 
 kotlin {
-    iosX64()
+    // Intel x64 Apple targets are dropped: the KMP dependency checker fails
+    // when a declared Apple target cannot resolve a shared dependency variant.
     iosArm64()
     iosSimulatorArm64()
 

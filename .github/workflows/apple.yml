@@ -32,9 +32,7 @@ jobs:
         run: |
           ./gradlew \
             :shared:database:compileKotlinMacosArm64 \
-            :shared:database:compileKotlinMacosX64 \
             :shared:database:compileKotlinIosArm64 \
-            :shared:database:compileKotlinIosX64 \
             :shared:database:compileKotlinIosSimulatorArm64 \
             :shared:database:compileCommonMainKotlinMetadata \
             :shared:core:compileKotlinMacosArm64 \
