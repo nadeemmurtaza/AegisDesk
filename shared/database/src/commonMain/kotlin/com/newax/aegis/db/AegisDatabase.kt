@@ -271,7 +271,7 @@ abstract class AegisDatabase : RoomDatabase() {
                         resource TEXT NOT NULL,
                         agentId TEXT NOT NULL,
                         status TEXT NOT NULL,
-                        atMs INTEGER NOT NULL
+                        atMs INTEGER NOT NULL DEFAULT 0
                     )
                 """)
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_work_log_action ON work_log(action)")
@@ -334,11 +334,11 @@ abstract class AegisDatabase : RoomDatabase() {
                         category TEXT NOT NULL,
                         title TEXT NOT NULL,
                         content TEXT NOT NULL,
-                        confidence INTEGER NOT NULL,
+                        confidence INTEGER NOT NULL DEFAULT 80,
                         source TEXT NOT NULL,
                         status TEXT NOT NULL,
-                        createdAtMs INTEGER NOT NULL,
-                        decidedAtMs INTEGER NOT NULL,
+                        createdAtMs INTEGER NOT NULL DEFAULT 0,
+                        decidedAtMs INTEGER NOT NULL DEFAULT 0,
                         syncHcWall INTEGER NOT NULL DEFAULT 0,
                         syncHcCounter INTEGER NOT NULL DEFAULT 0,
                         syncDeviceId TEXT NOT NULL DEFAULT '',

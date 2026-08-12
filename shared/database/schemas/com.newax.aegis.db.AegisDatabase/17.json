@@ -1,0 +1,3757 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 17,
+    "identityHash": "1c73b76d0d94d32ff5995192fb3ffa30",
+    "entities": [
+      {
+        "tableName": "persons",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `importanceScore` REAL NOT NULL, `sourceCount` INTEGER NOT NULL, `totalMentions` INTEGER NOT NULL, `lastSeenMs` INTEGER NOT NULL, `profileBuilt` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importanceScore",
+            "columnName": "importanceScore",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceCount",
+            "columnName": "sourceCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalMentions",
+            "columnName": "totalMentions",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenMs",
+            "columnName": "lastSeenMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileBuilt",
+            "columnName": "profileBuilt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_persons_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_persons_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ]
+      },
+      {
+        "tableName": "person_mentions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personId` INTEGER NOT NULL, `sourceName` TEXT NOT NULL, `count` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`personId`, `sourceName`), FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "personId",
+            "columnName": "personId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceName",
+            "columnName": "sourceName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "count",
+            "columnName": "count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personId",
+            "sourceName"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_person_mentions_personId",
+            "unique": false,
+            "columnNames": [
+              "personId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_mentions_personId` ON `${TABLE_NAME}` (`personId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "persons",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "personId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "person_facts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `personId` INTEGER NOT NULL, `fact` TEXT NOT NULL, `category` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `timestampMs` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(`personId`) REFERENCES `persons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "personId",
+            "columnName": "personId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fact",
+            "columnName": "fact",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestampMs",
+            "columnName": "timestampMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_person_facts_personId",
+            "unique": false,
+            "columnNames": [
+              "personId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_facts_personId` ON `${TABLE_NAME}` (`personId`)"
+          },
+          {
+            "name": "index_person_facts_category",
+            "unique": false,
+            "columnNames": [
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_facts_category` ON `${TABLE_NAME}` (`category`)"
+          },
+          {
+            "name": "index_person_facts_personId_category",
+            "unique": false,
+            "columnNames": [
+              "personId",
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_facts_personId_category` ON `${TABLE_NAME}` (`personId`, `category`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "persons",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "personId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "person_facts_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`fact` TEXT NOT NULL, `category` TEXT NOT NULL, `source` TEXT NOT NULL, content=`person_facts`)",
+        "fields": [
+          {
+            "fieldPath": "fact",
+            "columnName": "fact",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "rowid"
+          ]
+        },
+        "ftsVersion": "FTS4",
+        "ftsOptions": {
+          "tokenizer": "simple",
+          "tokenizerArgs": [],
+          "contentTable": "person_facts",
+          "languageIdColumnName": "",
+          "matchInfo": "FTS4",
+          "notIndexedColumns": [],
+          "prefixSizes": [],
+          "preferredOrder": "ASC"
+        },
+        "contentSyncTriggers": [
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_person_facts_fts_BEFORE_UPDATE BEFORE UPDATE ON `person_facts` BEGIN DELETE FROM `person_facts_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_person_facts_fts_BEFORE_DELETE BEFORE DELETE ON `person_facts` BEGIN DELETE FROM `person_facts_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_person_facts_fts_AFTER_UPDATE AFTER UPDATE ON `person_facts` BEGIN INSERT INTO `person_facts_fts`(`docid`, `fact`, `category`, `source`) VALUES (NEW.`rowid`, NEW.`fact`, NEW.`category`, NEW.`source`); END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_person_facts_fts_AFTER_INSERT AFTER INSERT ON `person_facts` BEGIN INSERT INTO `person_facts_fts`(`docid`, `fact`, `category`, `source`) VALUES (NEW.`rowid`, NEW.`fact`, NEW.`category`, NEW.`source`); END"
+        ]
+      },
+      {
+        "tableName": "learning_drafts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `category` TEXT NOT NULL, `fact` TEXT NOT NULL, `source` TEXT NOT NULL, `sourceSnippet` TEXT NOT NULL, `confidence` REAL NOT NULL, `status` TEXT NOT NULL, `subjectName` TEXT, `timestampMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fact",
+            "columnName": "fact",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceSnippet",
+            "columnName": "sourceSnippet",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subjectName",
+            "columnName": "subjectName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "timestampMs",
+            "columnName": "timestampMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_learning_drafts_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_learning_drafts_subjectName",
+            "unique": false,
+            "columnNames": [
+              "subjectName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_drafts_subjectName` ON `${TABLE_NAME}` (`subjectName`)"
+          },
+          {
+            "name": "index_learning_drafts_status_timestampMs",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "timestampMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_drafts_status_timestampMs` ON `${TABLE_NAME}` (`status`, `timestampMs`)"
+          }
+        ]
+      },
+      {
+        "tableName": "kv_store",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, `updatedMs` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedMs",
+            "columnName": "updatedMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "embeddings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceType` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `text` TEXT NOT NULL, `embedding` BLOB NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "sourceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "embedding",
+            "columnName": "embedding",
+            "affinity": "BLOB",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_embeddings_sourceType",
+            "unique": false,
+            "columnNames": [
+              "sourceType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_embeddings_sourceType` ON `${TABLE_NAME}` (`sourceType`)"
+          },
+          {
+            "name": "index_embeddings_sourceId",
+            "unique": true,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_embeddings_sourceId` ON `${TABLE_NAME}` (`sourceId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "triples",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subject` TEXT NOT NULL, `predicate` TEXT NOT NULL, `objectValue` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `createdMs` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subject",
+            "columnName": "subject",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "predicate",
+            "columnName": "predicate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "objectValue",
+            "columnName": "objectValue",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_triples_subject",
+            "unique": false,
+            "columnNames": [
+              "subject"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_triples_subject` ON `${TABLE_NAME}` (`subject`)"
+          },
+          {
+            "name": "index_triples_predicate",
+            "unique": false,
+            "columnNames": [
+              "predicate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_triples_predicate` ON `${TABLE_NAME}` (`predicate`)"
+          },
+          {
+            "name": "index_triples_subject_predicate",
+            "unique": false,
+            "columnNames": [
+              "subject",
+              "predicate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_triples_subject_predicate` ON `${TABLE_NAME}` (`subject`, `predicate`)"
+          },
+          {
+            "name": "index_triples_objectValue",
+            "unique": false,
+            "columnNames": [
+              "objectValue"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_triples_objectValue` ON `${TABLE_NAME}` (`objectValue`)"
+          }
+        ]
+      },
+      {
+        "tableName": "entities",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL DEFAULT 0, `canonicalName` TEXT NOT NULL, `payloadPointer` INTEGER, `createdAt` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canonicalName",
+            "columnName": "canonicalName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadPointer",
+            "columnName": "payloadPointer",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_entities_canonicalName",
+            "unique": false,
+            "columnNames": [
+              "canonicalName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_entities_canonicalName` ON `${TABLE_NAME}` (`canonicalName`)"
+          }
+        ]
+      },
+      {
+        "tableName": "predicates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_predicates_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_predicates_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ]
+      },
+      {
+        "tableName": "edges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `subjectId` INTEGER NOT NULL, `predicateId` INTEGER NOT NULL, `objectId` INTEGER, `objectValue` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `sourceId` INTEGER, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subjectId",
+            "columnName": "subjectId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "predicateId",
+            "columnName": "predicateId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "objectId",
+            "columnName": "objectId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "objectValue",
+            "columnName": "objectValue",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "importance",
+            "columnName": "importance",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "50"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "validFrom",
+            "columnName": "validFrom",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "validUntil",
+            "columnName": "validUntil",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_edges_subjectId_predicateId",
+            "unique": false,
+            "columnNames": [
+              "subjectId",
+              "predicateId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId` ON `${TABLE_NAME}` (`subjectId`, `predicateId`)"
+          },
+          {
+            "name": "index_edges_predicateId_objectId",
+            "unique": false,
+            "columnNames": [
+              "predicateId",
+              "objectId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_edges_predicateId_objectId` ON `${TABLE_NAME}` (`predicateId`, `objectId`)"
+          },
+          {
+            "name": "index_edges_subjectId_predicateId_objectId",
+            "unique": false,
+            "columnNames": [
+              "subjectId",
+              "predicateId",
+              "objectId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_edges_subjectId_predicateId_objectId` ON `${TABLE_NAME}` (`subjectId`, `predicateId`, `objectId`)"
+          },
+          {
+            "name": "index_edges_validUntil",
+            "unique": false,
+            "columnNames": [
+              "validUntil"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_edges_validUntil` ON `${TABLE_NAME}` (`validUntil`)"
+          }
+        ]
+      },
+      {
+        "tableName": "blobs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "entity_aliases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`entityId` INTEGER NOT NULL, `alias` TEXT NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`entityId`, `alias`))",
+        "fields": [
+          {
+            "fieldPath": "entityId",
+            "columnName": "entityId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "entityId",
+            "alias"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_entity_aliases_alias",
+            "unique": false,
+            "columnNames": [
+              "alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_entity_aliases_alias` ON `${TABLE_NAME}` (`alias`)"
+          }
+        ]
+      },
+      {
+        "tableName": "memory_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` INTEGER NOT NULL, `content` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `subject` TEXT NOT NULL DEFAULT '', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `importance` INTEGER NOT NULL DEFAULT 50, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `validFrom` INTEGER, `validUntil` INTEGER, `contentHash` TEXT NOT NULL DEFAULT '', `graphEdgeId` INTEGER, `embeddingId` TEXT, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "subject",
+            "columnName": "subject",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "importance",
+            "columnName": "importance",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "50"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "validFrom",
+            "columnName": "validFrom",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "validUntil",
+            "columnName": "validUntil",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "contentHash",
+            "columnName": "contentHash",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "graphEdgeId",
+            "columnName": "graphEdgeId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "embeddingId",
+            "columnName": "embeddingId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_memory_records_contentHash",
+            "unique": false,
+            "columnNames": [
+              "contentHash"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_contentHash` ON `${TABLE_NAME}` (`contentHash`)"
+          },
+          {
+            "name": "index_memory_records_subject",
+            "unique": false,
+            "columnNames": [
+              "subject"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_subject` ON `${TABLE_NAME}` (`subject`)"
+          },
+          {
+            "name": "index_memory_records_type",
+            "unique": false,
+            "columnNames": [
+              "type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_type` ON `${TABLE_NAME}` (`type`)"
+          },
+          {
+            "name": "index_memory_records_createdAt",
+            "unique": false,
+            "columnNames": [
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_createdAt` ON `${TABLE_NAME}` (`createdAt`)"
+          },
+          {
+            "name": "index_memory_records_validUntil",
+            "unique": false,
+            "columnNames": [
+              "validUntil"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_records_validUntil` ON `${TABLE_NAME}` (`validUntil`)"
+          }
+        ]
+      },
+      {
+        "tableName": "app_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `label` TEXT NOT NULL, `version` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `launchActivity` TEXT, `needsValidation` INTEGER NOT NULL DEFAULT 0, `lastScanMs` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "launchActivity",
+            "columnName": "launchActivity",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "needsValidation",
+            "columnName": "needsValidation",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastScanMs",
+            "columnName": "lastScanMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_app_records_packageName",
+            "unique": true,
+            "columnNames": [
+              "packageName"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_app_records_packageName` ON `${TABLE_NAME}` (`packageName`)"
+          }
+        ]
+      },
+      {
+        "tableName": "app_capability_links",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `intentAction` TEXT, `deepLinkPattern` TEXT, `mimeTypes` TEXT, `confidence` INTEGER NOT NULL DEFAULT 80, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`packageName`, `capability`))",
+        "fields": [
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capability",
+            "columnName": "capability",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intentAction",
+            "columnName": "intentAction",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "deepLinkPattern",
+            "columnName": "deepLinkPattern",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mimeTypes",
+            "columnName": "mimeTypes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "packageName",
+            "capability"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_app_capability_links_capability",
+            "unique": false,
+            "columnNames": [
+              "capability"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_app_capability_links_capability` ON `${TABLE_NAME}` (`capability`)"
+          }
+        ]
+      },
+      {
+        "tableName": "ui_procedures",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `versionRange` TEXT NOT NULL, `taskCapability` TEXT NOT NULL, `steps` TEXT NOT NULL, `screenSignature` TEXT NOT NULL DEFAULT '', `prerequisites` TEXT NOT NULL DEFAULT '', `recoveryPaths` TEXT NOT NULL DEFAULT '', `successConditions` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `successCount` INTEGER NOT NULL DEFAULT 0, `failureCount` INTEGER NOT NULL DEFAULT 0, `lastRunMs` INTEGER NOT NULL DEFAULT 0, `needsValidation` INTEGER NOT NULL DEFAULT 0, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionRange",
+            "columnName": "versionRange",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "taskCapability",
+            "columnName": "taskCapability",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "steps",
+            "columnName": "steps",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "screenSignature",
+            "columnName": "screenSignature",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "prerequisites",
+            "columnName": "prerequisites",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "recoveryPaths",
+            "columnName": "recoveryPaths",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "successConditions",
+            "columnName": "successConditions",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "successCount",
+            "columnName": "successCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "failureCount",
+            "columnName": "failureCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastRunMs",
+            "columnName": "lastRunMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "needsValidation",
+            "columnName": "needsValidation",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ui_procedures_packageName",
+            "unique": false,
+            "columnNames": [
+              "packageName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ui_procedures_packageName` ON `${TABLE_NAME}` (`packageName`)"
+          },
+          {
+            "name": "index_ui_procedures_taskCapability",
+            "unique": false,
+            "columnNames": [
+              "taskCapability"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ui_procedures_taskCapability` ON `${TABLE_NAME}` (`taskCapability`)"
+          }
+        ]
+      },
+      {
+        "tableName": "screen_nodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `screenSignature` TEXT NOT NULL, `screenType` TEXT NOT NULL DEFAULT '', `nodes` TEXT NOT NULL DEFAULT '', `appVersion` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`packageName`, `screenSignature`))",
+        "fields": [
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "screenSignature",
+            "columnName": "screenSignature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "screenType",
+            "columnName": "screenType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "nodes",
+            "columnName": "nodes",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "appVersion",
+            "columnName": "appVersion",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "packageName",
+            "screenSignature"
+          ]
+        }
+      },
+      {
+        "tableName": "nav_edges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fromSignature` TEXT NOT NULL, `toSignature` TEXT NOT NULL, `actionViewId` TEXT NOT NULL DEFAULT '', `actionContentDesc` TEXT NOT NULL DEFAULT '', `actionText` TEXT NOT NULL DEFAULT '')",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromSignature",
+            "columnName": "fromSignature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toSignature",
+            "columnName": "toSignature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionViewId",
+            "columnName": "actionViewId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "actionContentDesc",
+            "columnName": "actionContentDesc",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "actionText",
+            "columnName": "actionText",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_nav_edges_fromSignature",
+            "unique": false,
+            "columnNames": [
+              "fromSignature"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nav_edges_fromSignature` ON `${TABLE_NAME}` (`fromSignature`)"
+          },
+          {
+            "name": "index_nav_edges_toSignature",
+            "unique": false,
+            "columnNames": [
+              "toSignature"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nav_edges_toSignature` ON `${TABLE_NAME}` (`toSignature`)"
+          }
+        ]
+      },
+      {
+        "tableName": "person_snapshots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `displayName` TEXT NOT NULL, `canonicalPhone` TEXT, `canonicalEmail` TEXT, `preferredChannel` TEXT, `preferredLanguage` TEXT NOT NULL DEFAULT '', `preferredTone` TEXT NOT NULL DEFAULT '', `relationshipType` TEXT NOT NULL DEFAULT '', `activeProjectId` TEXT, `pendingCommitmentCount` INTEGER NOT NULL DEFAULT 0, `recentTopics` TEXT NOT NULL DEFAULT '', `lastInteractionMs` INTEGER NOT NULL DEFAULT 0, `importanceScore` INTEGER NOT NULL DEFAULT 50, `snapshotUpdatedMs` INTEGER NOT NULL DEFAULT 0, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`personEntityId`))",
+        "fields": [
+          {
+            "fieldPath": "personEntityId",
+            "columnName": "personEntityId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalPhone",
+            "columnName": "canonicalPhone",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "canonicalEmail",
+            "columnName": "canonicalEmail",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "preferredChannel",
+            "columnName": "preferredChannel",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "preferredLanguage",
+            "columnName": "preferredLanguage",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "preferredTone",
+            "columnName": "preferredTone",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "relationshipType",
+            "columnName": "relationshipType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "activeProjectId",
+            "columnName": "activeProjectId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pendingCommitmentCount",
+            "columnName": "pendingCommitmentCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "recentTopics",
+            "columnName": "recentTopics",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "lastInteractionMs",
+            "columnName": "lastInteractionMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "importanceScore",
+            "columnName": "importanceScore",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "50"
+          },
+          {
+            "fieldPath": "snapshotUpdatedMs",
+            "columnName": "snapshotUpdatedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personEntityId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_person_snapshots_personEntityId",
+            "unique": true,
+            "columnNames": [
+              "personEntityId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_person_snapshots_personEntityId` ON `${TABLE_NAME}` (`personEntityId`)"
+          },
+          {
+            "name": "index_person_snapshots_lastInteractionMs",
+            "unique": false,
+            "columnNames": [
+              "lastInteractionMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_person_snapshots_lastInteractionMs` ON `${TABLE_NAME}` (`lastInteractionMs`)"
+          }
+        ]
+      },
+      {
+        "tableName": "person_policies",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `canAutoOpenChat` INTEGER NOT NULL DEFAULT 1, `canAutoDraft` INTEGER NOT NULL DEFAULT 1, `canAutoSend` INTEGER NOT NULL DEFAULT 0, `canCallWithoutConfirm` INTEGER NOT NULL DEFAULT 0, `canShareFiles` INTEGER NOT NULL DEFAULT 1, `sensitiveActionsRequireConfirm` INTEGER NOT NULL DEFAULT 1, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`personEntityId`))",
+        "fields": [
+          {
+            "fieldPath": "personEntityId",
+            "columnName": "personEntityId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canAutoOpenChat",
+            "columnName": "canAutoOpenChat",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "canAutoDraft",
+            "columnName": "canAutoDraft",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "canAutoSend",
+            "columnName": "canAutoSend",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canCallWithoutConfirm",
+            "columnName": "canCallWithoutConfirm",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canShareFiles",
+            "columnName": "canShareFiles",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "sensitiveActionsRequireConfirm",
+            "columnName": "sensitiveActionsRequireConfirm",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personEntityId"
+          ]
+        }
+      },
+      {
+        "tableName": "person_channel_prefs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`personEntityId` INTEGER NOT NULL, `taskContext` TEXT NOT NULL, `packageName` TEXT NOT NULL, `capability` TEXT NOT NULL, `probability` REAL NOT NULL DEFAULT 0.8, `evidenceCount` INTEGER NOT NULL DEFAULT 1, `lastUpdatedMs` INTEGER NOT NULL, PRIMARY KEY(`personEntityId`, `taskContext`))",
+        "fields": [
+          {
+            "fieldPath": "personEntityId",
+            "columnName": "personEntityId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "taskContext",
+            "columnName": "taskContext",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capability",
+            "columnName": "capability",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probability",
+            "columnName": "probability",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0.8"
+          },
+          {
+            "fieldPath": "evidenceCount",
+            "columnName": "evidenceCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "lastUpdatedMs",
+            "columnName": "lastUpdatedMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "personEntityId",
+            "taskContext"
+          ]
+        }
+      },
+      {
+        "tableName": "commitments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `debtorPersonId` INTEGER, `creditorPersonId` INTEGER, `debtorLabel` TEXT NOT NULL, `creditorLabel` TEXT NOT NULL, `action` TEXT NOT NULL, `dueMs` INTEGER, `status` TEXT NOT NULL DEFAULT 'pending', `source` TEXT NOT NULL DEFAULT '', `confidence` INTEGER NOT NULL DEFAULT 80, `createdMs` INTEGER NOT NULL, `resolvedMs` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "debtorPersonId",
+            "columnName": "debtorPersonId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "creditorPersonId",
+            "columnName": "creditorPersonId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "debtorLabel",
+            "columnName": "debtorLabel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creditorLabel",
+            "columnName": "creditorLabel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dueMs",
+            "columnName": "dueMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'pending'"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resolvedMs",
+            "columnName": "resolvedMs",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_commitments_debtorPersonId",
+            "unique": false,
+            "columnNames": [
+              "debtorPersonId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_commitments_debtorPersonId` ON `${TABLE_NAME}` (`debtorPersonId`)"
+          },
+          {
+            "name": "index_commitments_creditorPersonId",
+            "unique": false,
+            "columnNames": [
+              "creditorPersonId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_commitments_creditorPersonId` ON `${TABLE_NAME}` (`creditorPersonId`)"
+          },
+          {
+            "name": "index_commitments_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_commitments_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_commitments_dueMs",
+            "unique": false,
+            "columnNames": [
+              "dueMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_commitments_dueMs` ON `${TABLE_NAME}` (`dueMs`)"
+          }
+        ]
+      },
+      {
+        "tableName": "trigger_rules",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `label` TEXT NOT NULL, `conditionType` TEXT NOT NULL, `conditionParams` TEXT NOT NULL, `actionType` TEXT NOT NULL, `actionParams` TEXT NOT NULL, `enabled` INTEGER NOT NULL DEFAULT 1, `debounceMs` INTEGER NOT NULL DEFAULT 30000, `lastFiredMs` INTEGER NOT NULL DEFAULT 0, `createdMs` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "conditionType",
+            "columnName": "conditionType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "conditionParams",
+            "columnName": "conditionParams",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionType",
+            "columnName": "actionType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionParams",
+            "columnName": "actionParams",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "debounceMs",
+            "columnName": "debounceMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "30000"
+          },
+          {
+            "fieldPath": "lastFiredMs",
+            "columnName": "lastFiredMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_trigger_rules_enabled",
+            "unique": false,
+            "columnNames": [
+              "enabled"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_trigger_rules_enabled` ON `${TABLE_NAME}` (`enabled`)"
+          },
+          {
+            "name": "index_trigger_rules_conditionType",
+            "unique": false,
+            "columnNames": [
+              "conditionType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_trigger_rules_conditionType` ON `${TABLE_NAME}` (`conditionType`)"
+          }
+        ]
+      },
+      {
+        "tableName": "file_objects",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `path` TEXT NOT NULL, `contentUriString` TEXT NOT NULL DEFAULT '', `mediaStoreId` INTEGER NOT NULL DEFAULT 0, `filename` TEXT NOT NULL, `extension` TEXT NOT NULL, `mimeType` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `createdMs` INTEGER NOT NULL DEFAULT 0, `modifiedMs` INTEGER NOT NULL DEFAULT 0, `receivedMs` INTEGER NOT NULL DEFAULT 0, `lastOpenedMs` INTEGER NOT NULL DEFAULT 0, `sourceApp` TEXT NOT NULL DEFAULT '', `folder` TEXT NOT NULL DEFAULT '', `sha256` TEXT NOT NULL DEFAULT '', `pHash` TEXT NOT NULL DEFAULT '', `metadataJson` TEXT NOT NULL DEFAULT '', `thumbnailPath` TEXT, `entitiesJson` TEXT NOT NULL DEFAULT '', `conceptsJson` TEXT NOT NULL DEFAULT '', `graphEntityId` INTEGER, `embeddingId` INTEGER, `indexState` INTEGER NOT NULL DEFAULT 0, `isDuplicate` INTEGER NOT NULL DEFAULT 0, `canonicalId` INTEGER, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "path",
+            "columnName": "path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentUriString",
+            "columnName": "contentUriString",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "mediaStoreId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "filename",
+            "columnName": "filename",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extension",
+            "columnName": "extension",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "sizeBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdMs",
+            "columnName": "createdMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "modifiedMs",
+            "columnName": "modifiedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "receivedMs",
+            "columnName": "receivedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastOpenedMs",
+            "columnName": "lastOpenedMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "sourceApp",
+            "columnName": "sourceApp",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "folder",
+            "columnName": "folder",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "pHash",
+            "columnName": "pHash",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "metadataJson",
+            "columnName": "metadataJson",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "thumbnailPath",
+            "columnName": "thumbnailPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "entitiesJson",
+            "columnName": "entitiesJson",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "conceptsJson",
+            "columnName": "conceptsJson",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "graphEntityId",
+            "columnName": "graphEntityId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "embeddingId",
+            "columnName": "embeddingId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "indexState",
+            "columnName": "indexState",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isDuplicate",
+            "columnName": "isDuplicate",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "canonicalId",
+            "columnName": "canonicalId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_file_objects_path",
+            "unique": true,
+            "columnNames": [
+              "path"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_file_objects_path` ON `${TABLE_NAME}` (`path`)"
+          },
+          {
+            "name": "index_file_objects_sha256",
+            "unique": false,
+            "columnNames": [
+              "sha256"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_sha256` ON `${TABLE_NAME}` (`sha256`)"
+          },
+          {
+            "name": "index_file_objects_pHash",
+            "unique": false,
+            "columnNames": [
+              "pHash"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_pHash` ON `${TABLE_NAME}` (`pHash`)"
+          },
+          {
+            "name": "index_file_objects_extension",
+            "unique": false,
+            "columnNames": [
+              "extension"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_extension` ON `${TABLE_NAME}` (`extension`)"
+          },
+          {
+            "name": "index_file_objects_folder",
+            "unique": false,
+            "columnNames": [
+              "folder"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_folder` ON `${TABLE_NAME}` (`folder`)"
+          },
+          {
+            "name": "index_file_objects_mimeType",
+            "unique": false,
+            "columnNames": [
+              "mimeType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_mimeType` ON `${TABLE_NAME}` (`mimeType`)"
+          },
+          {
+            "name": "index_file_objects_sourceApp",
+            "unique": false,
+            "columnNames": [
+              "sourceApp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_sourceApp` ON `${TABLE_NAME}` (`sourceApp`)"
+          },
+          {
+            "name": "index_file_objects_modifiedMs",
+            "unique": false,
+            "columnNames": [
+              "modifiedMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_modifiedMs` ON `${TABLE_NAME}` (`modifiedMs`)"
+          },
+          {
+            "name": "index_file_objects_createdMs",
+            "unique": false,
+            "columnNames": [
+              "createdMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_createdMs` ON `${TABLE_NAME}` (`createdMs`)"
+          },
+          {
+            "name": "index_file_objects_receivedMs",
+            "unique": false,
+            "columnNames": [
+              "receivedMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_receivedMs` ON `${TABLE_NAME}` (`receivedMs`)"
+          },
+          {
+            "name": "index_file_objects_indexState",
+            "unique": false,
+            "columnNames": [
+              "indexState"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_indexState` ON `${TABLE_NAME}` (`indexState`)"
+          },
+          {
+            "name": "index_file_objects_graphEntityId",
+            "unique": false,
+            "columnNames": [
+              "graphEntityId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_objects_graphEntityId` ON `${TABLE_NAME}` (`graphEntityId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "file_text_content",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fileId` INTEGER NOT NULL, `text` TEXT NOT NULL, `language` TEXT NOT NULL DEFAULT '', `pageCount` INTEGER NOT NULL DEFAULT 0, `wordCount` INTEGER NOT NULL DEFAULT 0, `extractedMs` INTEGER NOT NULL, PRIMARY KEY(`fileId`))",
+        "fields": [
+          {
+            "fieldPath": "fileId",
+            "columnName": "fileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "pageCount",
+            "columnName": "pageCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "wordCount",
+            "columnName": "wordCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "extractedMs",
+            "columnName": "extractedMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fileId"
+          ]
+        }
+      },
+      {
+        "tableName": "file_text_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`text` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "rowid"
+          ]
+        },
+        "ftsVersion": "FTS4",
+        "ftsOptions": {
+          "tokenizer": "simple",
+          "tokenizerArgs": [],
+          "contentTable": "",
+          "languageIdColumnName": "",
+          "matchInfo": "FTS4",
+          "notIndexedColumns": [],
+          "prefixSizes": [],
+          "preferredOrder": "ASC"
+        },
+        "contentSyncTriggers": []
+      },
+      {
+        "tableName": "file_entity_links",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fileId` INTEGER NOT NULL, `entityLabel` TEXT NOT NULL, `entityType` TEXT NOT NULL, `graphEntityId` INTEGER, PRIMARY KEY(`fileId`, `entityLabel`))",
+        "fields": [
+          {
+            "fieldPath": "fileId",
+            "columnName": "fileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityLabel",
+            "columnName": "entityLabel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityType",
+            "columnName": "entityType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "graphEntityId",
+            "columnName": "graphEntityId",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fileId",
+            "entityLabel"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_file_entity_links_entityLabel",
+            "unique": false,
+            "columnNames": [
+              "entityLabel"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_entity_links_entityLabel` ON `${TABLE_NAME}` (`entityLabel`)"
+          },
+          {
+            "name": "index_file_entity_links_entityType",
+            "unique": false,
+            "columnNames": [
+              "entityType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_entity_links_entityType` ON `${TABLE_NAME}` (`entityType`)"
+          },
+          {
+            "name": "index_file_entity_links_graphEntityId",
+            "unique": false,
+            "columnNames": [
+              "graphEntityId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_file_entity_links_graphEntityId` ON `${TABLE_NAME}` (`graphEntityId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "sync_journal",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`opId` TEXT NOT NULL, `deviceId` TEXT NOT NULL, `hlcWall` INTEGER NOT NULL DEFAULT 0, `hlcCounter` INTEGER NOT NULL DEFAULT 0, `kind` TEXT NOT NULL, `tableName` TEXT NOT NULL, `key` TEXT NOT NULL, `payload` BLOB NOT NULL, `tombstone` INTEGER NOT NULL DEFAULT 0, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`opId`))",
+        "fields": [
+          {
+            "fieldPath": "opId",
+            "columnName": "opId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceId",
+            "columnName": "deviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hlcWall",
+            "columnName": "hlcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "hlcCounter",
+            "columnName": "hlcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tableName",
+            "columnName": "tableName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tombstone",
+            "columnName": "tombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "opId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sync_journal_tableName",
+            "unique": false,
+            "columnNames": [
+              "tableName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_journal_tableName` ON `${TABLE_NAME}` (`tableName`)"
+          },
+          {
+            "name": "index_sync_journal_tableName_key",
+            "unique": false,
+            "columnNames": [
+              "tableName",
+              "key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_journal_tableName_key` ON `${TABLE_NAME}` (`tableName`, `key`)"
+          },
+          {
+            "name": "index_sync_journal_deviceId",
+            "unique": false,
+            "columnNames": [
+              "deviceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_journal_deviceId` ON `${TABLE_NAME}` (`deviceId`)"
+          },
+          {
+            "name": "index_sync_journal_hlcWall_hlcCounter",
+            "unique": false,
+            "columnNames": [
+              "hlcWall",
+              "hlcCounter"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_journal_hlcWall_hlcCounter` ON `${TABLE_NAME}` (`hlcWall`, `hlcCounter`)"
+          }
+        ]
+      },
+      {
+        "tableName": "sync_vector",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`peerDeviceId` TEXT NOT NULL, `lastAppliedHlcWall` INTEGER NOT NULL DEFAULT 0, `lastAppliedHlcCounter` INTEGER NOT NULL DEFAULT 0, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`peerDeviceId`))",
+        "fields": [
+          {
+            "fieldPath": "peerDeviceId",
+            "columnName": "peerDeviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAppliedHlcWall",
+            "columnName": "lastAppliedHlcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastAppliedHlcCounter",
+            "columnName": "lastAppliedHlcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "peerDeviceId"
+          ]
+        }
+      },
+      {
+        "tableName": "agent_scratchpad",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`agentId` TEXT NOT NULL, `key` TEXT NOT NULL, `value` TEXT NOT NULL, `updatedAtMs` INTEGER NOT NULL DEFAULT 0, `expiresAtMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`agentId`, `key`))",
+        "fields": [
+          {
+            "fieldPath": "agentId",
+            "columnName": "agentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updatedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "expiresAtMs",
+            "columnName": "expiresAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "agentId",
+            "key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_agent_scratchpad_agentId",
+            "unique": false,
+            "columnNames": [
+              "agentId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_agent_scratchpad_agentId` ON `${TABLE_NAME}` (`agentId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "episodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `episodeId` TEXT NOT NULL, `agentId` TEXT NOT NULL, `category` TEXT NOT NULL, `summary` TEXT NOT NULL, `outcome` TEXT NOT NULL, `lesson` TEXT NOT NULL, `occurredAtMs` INTEGER NOT NULL, `contextRef` TEXT NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "episodeId",
+            "columnName": "episodeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "agentId",
+            "columnName": "agentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outcome",
+            "columnName": "outcome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lesson",
+            "columnName": "lesson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAtMs",
+            "columnName": "occurredAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contextRef",
+            "columnName": "contextRef",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_episodes_agentId",
+            "unique": false,
+            "columnNames": [
+              "agentId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_agentId` ON `${TABLE_NAME}` (`agentId`)"
+          },
+          {
+            "name": "index_episodes_occurredAtMs",
+            "unique": false,
+            "columnNames": [
+              "occurredAtMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_occurredAtMs` ON `${TABLE_NAME}` (`occurredAtMs`)"
+          },
+          {
+            "name": "index_episodes_outcome",
+            "unique": false,
+            "columnNames": [
+              "outcome"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_outcome` ON `${TABLE_NAME}` (`outcome`)"
+          }
+        ]
+      },
+      {
+        "tableName": "handoffs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `handoffId` TEXT NOT NULL, `fromAgent` TEXT NOT NULL, `toAgent` TEXT NOT NULL, `task` TEXT NOT NULL, `summary` TEXT NOT NULL, `artifactJson` TEXT NOT NULL, `status` TEXT NOT NULL, `refId` TEXT NOT NULL, `createdAtMs` INTEGER NOT NULL, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "handoffId",
+            "columnName": "handoffId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromAgent",
+            "columnName": "fromAgent",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toAgent",
+            "columnName": "toAgent",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "task",
+            "columnName": "task",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "artifactJson",
+            "columnName": "artifactJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "refId",
+            "columnName": "refId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "createdAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_handoffs_fromAgent",
+            "unique": false,
+            "columnNames": [
+              "fromAgent"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_handoffs_fromAgent` ON `${TABLE_NAME}` (`fromAgent`)"
+          },
+          {
+            "name": "index_handoffs_toAgent",
+            "unique": false,
+            "columnNames": [
+              "toAgent"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_handoffs_toAgent` ON `${TABLE_NAME}` (`toAgent`)"
+          },
+          {
+            "name": "index_handoffs_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_handoffs_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_handoffs_createdAtMs",
+            "unique": false,
+            "columnNames": [
+              "createdAtMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_handoffs_createdAtMs` ON `${TABLE_NAME}` (`createdAtMs`)"
+          }
+        ]
+      },
+      {
+        "tableName": "work_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `action` TEXT NOT NULL, `resource` TEXT NOT NULL, `agentId` TEXT NOT NULL, `status` TEXT NOT NULL, `atMs` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resource",
+            "columnName": "resource",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "agentId",
+            "columnName": "agentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "atMs",
+            "columnName": "atMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_work_log_action",
+            "unique": false,
+            "columnNames": [
+              "action"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_work_log_action` ON `${TABLE_NAME}` (`action`)"
+          },
+          {
+            "name": "index_work_log_resource",
+            "unique": false,
+            "columnNames": [
+              "resource"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_work_log_resource` ON `${TABLE_NAME}` (`resource`)"
+          },
+          {
+            "name": "index_work_log_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_work_log_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ]
+      },
+      {
+        "tableName": "library_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `entryId` TEXT NOT NULL, `category` TEXT NOT NULL, `title` TEXT NOT NULL, `content` TEXT NOT NULL, `confidence` INTEGER NOT NULL DEFAULT 80, `source` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtMs` INTEGER NOT NULL DEFAULT 0, `decidedAtMs` INTEGER NOT NULL DEFAULT 0, `syncHcWall` INTEGER NOT NULL DEFAULT 0, `syncHcCounter` INTEGER NOT NULL DEFAULT 0, `syncDeviceId` TEXT NOT NULL DEFAULT '', `syncTombstone` INTEGER NOT NULL DEFAULT 0)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entryId",
+            "columnName": "entryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "80"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "createdAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "decidedAtMs",
+            "columnName": "decidedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcWall",
+            "columnName": "syncHcWall",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncHcCounter",
+            "columnName": "syncHcCounter",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "syncDeviceId",
+            "columnName": "syncDeviceId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "syncTombstone",
+            "columnName": "syncTombstone",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_library_entries_category",
+            "unique": false,
+            "columnNames": [
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_entries_category` ON `${TABLE_NAME}` (`category`)"
+          },
+          {
+            "name": "index_library_entries_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_entries_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_library_entries_title",
+            "unique": false,
+            "columnNames": [
+              "title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_entries_title` ON `${TABLE_NAME}` (`title`)"
+          }
+        ]
+      },
+      {
+        "tableName": "agents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`agentId` TEXT NOT NULL, `name` TEXT NOT NULL, `version` TEXT NOT NULL, `description` TEXT NOT NULL, `category` TEXT NOT NULL, `keywords` TEXT NOT NULL, `capabilities` TEXT NOT NULL, `skills` TEXT NOT NULL, `enabled` INTEGER NOT NULL DEFAULT 1, `source` TEXT NOT NULL, `installedAtMs` INTEGER NOT NULL DEFAULT 0, `packageDir` TEXT NOT NULL, PRIMARY KEY(`agentId`))",
+        "fields": [
+          {
+            "fieldPath": "agentId",
+            "columnName": "agentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keywords",
+            "columnName": "keywords",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capabilities",
+            "columnName": "capabilities",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skills",
+            "columnName": "skills",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installedAtMs",
+            "columnName": "installedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "packageDir",
+            "columnName": "packageDir",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "agentId"
+          ]
+        }
+      },
+      {
+        "tableName": "skills",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`skillId` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `category` TEXT NOT NULL, `version` TEXT NOT NULL, `capability` TEXT NOT NULL, `toolSchema` TEXT NOT NULL, `sandboxRequired` INTEGER NOT NULL, `requiresApproval` INTEGER NOT NULL, `risks` TEXT NOT NULL, `enabled` INTEGER NOT NULL DEFAULT 1, `source` TEXT NOT NULL, `packageDir` TEXT NOT NULL, `installedAtMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`skillId`))",
+        "fields": [
+          {
+            "fieldPath": "skillId",
+            "columnName": "skillId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capability",
+            "columnName": "capability",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolSchema",
+            "columnName": "toolSchema",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sandboxRequired",
+            "columnName": "sandboxRequired",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requiresApproval",
+            "columnName": "requiresApproval",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "risks",
+            "columnName": "risks",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageDir",
+            "columnName": "packageDir",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installedAtMs",
+            "columnName": "installedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "skillId"
+          ]
+        }
+      },
+      {
+        "tableName": "agent_skills",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`agentId` TEXT NOT NULL, `skillId` TEXT NOT NULL, `grantedAtMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`agentId`, `skillId`))",
+        "fields": [
+          {
+            "fieldPath": "agentId",
+            "columnName": "agentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skillId",
+            "columnName": "skillId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grantedAtMs",
+            "columnName": "grantedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "agentId",
+            "skillId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_agent_skills_skillId",
+            "unique": false,
+            "columnNames": [
+              "skillId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_agent_skills_skillId` ON `${TABLE_NAME}` (`skillId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "skill_sets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`setId` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `createdAtMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`setId`))",
+        "fields": [
+          {
+            "fieldPath": "setId",
+            "columnName": "setId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "createdAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "setId"
+          ]
+        }
+      },
+      {
+        "tableName": "skill_set_members",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`setId` TEXT NOT NULL, `skillId` TEXT NOT NULL, PRIMARY KEY(`setId`, `skillId`))",
+        "fields": [
+          {
+            "fieldPath": "setId",
+            "columnName": "setId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skillId",
+            "columnName": "skillId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "setId",
+            "skillId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_skill_set_members_skillId",
+            "unique": false,
+            "columnNames": [
+              "skillId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_skill_set_members_skillId` ON `${TABLE_NAME}` (`skillId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "skill_approvals",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`approvalId` TEXT NOT NULL, `agentId` TEXT NOT NULL, `skillId` TEXT NOT NULL, `requestContext` TEXT NOT NULL, `untrustedSource` INTEGER NOT NULL, `status` TEXT NOT NULL, `requestedAtMs` INTEGER NOT NULL DEFAULT 0, `decidedAtMs` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`approvalId`))",
+        "fields": [
+          {
+            "fieldPath": "approvalId",
+            "columnName": "approvalId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "agentId",
+            "columnName": "agentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skillId",
+            "columnName": "skillId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestContext",
+            "columnName": "requestContext",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "untrustedSource",
+            "columnName": "untrustedSource",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestedAtMs",
+            "columnName": "requestedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "decidedAtMs",
+            "columnName": "decidedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "approvalId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1c73b76d0d94d32ff5995192fb3ffa30')"
+    ]
+  }
+}

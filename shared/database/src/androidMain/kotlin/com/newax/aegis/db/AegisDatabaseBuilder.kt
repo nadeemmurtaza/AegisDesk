@@ -3,7 +3,7 @@ package com.newax.aegis.db
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 fun getAegisDatabase(context: Context, passphrase: ByteArray): AegisDatabase {
     val dbFile = context.getDatabasePath("aegis.db")
@@ -14,7 +14,7 @@ fun getAegisDatabase(context: Context, passphrase: ByteArray): AegisDatabase {
     )
     
     return builder
-        .openHelperFactory(SupportFactory(passphrase))
+        .openHelperFactory(SupportOpenHelperFactory(passphrase))
         .addMigrations(
             AegisDatabase.MIGRATION_1_2,
             AegisDatabase.MIGRATION_2_3,

@@ -1,17 +1,18 @@
 plugins {
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.multiplatform")
 }
 
 kotlin {
-    jvm()
-    androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
+    android {
+        namespace = "com.newax.aegis.platformapi"
+        compileSdk = 36
+        minSdk = 26
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
+    jvm()
 
     // Apple targets — Track M1 logic-only slice: the capability contracts
     // (expect-free commonMain) now compile for macOS + iOS. Apple-target
@@ -36,17 +37,5 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-    }
-}
-
-android {
-    namespace = "com.newax.aegis.platformapi"
-    compileSdk = 35
-    defaultConfig {
-        minSdk = 26
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }

@@ -21,9 +21,9 @@ import java.net.ServerSocket
  * §10.1, P2): a fixed-port TCP channel over a WiFi-P2P group, used by
  * [AndroidProximityDiscovery] — the RECEIVER creates the group (group owner,
  * listens on [PORT]); the SENDER discovers it by its P2P device name
- * ("aegis-<deviceId>", set with [WifiP2pManager.setDeviceName] — API 30+)
- * and joins, then both sides run the shared [ProximityHandshake] +
- * [ProximityTransfer] protocol over [TcpTransferChannel].
+ * ("aegis-<deviceId>", set via [setDeviceName] — API 30+) and joins, then
+ * both sides run the shared [ProximityHandshake] + [ProximityTransfer]
+ * protocol over [TcpTransferChannel].
  *
  * Failure modes are explicit callbacks (reason strings), never exceptions:
  * WiFi-Direct unavailable, API < 30 (setDeviceName does not exist), peer
@@ -87,7 +87,7 @@ class P2pProximityChannel(private val context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return onError("WiFi-Direct transfer requires Android 11+ (API 30) — BLE discovery still works")
         }
-        manager.setDeviceName(channel, deviceNameFor(deviceId), object : WifiP2pManager.ActionListener {
+        setDeviceName(manager, channel, deviceNameFor(deviceId), object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 manager.createGroup(channel, object : WifiP2pManager.ActionListener {
                     override fun onSuccess() {
@@ -105,6 +105,35 @@ class P2pProximityChannel(private val context: Context) {
 
             override fun onFailure(reason: Int) = onError("setDeviceName failed (reason $reason)")
         })
+    }
+
+    /**
+     * Name this device's P2P interface. [WifiP2pManager.setDeviceName] is a
+     * `@hide @SystemApi` method — absent from the public SDK — so it is invoked
+     * reflectively (the method exists in the framework since API 30, which the
+     * callers gate on). Failure surfaces through [listener], matching the other
+     * explicit-callback error paths.
+     */
+    private fun setDeviceName(
+        manager: WifiP2pManager,
+        channel: WifiP2pManager.Channel,
+        deviceName: String,
+        listener: WifiP2pManager.ActionListener
+    ) {
+        try {
+            val method = WifiP2pManager::class.java.getMethod(
+                "setDeviceName",
+                WifiP2pManager.Channel::class.java,
+                String::class.java,
+                WifiP2pManager.ActionListener::class.java
+            )
+            method.invoke(manager, channel, deviceName, listener)
+        } catch (_: Exception) {
+            // NoSuchMethod (pre-API-30 device or OEM removal), SecurityException
+            // (hidden-API policy / system-app restriction), or the framework
+            // rejecting the call — all funnel into the named-failure path.
+            listener.onFailure(WifiP2pManager.ERROR)
+        }
     }
 
     fun stopGroupOwner() {
@@ -183,7 +212,7 @@ class P2pProximityChannel(private val context: Context) {
 
     private fun onPeers(peers: WifiP2pDeviceList) {
         val expected = targetName ?: return
-        val device = peers.deviceList.values.firstOrNull {
+        val device = peers.deviceList.firstOrNull {
             it.deviceName == expected && it.status != WifiP2pDevice.UNAVAILABLE
         } ?: return // keep waiting — the group owner may not be discoverable yet
         targetName = null

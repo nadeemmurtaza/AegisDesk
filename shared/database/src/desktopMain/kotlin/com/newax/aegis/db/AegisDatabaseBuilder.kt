@@ -1,6 +1,6 @@
 package com.newax.aegis.db
 
-import androidx.room.RoomDatabase
+import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import java.io.File
 
@@ -13,8 +13,7 @@ import java.io.File
  * two platforms share one schema.
  */
 fun getAegisDatabase(file: File): AegisDatabase {
-    return RoomDatabase.Builder<AegisDatabase>(
-        constructor = AegisDatabaseConstructor,
+    return Room.databaseBuilder<AegisDatabase>(
         name = file.absolutePath
     )
         .setDriver(BundledSQLiteDriver())

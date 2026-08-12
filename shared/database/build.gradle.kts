@@ -1,12 +1,15 @@
 plugins {
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.multiplatform")
     id("com.google.devtools.ksp")
-    id("androidx.room") version "2.7.0-alpha13"
+    id("androidx.room") version "2.8.4"
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "com.newax.aegis.database"
+        compileSdk = 36
+        minSdk = 26
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
@@ -38,25 +41,26 @@ kotlin {
             // NOT depend on database (Track I can't use Room), so this is the
             // one-directional edge the design doc's "wiring slice" describes.
             implementation(project(":shared:sync"))
-            api("androidx.room:room-runtime:2.7.0-alpha13")
-            api("androidx.sqlite:sqlite-bundled:2.5.0-alpha13")
+            api("androidx.room:room-runtime:2.8.4")
+            api("androidx.sqlite:sqlite-bundled:2.7.0")
             // required for coroutines Flow, etc in KMP
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
         }
         androidMain.dependencies {
-            implementation("net.zetetic:android-database-sqlcipher:4.5.4")
-            implementation("androidx.sqlite:sqlite-ktx:2.4.0")
-            implementation("androidx.room:room-ktx:2.7.0-alpha13")
+            // SQLCipher for Android — the successor artifact (the old
+            // android-database-sqlcipher coordinate is deprecated). The API is
+            // net.zetetic.database.sqlcipher.SupportOpenHelperFactory, the drop-in
+            // for the former net.sqlcipher SupportFactory (see the builder).
+            implementation("net.zetetic:sqlcipher-android:4.17.0")
+            implementation("androidx.sqlite:sqlite-ktx:2.7.0")
+            implementation("androidx.room:room-ktx:2.8.4")
         }
-        // TEMP-GUARD (Linux host test run): KGP disables Apple targets here so
-        // appleMain does not exist; findByName + null-safe is equivalent where
-        // it does. REVERTED after the run.
         val appleMain = sourceSets.findByName("appleMain")
         appleMain?.dependencies {
             // The native storage driver: OS-provided SQLite on macOS/iOS.
             // linkerOpts below pull in the system libsqlite3 at link time.
-            implementation("androidx.sqlite:sqlite-framework:2.5.0-alpha13")
+            implementation("androidx.sqlite:sqlite-framework:2.7.0")
         }
     }
 
@@ -70,33 +74,20 @@ kotlin {
     }
 }
 
-android {
-    namespace = "com.newax.aegis.database"
-    compileSdk = 35
-    defaultConfig {
-        minSdk = 26
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
 room {
     schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
-    // DO NOT ADD kspCommonMainMetadata! It causes MissingType errors in Room KMP.
-    // (KSP1 is pinned repo-wide via gradle.properties ksp.useKSP2=false for the
-    // same reason — the KSP2-only kspCommonMainKotlinMetadata task breaks Room KMP.)
-    add("kspAndroid", "androidx.room:room-compiler:2.7.0-alpha13")
-    add("kspDesktop", "androidx.room:room-compiler:2.7.0-alpha13")
+    // Per-target KSP for Room's codegen (KSP 2.3.x target-specific
+    // configurations — the ksp() KMP shorthand is deprecated).
+    add("kspAndroid", "androidx.room:room-compiler:2.8.4")
+    add("kspDesktop", "androidx.room:room-compiler:2.8.4")
     // Apple targets — per-target KSP for Room's codegen on native (R5: new
     // target = per-target KSP config added at the same moment).
-    add("kspIosX64", "androidx.room:room-compiler:2.7.0-alpha13")
-    add("kspIosArm64", "androidx.room:room-compiler:2.7.0-alpha13")
-    add("kspIosSimulatorArm64", "androidx.room:room-compiler:2.7.0-alpha13")
-    add("kspMacosX64", "androidx.room:room-compiler:2.7.0-alpha13")
-    add("kspMacosArm64", "androidx.room:room-compiler:2.7.0-alpha13")
+    add("kspIosX64", "androidx.room:room-compiler:2.8.4")
+    add("kspIosArm64", "androidx.room:room-compiler:2.8.4")
+    add("kspIosSimulatorArm64", "androidx.room:room-compiler:2.8.4")
+    add("kspMacosX64", "androidx.room:room-compiler:2.8.4")
+    add("kspMacosArm64", "androidx.room:room-compiler:2.8.4")
 }

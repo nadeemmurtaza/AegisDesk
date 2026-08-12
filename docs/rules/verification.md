@@ -11,14 +11,14 @@ Read this when a toolchain is available. Run cheapest-first, **stop at the first
 ./gradlew :shared:database:compileDebugKotlin
 ./gradlew :shared:database:kspDesktopKotlin                  # Room query verification (KSP)
 ./gradlew :shared:database:kspAndroidKotlin
-./gradlew :apps:androidApp:compileDebugKotlin
-./gradlew :apps:androidApp:assembleDebug                     # full Android gate (invariant: must stay green)
-./gradlew :apps:androidApp:lintDebug
-./gradlew :apps:androidApp:testDebugUnitTest                 # JVM unit tests
-./gradlew :apps:androidApp:connectedDebugAndroidTest         # needs a device/emulator — Room MigrationTest
-./gradlew :platform:windows:test                             # Windows adapter tests (any OS; Win32 paths OS-guarded)
-./gradlew :apps:desktopApp:run                               # desktop bootstrap smoke — prints capability statuses
-./gradlew :apps:androidApp:assembleRelease                   # only this exercises R8/minify/signing
+./gradlew :platform:android:frontend:compileDebugKotlin
+./gradlew :platform:android:frontend:assembleDebug                     # full Android gate (invariant: must stay green)
+./gradlew :platform:android:frontend:lintDebug
+./gradlew :platform:android:frontend:testDebugUnitTest                 # JVM unit tests
+./gradlew :platform:android:frontend:connectedDebugAndroidTest         # needs a device/emulator — Room MigrationTest
+./gradlew :platform:windows:backend:test                             # Windows adapter tests (any OS; Win32 paths OS-guarded)
+./gradlew :platform:windows:frontend:run                               # desktop bootstrap smoke — prints capability statuses
+./gradlew :platform:android:frontend:assembleRelease                   # only this exercises R8/minify/signing
 ```
 
 **Critical:** annotation processors and KSP only run on a full compile. Room's query verifier, KSP-generated `_Impl`, and expect/actual wiring all fail at this stage, not at typecheck. A green editor means nothing here. And **editing `build.gradle.kts` is itself a change that must be verified** — an invalid DSL call fails every task in the module, so a broken build script looks like a broken codebase. `./gradlew tasks` is a fast way to confirm the script itself evaluates.

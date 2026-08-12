@@ -62,4 +62,4 @@ jobs:
         run: ./gradlew :shared:database:desktopJar :shared:database:assembleDebug --stacktrace
 
       - name: "Build Android app — invariant: Android stays green"
-        run: ./gradlew :apps:androidApp:assembleDebug :apps:androidApp:testDebugUnitTest --stacktrace
+        run: ./gradlew :platform:android:frontend:assembleDebug :platform:android:frontend:testDebugUnitTest --stacktrace

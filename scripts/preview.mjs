@@ -36,15 +36,15 @@ function apkEntry() {
     return `<div class="card">
       <div class="tag ok">APK READY</div>
       <h2>Debug APK available</h2>
-      <p class="muted">Built at <code>apps/androidApp/build/outputs/apk/debug/app-debug.apk</code> — ${mb} MB.</p>
+      <p class="muted">Built at <code>platform/android/frontend/build/outputs/apk/debug/app-debug.apk</code> — ${mb} MB.</p>
       <a class="btn" href="/apk" download>Download app-debug.apk</a>
     </div>`;
   }
   return `<div class="card">
       <div class="tag">NO APK YET</div>
       <h2>Build the APK to download it</h2>
-      <p class="muted">No APK found at <code>apps/androidApp/build/outputs/apk/debug/app-debug.apk</code>.
-      The Gradle build requires JDK 17 + Android SDK 35 — run <code>sh ./gradlew :apps:androidApp:assembleDebug</code>
+      <p class="muted">No APK found at <code>platform/android/frontend/build/outputs/apk/debug/app-debug.apk</code>.
+      The Gradle build requires JDK 17 + Android SDK 35 — run <code>sh ./gradlew :platform:android:frontend:assembleDebug</code>
       on a machine with the Android toolchain (or via the repo's GitHub Actions workflow), then
       this page will offer the file here.</p>
     </div>`;
@@ -152,8 +152,8 @@ function renderIndex() {
   <div class="card">
     <h2>Build it</h2>
     <p class="muted">Requires JDK 17 and Android SDK 35 (Android Studio syncs these). No env vars or API keys are needed.</p>
-    <pre>sh ./gradlew :apps:androidApp:assembleDebug
-# APK → apps/androidApp/build/outputs/apk/debug/app-debug.apk</pre>
+    <pre>sh ./gradlew :platform:android:frontend:assembleDebug
+# APK → platform/android/frontend/build/outputs/apk/debug/app-debug.apk</pre>
     <p class="muted">Continuous build &amp; instrumented DB migration tests already run in CI: <a class="link" href="https://github.com/nadeemmurtaza/AegisDesk/actions">.github/workflows/android.yml</a></p>
   </div>
 

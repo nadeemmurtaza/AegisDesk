@@ -18,11 +18,11 @@ described (Android / Windows / macOS / iOS columns).
 
 | | **Track I — iOS body** (Agent 4) | **Track A — Android body + shared brain** (Agent 1, this session) | **Track M — macOS body** (Agent 3) | **Track W — Windows body** (Agent 2, ex-Track B) |
 |---|---|---|---|---|
-| Modules owned | `platform/ios/**` *(new)*, `apps/iosApp/**` *(new)* | `shared/core/**`, `platform/android/**`, `apps/androidApp/**` | `platform/macos/**` *(new)*, `apps/macosApp/**` *(new)* | `platform/windows/**`, `apps/desktopApp/**` |
+| Modules owned | `platform/ios/backend/**` *(new)*, `platform/ios/frontend/**` *(new)* | `shared/core/**`, `platform/android/backend/**`, `platform/android/frontend/**` | `platform/macos/backend/**` *(new)*, `platform/macos/frontend/**` *(new)* | `platform/windows/backend/**`, `platform/windows/frontend/**` |
 | Headline | CMP iOS app shell (shared UI) + iOS capability surface (FILES, SECRETS/Keychain, SYSTEM; automation = NOT_SUPPORTED) | **PolicyEngine arc completion** (authority-spine evolution) + Android body — **A1–A8 already landed** | Compose Desktop macOS app (mirrors W's UI) + macOS capability surface (AXUIElement automation, Keychain secrets, GGUF model) | Compose Desktop UI (replaces CLI) + remaining Windows capabilities + desktop persistence |
-| Why this work is real | ARCHITECTURE.md platform matrix: iOS row exists with "CMP iOS (shared UI, planned)" and "Native driver (planned)" — zero iOS code exists. No iOS target is even configured in the shared KMP modules. | ARCHITECTURE.md rule 3 corollary (permission vs policy) + rule 10 (PLAN is never EXECUTE). A1–A8 shipped the policy spine; the arc continues with execution-audit surfacing and goal-tier hints. | ARCHITECTURE.md platform matrix: macOS row = Compose Desktop (same as Windows), AXUIElement automation, Keychain secrets — all unimplemented; no macOS module exists. | ARCHITECTURE.md: "Compose Desktop UI pending". platform/windows implements only DESKTOP + the app index (FILES/PROCESSES/SHELL/SECRETS/SYSTEM pending). Desktop goals are in-memory. |
+| Why this work is real | ARCHITECTURE.md platform matrix: iOS row exists with "CMP iOS (shared UI, planned)" and "Native driver (planned)" — zero iOS code exists. No iOS target is even configured in the shared KMP modules. | ARCHITECTURE.md rule 3 corollary (permission vs policy) + rule 10 (PLAN is never EXECUTE). A1–A8 shipped the policy spine; the arc continues with execution-audit surfacing and goal-tier hints. | ARCHITECTURE.md platform matrix: macOS row = Compose Desktop (same as Windows), AXUIElement automation, Keychain secrets — all unimplemented; no macOS module exists. | ARCHITECTURE.md: "Compose Desktop UI pending". platform/windows/backend implements only DESKTOP + the app index (FILES/PROCESSES/SHELL/SECRETS/SYSTEM pending). Desktop goals are in-memory. |
 | Slices | **I0** ios targets on shared KMP modules (Phase 0) · I1 CMP iOS app shell + shared UI · I2 iOS capability surface + registration + screens · I3 iOS persistence | A1–A8 landed (PolicyEngine, policy modes UI, contract resolution, rule-10 execution gate, goal persistence, policy-refusal UI, plan-time pre-flight, execution audit) · **A9+** next (audit in Capabilities/Policy screen, goal-tier hints) | M1 Compose Desktop macOS app (Status/Apps/Goals) · M2 macOS capability surface (FILES/PROCESSES/SHELL via JVM stdlib, DESKTOP via AXUIElement behind a seam, SECRETS via Keychain, SYSTEM) + registration + screens · M3 persistence + execution audit | W1 Compose Desktop UI · W2 Windows capability surface (FILES, PROCESSES, SHELL, SECRETS/DPAPI, SYSTEM) + registration · W3 goal persistence + execution audit |
-| Key invariants | Shared modules stay platform-free (invariant 5); R13 — every capability ships with its screen; expect/actual balance in every target | Keep `:apps:androidApp:assembleDebug` green on every slice (invariant 9); R13 | R13 (the window is the surface — no headless capability); keep Android untouched so CI stays green automatically; macOS-only code never leaks into shared commonMain | Same as M; keep Android untouched so CI stays green automatically |
+| Key invariants | Shared modules stay platform-free (invariant 5); R13 — every capability ships with its screen; expect/actual balance in every target | Keep `:platform:android:frontend:assembleDebug` green on every slice (invariant 9); R13 | R13 (the window is the surface — no headless capability); keep Android untouched so CI stays green automatically; macOS-only code never leaks into shared commonMain | Same as M; keep Android untouched so CI stays green automatically |
 
 **Why this split:** it matches ARCHITECTURE.md's own platform matrix (one
 shared brain, four bodies — Android, Windows, macOS, iOS) and gives every
@@ -44,19 +44,19 @@ run concurrently with zero file overlap afterward.
 
 ## 2. Phase 0 — setup commit (do this BEFORE the agents start)
 
-The current `settings.gradle.kts` includes only `apps/androidApp`,
-`apps/desktopApp`, `shared/{core,database,platform-api,model-api}`,
+The current `settings.gradle.kts` includes only `platform/android/frontend`,
+`platform/windows/frontend`, `shared/{core,database,platform-api,model-api}`,
 `platform/{android,windows}`. Tracks M and I need modules that do not exist,
 and Track I needs iOS targets on the shared KMP modules. **One setup commit
 lands all of this so the four tracks never touch the same file again:**
 
 1. **Scaffold the new modules** (deliberate scaffolding is allowed —
    empty adapters ahead of their consumers, named as a known gap in the
-   handoff): `platform/macos/` (plain `kotlin("jvm")`, mirroring
-   `platform/windows`), `platform/ios/` (KMP: `iosArm64` +
-   `iosSimulatorArm64` (+ `iosX64` for Intel simulators)), `apps/macosApp/`
-   (`kotlin("jvm")` + `application`, mirroring `apps/desktopApp`),
-   `apps/iosApp/` (CMP iOS app).
+   handoff): `platform/macos/backend/` (plain `kotlin("jvm")`, mirroring
+   `platform/windows/backend`), `platform/ios/backend/` (KMP: `iosArm64` +
+   `iosSimulatorArm64` (+ `iosX64` for Intel simulators)), `platform/macos/frontend/`
+   (`kotlin("jvm")` + `application`, mirroring `platform/windows/frontend`),
+   `platform/ios/frontend/` (CMP iOS app).
 2. **Add the four includes to `settings.gradle.kts`** in the same change
    (R5 — module and registration in the same breath).
 3. **Add iOS targets to the shared KMP modules** — `shared/core`,
@@ -70,7 +70,7 @@ lands all of this so the four tracks never touch the same file again:**
    in the same commit.
 5. **Verify** (on a Mac with JDK 17 + Xcode): `bash scripts/check-invariants.sh`
    (must exit 0), then
-   `./gradlew :shared:core:compileKotlinIosArm64 :shared:core:compileKotlinIosSimulatorArm64 :platform:ios:compileKotlinIosSimulatorArm64 :apps:desktopApp:compileKotlin :apps:macosApp:compileKotlin :apps:androidApp:assembleDebug`.
+   `./gradlew :shared:core:compileKotlinIosArm64 :shared:core:compileKotlinIosSimulatorArm64 :platform:ios:backend:compileKotlinIosSimulatorArm64 :platform:windows:frontend:compileKotlin :platform:macos:frontend:compileKotlin :platform:android:frontend:assembleDebug`.
    Android must stay green (invariant 9) — the iOS targets are additive.
 
 After Phase 0: `settings.gradle.kts`, `shared/platform-api`,
@@ -91,9 +91,9 @@ other track consumes it read-only.
    substrate (schema v13 + migration — slice S0 of `docs/SYNC_DESIGN.md`, led
    by the lead and reviewed by all tracks), then refreezes. `ARCHITECTURE.md`
    is the one shared file all may edit — **only your own module-map lines** (A: the
-   `shared/core/`, `platform/android/`, `apps/androidApp/` lines; W: the
-   `apps/desktopApp/`, `platform/windows/` lines; M: the new `platform/macos/`,
-   `apps/macosApp/` lines; I: the new `platform/ios/`, `apps/iosApp/` lines).
+   `shared/core/`, `platform/android/backend/`, `platform/android/frontend/` lines; W: the
+   `platform/windows/frontend/`, `platform/windows/backend/` lines; M: the new `platform/macos/backend/`,
+   `platform/macos/frontend/` lines; I: the new `platform/ios/backend/`, `platform/ios/frontend/` lines).
    Prefer appending to your line over rewriting shared text.
 3. **Read `AGENTS.md` first and obey it.** Key rules you will hit constantly:
    R3 no placeholders (no `TODO`, no stubbed bodies, no `expect` without
@@ -110,10 +110,10 @@ other track consumes it read-only.
    flag it loudly — otherwise do not bump.
 5. **Verify every slice before moving on**, cheapest first:
    `bash scripts/check-invariants.sh` (must exit 0), then your track's build:
-   - Track A: `./gradlew :shared:core:compileKotlinJvm :apps:androidApp:testDebugUnitTest :apps:androidApp:assembleDebug`
-   - Track W: `./gradlew :platform:windows:test :apps:desktopApp:test`
-   - Track M: `./gradlew :platform:macos:test :apps:macosApp:test :apps:macosApp:run` (the run needs a GGUF model — tests are the real gate; runs need a Mac)
-   - Track I: `./gradlew :shared:core:compileKotlinIosSimulatorArm64 :platform:ios:compileKotlinIosSimulatorArm64 :apps:iosApp:compileKotlinIosSimulatorArm64` (Mac + Xcode only)
+   - Track A: `./gradlew :shared:core:compileKotlinJvm :platform:android:frontend:testDebugUnitTest :platform:android:frontend:assembleDebug`
+   - Track W: `./gradlew :platform:windows:backend:test :platform:windows:frontend:test`
+   - Track M: `./gradlew :platform:macos:backend:test :platform:macos:frontend:test :platform:macos:frontend:run` (the run needs a GGUF model — tests are the real gate; runs need a Mac)
+   - Track I: `./gradlew :shared:core:compileKotlinIosSimulatorArm64 :platform:ios:backend:compileKotlinIosSimulatorArm64 :platform:ios:frontend:compileKotlinIosSimulatorArm64` (Mac + Xcode only)
    - This sandbox has **no JDK** — Gradle cannot run here. Every Gradle step
      is `UNVERIFIED`; run the exact commands on the right machine / CI.
    - Static verification (runs here): `check-invariants.sh` + grep for
@@ -128,10 +128,10 @@ other track consumes it read-only.
 
 ## 4. Track A — Android body + shared brain (Agent 1, this session)
 
-Owned paths: `shared/core/**`, `platform/android/**`, `apps/androidApp/**`.
+Owned paths: `shared/core/**`, `platform/android/backend/**`, `platform/android/frontend/**`.
 Frozen: everything else (except your ARCHITECTURE.md lines).
 
-**Landed so far (A1–A8)** — see ARCHITECTURE.md's `apps/androidApp` and
+**Landed so far (A1–A8)** — see ARCHITECTURE.md's `platform/android/frontend` and
 `shared/core` lines for the full list: A1 PolicyEngine, A2 policy modes UI +
 authority path, A3 planner resolves through the shared contract, A4
 execution-time authority (ActionOrigin.AGENT + GoalExecutor policy gate —
@@ -150,7 +150,7 @@ execution audit trail ("Recent runs" on the Goals screen).
 - A11 — per-goal re-plan (edit the goal description, re-plan, keep task
   statuses where the DAG is unchanged).
 
-Keep `:apps:androidApp:assembleDebug` green on every slice (invariant 9) and
+Keep `:platform:android:frontend:assembleDebug` green on every slice (invariant 9) and
 R13 (every capability ships with its screen). No instructions section needed —
 this is the session that wrote this document.
 
@@ -158,14 +158,14 @@ this is the session that wrote this document.
 
 ## 5. Track W — Windows body (Agent 2, ex-Track B)
 
-Owned paths: `platform/windows/**`, `apps/desktopApp/**`.
+Owned paths: `platform/windows/backend/**`, `platform/windows/frontend/**`.
 Frozen: everything else (except your ARCHITECTURE.md lines). **Never touch
-`apps/androidApp`** — CI's `assembleDebug` gate stays green because you don't.
+`platform/android/frontend`** — CI's `assembleDebug` gate stays green because you don't.
 
 **State you inherit (all verified by prior slices — read these files before
 writing anything):**
 
-- `apps/desktopApp/src/main/kotlin/Main.kt` — the CLI runner, currently the
+- `platform/windows/frontend/src/main/kotlin/Main.kt` — the CLI runner, currently the
   desktop surface. Commands: `status`, `skills`, `plan <goal>`,
   `apps [query]`, `goals`, `run <goal>`, `abandon`. Banner reads Phase 5i.
   `printStatusBlock`/`printSkills`/`printPlan`/`printApps`/`printGoals`/
@@ -173,7 +173,7 @@ writing anything):**
   UI logic you will lift into Compose.
 - `desktop/DesktopCapabilitiesHolder.kt` — one `PlatformCapabilityRegistry`
   per process; `init()` registers `WindowsDesktopCapability()`. **This is the
-  file where W2's new capabilities register** (your only apps/desktopApp file
+  file where W2's new capabilities register** (your only platform/windows/frontend file
   that touches the registry — it is in your ownership).
 - `desktop/DesktopModelProviderHolder.kt` — one `ModelProvider` per process;
   `set(provider)` / `clear()` / `current()`.
@@ -186,7 +186,7 @@ writing anything):**
   appIndex, onProgress)` (activates, walks tasks topologically, live
   capability gate, pipes outputs, FAILED→block) and `DesktopExecutionRouter`
   (ladder: `EXACT_TARGET` → `PROCESS_LAUNCH` → `WIN32_AUTOMATION`).
-- `platform/windows/` — `WindowsDesktopCapability` (Win32 bridge behind the
+- `platform/windows/backend/` — `WindowsDesktopCapability` (Win32 bridge behind the
   `WindowsUiaBridge` seam; NOT_SUPPORTED off-Windows), `WindowsAppIndex`
   (Start Menu enumeration, fuzzy search, behind a seam), GGUF provider trio
   (`GgufModelProvider`, `KherudGgufEngine`, `GgufHeaderParser`),
@@ -195,10 +195,10 @@ writing anything):**
   `shared/platform-api`): `PlatformCapability`/`PlatformCapabilityRegistry`/
   `InMemoryPlatformCapabilityRegistry`, `CapabilityResolver`/`CapabilityResolution`,
   `CapabilityStatus`/`CapabilityResult`/`OperationContext.create(caller, origin)`
-  (`ActionOrigin` from `shared/core` — already a desktopApp dependency),
+  (`ActionOrigin` from `shared/core` — already a platform:windows:frontend dependency),
   `CapabilityId`, `FileCapability`/`ProcessCapability`/`ShellCapability`/
   `SecretsCapability`/`SystemCapability`/`DesktopCapability`, `PrivilegeLevel`.
-  **The Android adapters in `platform/android` are your mirror** for how each
+  **The Android adapters in `platform/android/backend` are your mirror** for how each
   contract is implemented.
 
 ### W1 — Compose Desktop UI (the surface, R13)
@@ -207,7 +207,7 @@ The CLI is today's UI; replace/augment it with a real Compose Desktop window
 that mirrors Android's `CapabilitiesScreen` + `GoalsScreen`:
 
 - Add the Compose Multiplatform desktop plugin + deps to
-  `apps/desktopApp/build.gradle.kts` **only** (pinned per R8: pick the Compose
+  `platform/windows/frontend/build.gradle.kts` **only** (pinned per R8: pick the Compose
   plugin version compatible with Kotlin 2.1.0 — e.g. the 1.7.x line — and
   update the AGENTS.md baseline table + this file's notes in the same change;
   do not touch Android's BOM). Keep the CLI runnable (the model loop can live
@@ -222,13 +222,13 @@ that mirrors Android's `CapabilitiesScreen` + `GoalsScreen`:
      blocked-capability warnings; actions: plan input, **Run** (→
      `DesktopGoalExecutor.run` with progress lines surfaced live), **Abandon**.
 - Every screen has loading, empty, and error states; no placeholders (R3/R13).
-- `apps/desktopApp/src/test/` — state-holder tests (pure JVM; Compose UI
+- `platform/windows/frontend/src/test/` — state-holder tests (pure JVM; Compose UI
   itself is a machine-run concern — keep all decision logic in testable
   plain-Kotlin state holders).
 
 ### W2 — Windows capability surface (FILES, PROCESSES, SHELL, SECRETS, SYSTEM)
 
-`platform/windows` currently implements only DESKTOP. Implement the rest
+`platform/windows/backend` currently implements only DESKTOP. Implement the rest
 behind seams, mirroring the Android adapters and the `WindowsDesktopCapability`
 pattern (capability + seam interface + production bridge + fake-bridge tests):
 
@@ -250,7 +250,7 @@ pattern (capability + seam interface + production bridge + fake-bridge tests):
 - **SYSTEM** — `SystemCapability` over env/sysinfo (os, arch, memory, disk).
 - **Registration + surface**: register each in `DesktopCapabilitiesHolder.init()`
   (your file) and surface them in the W1 status screen — R6/R13.
-- Tests: fake-bridge tests per capability in `platform/windows/src/test/`
+- Tests: fake-bridge tests per capability in `platform/windows/backend/src/test/`
   mirroring `WindowsDesktopCapabilityTest`; OS-independent (forced statuses,
   injected seams).
 
@@ -258,18 +258,18 @@ pattern (capability + seam interface + production bridge + fake-bridge tests):
 
 - **Persistence:** desktop goals/tasks/state must survive restarts. Store to a
   JSON file under `~/.aegis/` (e.g. `goals.json`) from a small store owned by
-  `apps/desktopApp` — **do not touch `shared/database`** (frozen; DB-backed
+  `platform/windows/frontend` — **do not touch `shared/database`** (frozen; DB-backed
   persistence is a later round with migrations). `DesktopGoalPlanner` gains
   `save()`/`load(store)` that round-trips goals, task graphs, state machines,
   and plan pre-flights; load on bootstrap, save on every mutation;
   corrupt/missing file → honest empty start (named failure mode).
-- **Execution audit:** a `desktopApp` audit log of `run` executions — goal,
+- **Execution audit:** a `platform:windows:frontend` audit log of `run` executions — goal,
   tasks, tiers used (`EXACT_TARGET`/`PROCESS_LAUNCH`/`WIN32_AUTOMATION`),
   outcomes, timestamps — appended on each executor run and surfaced in the UI
   (a "Recent runs" section on the goals screen). This is the desktop twin of
   Android's A5/A8 (invariant 8) — mirror the Android shapes
   (`GoalSnapshotCodec`/`ExecutionAuditStore`, org.json → file) but stay inside
-  `apps/desktopApp`.
+  `platform/windows/frontend`.
 - Tests: round-trip (save → new planner instance → load → identical state),
   corrupt-file recovery, audit append. Pure JVM.
 
@@ -277,14 +277,14 @@ pattern (capability + seam interface + production bridge + fake-bridge tests):
 
 ## 6. Track M — macOS body (Agent 3)
 
-Owned paths: `platform/macos/**` *(new)*, `apps/macosApp/**` *(new)*.
+Owned paths: `platform/macos/backend/**` *(new)*, `platform/macos/frontend/**` *(new)*.
 Frozen: everything else (except your ARCHITECTURE.md lines). **Never touch
-`apps/androidApp` or `apps/desktopApp`** — CI's Android gate and W's work stay
+`platform/android/frontend` or `platform/windows/frontend`** — CI's Android gate and W's work stay
 green because you don't.
 
 **What exists to build on:** the JVM patterns are identical to Windows —
-read `platform/windows` (your mirror: `WindowsDesktopCapability` seam pattern,
-`WindowsAppIndex`, the GGUF provider trio) and `apps/desktopApp`
+read `platform/windows/backend` (your mirror: `WindowsDesktopCapability` seam pattern,
+`WindowsAppIndex`, the GGUF provider trio) and `platform/windows/frontend`
 (the CLI runner whose `print*` functions are the UI logic). The contracts in
 frozen `shared/platform-api` are the same list as Track W section 5. **Phase 0
 must have landed first** — your modules exist as scaffolding, empty adapters
@@ -297,7 +297,7 @@ Keychain, DB (Room KMP bundled) = ✅. Everything else (brain, memory) = ✅.
 ### M1 — Compose Desktop macOS app (the surface, R13)
 
 Mirror W1's screens but as a macOS app:
-- Add Compose Multiplatform desktop plugin + deps to `apps/macosApp/build.gradle.kts`
+- Add Compose Multiplatform desktop plugin + deps to `platform/macos/frontend/build.gradle.kts`
   (same version decision as W1 — one Compose desktop version shared by both
   desktop apps; note it once in AGENTS.md's baseline table, not twice).
 - Screens: **Status/Capabilities** (registry + model state), **Apps**
@@ -305,8 +305,8 @@ Mirror W1's screens but as a macOS app:
   Plan/Run/Abandon). All decision logic in plain-Kotlin testable state
   holders; loading/empty/error states everywhere; no placeholders (R3/R13).
 - The model provider for macOS is the GGUF path — the `de.kherud:java-llama.cpp`
-  binding bundles a `.dylib` for macOS, so `platform/macos` mirrors
-  `platform/windows`' `GgufModelProvider`/`KherudGgufEngine`/`GgufHeaderParser`
+  binding bundles a `.dylib` for macOS, so `platform/macos/backend` mirrors
+  `platform/windows/backend`' `GgufModelProvider`/`KherudGgufEngine`/`GgufHeaderParser`
   behind the same `ModelProvider` contract.
 
 ### M2 — macOS capability surface (FILES, PROCESSES, SHELL, DESKTOP, SECRETS, SYSTEM)
@@ -335,7 +335,7 @@ Mirror the Android adapters + the `WindowsDesktopCapability` pattern
 - **Registration + surface**: register each in a macOS
   `MacCapabilitiesHolder.init()` (your file) and surface them in the M1
   status screen — R6/R13.
-- Tests: fake-bridge tests per capability in `platform/macos/src/test/`
+- Tests: fake-bridge tests per capability in `platform/macos/backend/src/test/`
   mirroring `WindowsDesktopCapabilityTest`; OS-independent (forced statuses,
   injected seams). The seam keeps everything except the real bridge testable
   on Linux/CI.
@@ -352,7 +352,7 @@ later round).
 
 ## 7. Track I — iOS body (Agent 4)
 
-Owned paths: `platform/ios/**` *(new)*, `apps/iosApp/**` *(new)*.
+Owned paths: `platform/ios/backend/**` *(new)*, `platform/ios/frontend/**` *(new)*.
 Frozen: everything else (except your ARCHITECTURE.md lines). **Phase 0 must
 have landed first** — it added `iosArm64`/`iosSimulatorArm64` (+ `iosX64`)
 targets to `shared/core`, `shared/platform-api`, `shared/model-api`, and
@@ -370,13 +370,13 @@ same list as Track W section 5 (`PlatformCapability`, `CapabilityResolver`,
 `FileCapability`/`ProcessCapability`/`ShellCapability`/`SecretsCapability`/
 `SystemCapability`/`DesktopCapability`, `PrivilegeLevel`). `ActionOrigin`
 comes from `shared/core` — already consumable once Phase 0 adds the iOS
-target. **The Android adapters in `platform/android` are your mirror** for
+target. **The Android adapters in `platform/android/backend` are your mirror** for
 how each contract is implemented.
 
 ### I1 — CMP iOS app shell + shared UI
 
 - Build the iOS app with Compose Multiplatform for iOS (the `composeApp`
-  pattern: shared Compose UI + iOS entrypoint in `apps/iosApp`). Mirror
+  pattern: shared Compose UI + iOS entrypoint in `platform/ios/frontend`). Mirror
   Android's screens (Capabilities + Goals) — shared UI is the whole point of
   CMP; where Android and iOS differ, keep the differences behind
   expect/actual or platform source sets, never `if (platform)` in commonMain.
@@ -404,7 +404,7 @@ Mirror the Android adapters; Kotlin/Native interop where needed:
 - **Registration + surface**: register each in an iOS
   `IosCapabilitiesHolder.init()` (your file) and surface them in the I1
   screens — R6/R13.
-- Tests: seam/fake tests in `platform/ios/src/iosTest/` (and commonTest for
+- Tests: seam/fake tests in `platform/ios/backend/src/iosTest/` (and commonTest for
   the pure logic), mirroring the Android/Windows fake-bridge tests.
 
 ### I3 — iOS persistence
@@ -434,10 +434,10 @@ interface.
 > list in section 5 before writing anything — those are the exact shapes you
 > build on.
 >
-> **Your ownership (edit only these):** `platform/windows/**` and
-> `apps/desktopApp/**`. Frozen (never edit): `shared/**`, `apps/androidApp/**`,
+> **Your ownership (edit only these):** `platform/windows/backend/**` and
+> `platform/windows/frontend/**`. Frozen (never edit): `shared/**`, `platform/android/frontend/**`,
 > `settings.gradle.kts`, `AGENTS.md`, and all of `docs/` except
-> `ARCHITECTURE.md`'s `apps/desktopApp/` and `platform/windows/` module-map
+> `ARCHITECTURE.md`'s `platform/windows/frontend/` and `platform/windows/backend/` module-map
 > lines. `shared/platform-api` is read-only — it defines the contracts you
 > implement; read it constantly.
 >
@@ -445,7 +445,7 @@ interface.
 > starting the next; no placeholders ever):**
 >
 > 1. **W1 — Compose Desktop UI.** Add Compose Multiplatform (desktop) to
->    `apps/desktopApp/build.gradle.kts` with a version compatible with Kotlin
+>    `platform/windows/frontend/build.gradle.kts` with a version compatible with Kotlin
 >    2.1.0; update the AGENTS.md baseline table in the same change (your only
 >    AGENTS.md touch — a version note, not a rule). Build three screens that
 >    lift the existing CLI logic into a window: Status/Capabilities (registry +
@@ -457,7 +457,7 @@ interface.
 > 2. **W2 — Windows capabilities.** Implement FILES, PROCESSES, SHELL,
 >    SECRETS (DPAPI via JNA Crypt32 — the seam + honest fallback if the native
 >    path is unverifiable; never a stub), and SYSTEM capabilities in
->    `platform/windows`, mirroring the Android adapters in `platform/android`
+>    `platform/windows/backend`, mirroring the Android adapters in `platform/android/backend`
 >    and the `WindowsDesktopCapability` seam pattern. Register them in
 >    `DesktopCapabilitiesHolder.init()` and surface them in the W1 status
 >    screen. Credentials stay references, never content. Contract tests per
@@ -470,7 +470,7 @@ interface.
 >
 > **Verification per slice** (this sandbox has no JDK — Gradle steps are
 > `UNVERIFIED`; run them on a JDK-17 machine / CI): `bash scripts/check-invariants.sh`
-> must exit 0; `./gradlew :platform:windows:test :apps:desktopApp:test`; keep
+> must exit 0; `./gradlew :platform:windows:backend:test :platform:windows:frontend:test`; keep
 > Android untouched so CI's `assembleDebug` stays green. Static greps: no
 > placeholders in new files, no dangling references, no platform imports in
 > `shared/*/src/commonMain` (you never touch shared, so this stays green).
@@ -492,27 +492,27 @@ interface.
 > **FIRST: read, in order** — `AGENTS.md` (binding rules), `ARCHITECTURE.md`
 > (invariants + module map + platform matrix), and
 > `docs/PARALLEL_WORKSPLIT.md` (section 3 coordination protocol, section 6
-> track details). **Phase 0 must have landed** — `platform/macos` and
-> `apps/macosApp` exist as scaffolding; if they don't, stop and tell the user
+> track details). **Phase 0 must have landed** — `platform/macos/backend` and
+> `platform/macos/frontend` exist as scaffolding; if they don't, stop and tell the user
 > Phase 0 is missing.
 >
-> **Your mirror:** `platform/windows` (the `WindowsDesktopCapability` seam
-> pattern, `WindowsAppIndex`, the GGUF provider trio) and `apps/desktopApp`
+> **Your mirror:** `platform/windows/backend` (the `WindowsDesktopCapability` seam
+> pattern, `WindowsAppIndex`, the GGUF provider trio) and `platform/windows/frontend`
 > (the CLI runner whose `print*` functions are the UI logic). Your modules
 > mirror them 1:1 with macOS natives (AXUIElement, Keychain, `/bin/zsh`).
-> Read `platform/android`'s adapters too — they show the contract shapes.
+> Read `platform/android/backend`'s adapters too — they show the contract shapes.
 >
-> **Your ownership (edit only these):** `platform/macos/**` and
-> `apps/macosApp/**`. Frozen (never edit): `shared/**`, `apps/androidApp/**`,
-> `apps/desktopApp/**`, `platform/windows/**`, `settings.gradle.kts`,
+> **Your ownership (edit only these):** `platform/macos/backend/**` and
+> `platform/macos/frontend/**`. Frozen (never edit): `shared/**`, `platform/android/frontend/**`,
+> `platform/windows/frontend/**`, `platform/windows/backend/**`, `settings.gradle.kts`,
 > `AGENTS.md`, and all of `docs/` except `ARCHITECTURE.md`'s
-> `platform/macos/` and `apps/macosApp/` module-map lines. `shared/platform-api`
+> `platform/macos/backend/` and `platform/macos/frontend/` module-map lines. `shared/platform-api`
 > is read-only — it defines the contracts you implement.
 >
 > **Slices, in order (each complete and verifiable; no placeholders):**
 >
 > 1. **M1 — Compose Desktop macOS app.** Add Compose Multiplatform (desktop)
->    to `apps/macosApp/build.gradle.kts` (same version decision as Track W's
+>    to `platform/macos/frontend/build.gradle.kts` (same version decision as Track W's
 >    W1 — one desktop Compose version for both desktop apps; if W1 already
 >    pinned it in AGENTS.md's baseline table, reuse it without touching the
 >    table). Screens: Status/Capabilities, Apps (your macOS app index), Goals
@@ -532,7 +532,7 @@ interface.
 >
 > **Verification per slice** (this sandbox has no JDK — Gradle steps are
 > `UNVERIFIED`; run them on a Mac with JDK 17): `bash scripts/check-invariants.sh`
-> must exit 0; `./gradlew :platform:macos:test :apps:macosApp:test`. The
+> must exit 0; `./gradlew :platform:macos:backend:test :platform:macos:frontend:test`. The
 > native halves (AXUIElement, Keychain) are behind seams — the fake-bridge
 > tests run anywhere. Keep Android and Windows untouched.
 >
@@ -556,17 +556,17 @@ interface.
 > `shared/core`, `shared/platform-api`, `shared/model-api`, and your modules
 > are scaffolded. If not, stop and tell the user Phase 0 is missing.
 >
-> **Your mirror:** `platform/android`'s adapters show the contract shapes;
+> **Your mirror:** `platform/android/backend`'s adapters show the contract shapes;
 > Android's `CapabilitiesScreen`/`GoalsScreen` are the UI reference. Kotlin/
 > Native interop (kotlinx.cinterop) is how you reach Foundation/Security/
-> UIKit; keep every interop detail in `platform/ios` and `apps/iosApp` iOS
+> UIKit; keep every interop detail in `platform/ios/backend` and `platform/ios/frontend` iOS
 > source sets — **never** in shared commonMain (invariant 5).
 >
-> **Your ownership (edit only these):** `platform/ios/**` and
-> `apps/iosApp/**`. Frozen (never edit): `shared/**`, `apps/androidApp/**`,
-> `apps/desktopApp/**`, `platform/windows/**`, `platform/macos/**`,
+> **Your ownership (edit only these):** `platform/ios/backend/**` and
+> `platform/ios/frontend/**`. Frozen (never edit): `shared/**`, `platform/android/frontend/**`,
+> `platform/windows/frontend/**`, `platform/windows/backend/**`, `platform/macos/backend/**`,
 > `settings.gradle.kts`, `AGENTS.md`, and all of `docs/` except
-> `ARCHITECTURE.md`'s `platform/ios/` and `apps/iosApp/` module-map lines.
+> `ARCHITECTURE.md`'s `platform/ios/backend/` and `platform/ios/frontend/` module-map lines.
 > `shared/platform-api` is read-only — it defines the contracts you implement.
 >
 > **Slices, in order (each complete and verifiable; no placeholders):**
@@ -589,7 +589,7 @@ interface.
 > **Verification per slice** (this sandbox has no JDK and no Xcode — Gradle
 > steps are `UNVERIFIED`; run them on a Mac with JDK 17 + Xcode):
 > `bash scripts/check-invariants.sh` must exit 0;
-> `./gradlew :shared:core:compileKotlinIosSimulatorArm64 :platform:ios:compileKotlinIosSimulatorArm64 :apps:iosApp:compileKotlinIosSimulatorArm64`.
+> `./gradlew :shared:core:compileKotlinIosSimulatorArm64 :platform:ios:backend:compileKotlinIosSimulatorArm64 :platform:ios:frontend:compileKotlinIosSimulatorArm64`.
 > Keep Android and the desktop tracks untouched.
 >
 > **Handoff:** close every slice with the AGENTS.md block

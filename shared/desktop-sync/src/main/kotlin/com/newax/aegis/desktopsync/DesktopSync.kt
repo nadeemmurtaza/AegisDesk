@@ -21,7 +21,7 @@ import com.newax.aegis.sync.Identity
 import com.newax.aegis.sync.JvmLanTransport
 import com.newax.aegis.sync.PairedPeer
 import com.newax.aegis.sync.Pairing
-import com.newax.aegis.sync.PairingRequest
+import com.newax.aegis.sync.Pairing.PairingRequest
 import com.newax.aegis.sync.PeerEndpoint
 import com.newax.aegis.sync.StoredIdentity
 import com.newax.aegis.sync.SyncEntry
@@ -35,8 +35,8 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * The desktop sync engine shared by both desktop bodies (Windows desktopApp and
- * macOS macosApp) — the JVM twin of Android's SyncRuntime + SyncWorker
+ * The desktop sync engine shared by both desktop bodies (the Windows and
+ * macOS frontends) — the JVM twin of Android's SyncRuntime + SyncWorker
  * (docs/SYNC_DESIGN.md §4.2). One object per process:
  *
  *  - device identity (load-or-generate via [platformKeyStore] — OsKeyStore:
@@ -123,7 +123,7 @@ object DesktopSync {
     private var commandDispatcher: ((SyncEntry) -> Unit)? = null
 
     /**
-     * Fix C — the desktopApp body registers its CommandDispatcher here so
+     * Fix C — the desktop frontend body registers its CommandDispatcher here so
      * DesktopSync (shared) can hand it incoming targeted commands. One
      * dispatcher per process, first registration wins.
      */
@@ -710,7 +710,7 @@ object DesktopSync {
                 }
                 key.startsWith(COMMAND_TARGET_PREFIX) && key.removePrefix(COMMAND_TARGET_PREFIX) == myId -> {
                     // Fix C — the desktop now dispatches through its own
-                    // CommandDispatcher (registered by the desktopApp body);
+                    // CommandDispatcher (registered by the desktop frontend body);
                     // without one, refuse explicitly so the sender never waits
                     // silently.
                     val dispatcher = commandDispatcher

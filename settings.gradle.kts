@@ -4,9 +4,9 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "AegisAssistant"
-include(":apps:androidApp")
-include(":apps:desktopApp")
-include(":apps:macosApp")
+include(":platform:android:frontend")
+include(":platform:windows:frontend")
+include(":platform:macos:frontend")
 
 include(":shared:core")
 include(":shared:database")
@@ -15,5 +15,5 @@ include(":shared:model-api")
 include(":shared:sync")
 include(":shared:desktop-sync")
 
-include(":platform:android")
-include(":platform:windows")
+include(":platform:android:backend")
+include(":platform:windows:backend")

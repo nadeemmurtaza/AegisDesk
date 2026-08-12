@@ -10,7 +10,7 @@ import com.newax.aegis.platform.system.SystemCapability
 /**
  * The aggregate capability surface a platform exposes to the shared runtime —
  * one typed object per platform body (Android, Windows, macOS, Linux, iOS).
- * Implemented by the platform adapters (platform/android, platform/windows);
+ * Implemented by the platform adapters (platform/android/backend, platform/windows/backend);
  * consumed by the executor, skill registry, and planner.
  */
 interface PlatformCapabilities {

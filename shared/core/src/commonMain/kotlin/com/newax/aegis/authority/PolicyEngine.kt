@@ -209,6 +209,9 @@ class PolicyEngine(
     /** True when the user has pinned an override for the action class. */
     fun hasModeOverride(actionClass: String): Boolean = store.modeOverride(actionClass) != null
 
+    /** The user's pinned override for the action class, or null when unset. */
+    fun modeOverride(actionClass: String): PolicyMode? = store.modeOverride(actionClass)
+
     fun setModeOverride(actionClass: String, mode: PolicyMode) = store.setModeOverride(actionClass, mode)
 
     fun clearModeOverride(actionClass: String) = store.clearModeOverride(actionClass)

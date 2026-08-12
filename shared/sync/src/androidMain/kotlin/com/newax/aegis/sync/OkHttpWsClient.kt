@@ -40,7 +40,7 @@ class OkHttpWsClient : WsClient {
 
     private class OkHttpWsConnection(private val socket: WebSocket) : WsConnection {
         override fun sendBinary(bytes: ByteArray): Boolean = try {
-            socket.send(bytes.toByteString())
+            socket.send(ByteString.of(*bytes))
         } catch (_: Exception) {
             false
         }
