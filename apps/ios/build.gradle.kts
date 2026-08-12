@@ -7,12 +7,6 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    cocoapods {
-        summary = "Newax Aegis iOS App"
-        homepage = "https://github.com/nadeemmurtaza/AegisDesk"
-        pod("Firebase/Core")
-    }
-
     sourceSets {
         val commonMain by getting {
             dependencies {
