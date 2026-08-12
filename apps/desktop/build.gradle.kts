@@ -16,14 +16,14 @@ compose.desktop {
 }
 
 dependencies {
-    // The desktop GGUF model provider (platform:windows:backend — Phase 5c) fulfills
+    // The desktop GGUF model provider (platform-impl:windows — Phase 5c) fulfills
     // the shared ModelProvider contract for desktop inference.
-    implementation(project(":platform:windows:backend"))
+    implementation(project(":platform-impl:windows"))
 
     // ActionOrigin (OperationContext.origin) lives in shared:core; platform-api
     // declares it implementation-only, so consumers that build OperationContext
     // (the GoalExecutor's Win32 launch context — Phase 5h) must declare core
-    // explicitly — same as platform:windows:backend and platform:android:backend.
+    // explicitly — same as platform-impl:windows and platform-impl:android.
     implementation(project(":shared:core"))
 
     // The sync engine's JVM seam (mDNS proximity discovery, TCP transfer

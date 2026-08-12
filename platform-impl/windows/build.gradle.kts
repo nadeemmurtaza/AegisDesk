@@ -26,7 +26,7 @@ dependencies {
     api(project(":shared:platform-api"))
     // ActionOrigin (OperationContext.origin) lives in shared:core; platform-api
     // declares it implementation-only, so consumers that build OperationContext
-    // (capability tests) must declare core explicitly — same as platform:android:backend.
+    // (capability tests) must declare core explicitly — same as platform-impl:android.
     implementation(project(":shared:core"))
 
     // kherud/java-llama.cpp — actively maintained JVM binding for llama.cpp

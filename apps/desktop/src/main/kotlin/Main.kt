@@ -8,8 +8,8 @@
  * NOT_INSTALLED → LOADING → READY/ERROR live.
  *
  * CLI mode (unchanged Phase 5e–5i behavior, kept behind `--cli`):
- *   ./gradlew :platform:windows:frontend:run --args="--cli"                          # scans ~/.aegis/models/
- *   ./gradlew :platform:windows:frontend:run --args="--cli /path/to/model.gguf"      # uses the given file
+*   ./gradlew :apps:desktop:run --args="--cli"                          # scans ~/.aegis/models/
+*   ./gradlew :apps:desktop:run --args="--cli /path/to/model.gguf"      # uses the given file
  *
  * In CLI mode on startup the app:
  *   1. Bootstraps the desktop process-wide surfaces:
@@ -165,7 +165,7 @@ private suspend fun cliMain(args: Array<String>) {
     println(" ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝╚══════╝")
     println()
     println("  Desktop — offline GGUF model runner")
-    println("  shared/model-api · platform:windows:backend · Phase 5i · window UI (B1) — --cli for this loop")
+    println("  shared/model-api · platform-impl:windows · Phase 5i · window UI (B1) — --cli for this loop")
     println()
 
     // ── 0. Bootstrap the process-wide surfaces ────────────────────────────
@@ -194,7 +194,7 @@ private suspend fun cliMain(args: Array<String>) {
                 models.isEmpty() -> {
                     println("  ✗ No .gguf model found.")
                     println("    Place a model in ~/.aegis/models/ or pass the path as argument:")
-                    println("    ./gradlew :platform:windows:frontend:run --args=\"/path/to/model.gguf\"")
+                    println("    ./gradlew :apps:desktop:run --args=\"/path/to/model.gguf\"")
                     println()
                     return
                 }
