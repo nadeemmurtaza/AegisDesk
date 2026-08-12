@@ -41,13 +41,15 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
-        commonMain.dependencies {
-            api(project(":shared:core"))
-            api("androidx.room:room-runtime:2.8.4")
-            api("androidx.sqlite:sqlite-bundled:2.7.0")
-            // required for coroutines Flow, etc in KMP
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+        val commonMain by getting {
+            dependencies {
+                api(project(":shared:core"))
+                api("androidx.room:room-runtime:2.8.4")
+                api("androidx.sqlite:sqlite-bundled:2.7.0")
+                // required for coroutines Flow, etc in KMP
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+            }
         }
         // RoomJournalStore is JVM+Android only — shared:sync deliberately
         // declares no Apple targets (the Keychain/CryptoKit actuals are a
