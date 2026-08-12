@@ -1,5 +1,7 @@
 package com.newax.aegis.authority
 
+import com.newax.aegis.currentTimeMillis
+
 import com.newax.aegis.assistant.ActionOrigin
 import com.newax.aegis.assistant.ProposedAction
 import com.newax.aegis.assistant.RiskLevel
@@ -162,7 +164,7 @@ class PolicyEngine(
             mode = mode,
             decision = decision,
             reason = reason,
-            auditedAtMs = System.currentTimeMillis(),
+            auditedAtMs = currentTimeMillis(),
         )
         auditSink(record)
         return PolicyEvaluation(action = action, audit = record)

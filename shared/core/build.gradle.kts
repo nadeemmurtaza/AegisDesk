@@ -15,10 +15,11 @@ kotlin {
     jvm()
 
     // Apple targets — Track M1 logic-only slice: the platform-free brain now
-    // compiles for macOS + iOS. commonMain has zero expects, so no actuals are
-    // needed here; platform adapters, the storage driver, and the model runtime
-    // land in later slices. Apple-target compiles run on a macOS host only
-    // (CI and this Linux sandbox keep verifying jvm + android).
+    // compiles for macOS + iOS. The one expect/actual pair is the Platform
+    // time/lock seam (jvmMain/androidMain/appleMain actuals); everything else
+    // in commonMain is platform-free. Platform adapters, the storage driver,
+    // and the model runtime land in later slices. Apple-target compiles run on
+    // a macOS host only (CI and this Linux sandbox keep verifying jvm + android).
     // Intel x64 Apple targets are dropped: the KMP dependency checker fails
     // when a declared Apple target cannot resolve a shared dependency variant.
     iosArm64()

@@ -1,5 +1,7 @@
 package com.newax.aegis.engine.planner
 
+import com.newax.aegis.currentTimeMillis
+
 object QueryPlanner {
 
     enum class Intent {
@@ -93,7 +95,7 @@ object QueryPlanner {
             .filter { it.length > 2 && it !in STOP_WORDS }
 
     private fun parseTemporalFilter(lower: String): TemporalFilter? {
-        val now = System.currentTimeMillis(); val DAY = 86_400_000L
+        val now = currentTimeMillis(); val DAY = 86_400_000L
         return when {
             lower.contains("yesterday")  -> TemporalFilter(now - 2 * DAY, now - DAY)
             lower.contains("today")      -> TemporalFilter(now - DAY,     now)

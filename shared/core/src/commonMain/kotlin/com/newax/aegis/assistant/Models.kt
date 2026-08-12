@@ -1,10 +1,15 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.newax.aegis.assistant
+
+import com.newax.aegis.currentTimeMillis
+import kotlin.uuid.Uuid
 
 data class ChatMessage(
     val text: String,
     val fromUser: Boolean,
-    val timestamp: Long = System.currentTimeMillis(),
-    val id: String = java.util.UUID.randomUUID().toString()
+    val timestamp: Long = currentTimeMillis(),
+    val id: String = Uuid.random().toString()
 )
 
 sealed interface ProposedAction {

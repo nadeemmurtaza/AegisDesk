@@ -1,5 +1,7 @@
 package com.newax.aegis.engine
 
+import com.newax.aegis.withLock
+
 import com.newax.aegis.assistant.ProposedAction
 
 enum class AutomationToggle(
@@ -133,10 +135,12 @@ object AutomationSettings {
     private val lock = Any()
     private var secureSettings: SecureSettings? = null
 
-    fun init(settings: SecureSettings) = synchronized(lock) {
-        if (secureSettings != null) return
-        secureSettings = settings
-        com.newax.aegis.engine.apps.AppPermissionManager.init(settings)
+    fun init(settings: SecureSettings) = withLock(lock) {
+        // withLock is not inline, so no non-local return — nest instead.
+        if (secureSettings == null) {
+            secureSettings = settings
+            com.newax.aegis.engine.apps.AppPermissionManager.init(settings)
+        }
     }
 
     fun isEnabled(toggle: AutomationToggle): Boolean =
