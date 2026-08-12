@@ -45,7 +45,7 @@ kotlin {
             dependsOn(jvmAndroidMain)
             dependencies {
                 // OsKeyStore: DPAPI (Crypt32Util) on Windows — same version as
-                // platform/windows/backend. macOS uses the JDK KeychainStore (no dep).
+                // platform-impl/windows. macOS uses the JDK KeychainStore (no dep).
                 implementation("net.java.dev.jna:jna-platform:5.19.1")
             }
         }

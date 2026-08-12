@@ -17,7 +17,7 @@ import javax.crypto.spec.GCMParameterSpec
  *  - **Windows: DPAPI.** The identity blob is encrypted with
  *    [Crypt32Util.cryptProtectData] (per-user, machine-bound — only the
  *    current Windows user can decrypt) and stored as Base64 in
- *    `identity.dat`. Same primitive as the platform/windows/backend secrets vault.
+ *    `identity.dat`. Same primitive as the platform-impl/windows secrets vault.
  *  - **macOS: Keychain.** A random AES-256 key lives in the login Keychain
  *    (JDK `KeychainStore`); the identity blob is AES-GCM-wrapped with it —
  *    the same wrap format as [AndroidSyncKeyStore] — in `identity.dat`.

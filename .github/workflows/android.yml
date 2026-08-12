@@ -24,24 +24,24 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build debug APK
-        run: ./gradlew :platform:android:frontend:assembleDebug --stacktrace
+        run: ./gradlew :apps:android:assembleDebug --stacktrace
 
       - name: Run unit tests
-        run: ./gradlew :platform:android:frontend:testDebugUnitTest --stacktrace
+        run: ./gradlew :apps:android:testDebugUnitTest --stacktrace
 
-      # The Android capability adapter (platform/android/backend) implements the shared
+      # The Android capability adapter (platform-impl/android) implements the shared
       # PlatformCapabilities contract; assembleDebug compiles it and testDebugUnitTest
       # runs its JVM tests (file round-trip + bounded shell runner).
-      - name: Build platform:android adapter + run its unit tests
-        run: ./gradlew :platform:android:backend:assembleDebug :platform:android:backend:testDebugUnitTest --stacktrace
+      - name: Build platform-impl:android adapter + run its unit tests
+        run: ./gradlew :platform-impl:android:assembleDebug :platform-impl:android:testDebugUnitTest --stacktrace
 
-      # The Windows capability adapter (platform/windows/backend) implements the same contract
+      # The Windows capability adapter (platform-impl/windows) implements the same contract
       # on the JVM. Its unit tests run on any OS: Windows-only paths are guarded with
       # JUnit Assume or typed CapabilityResult failures (the Windows-only paths — DPAPI
       # secrets round-trip, Toolhelp32 process listing, Win32 app index — actually run on
       # the windows-adapter-tests job below).
-      - name: Build platform:windows adapter + run its unit tests
-        run: ./gradlew :platform:windows:backend:test --stacktrace
+      - name: Build platform-impl:windows adapter + run its unit tests
+        run: ./gradlew :platform-impl:windows:test --stacktrace
 
   # The Windows-only adapter tests are Assume-gated on IS_WINDOWS, so the ubuntu
   # job above compiles them but skips the OS-bound paths. This Windows runner is
@@ -63,15 +63,15 @@ jobs:
 
       # bash shell (Git Bash ships on windows-latest) so the POSIX gradlew wrapper
       # runs; Gradle on Windows resolves the JDK from setup-java.
-      - name: Run platform:windows adapter tests on Windows
+      - name: Run platform-impl:windows adapter tests on Windows
         shell: bash
-        run: ./gradlew :platform:windows:backend:test --stacktrace
+        run: ./gradlew :platform-impl:windows:test --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
-          path: platform/android/frontend/build/outputs/apk/debug/app-debug.apk
+          path: apps/android/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
   instrumented-tests:
@@ -103,4 +103,4 @@ jobs:
           api-level: 29
           target: default
           arch: x86_64
-          script: ./gradlew :platform:android:frontend:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.newax.aegis.db.MigrationTest --stacktrace
+          script: ./gradlew :apps:android:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.newax.aegis.db.MigrationTest --stacktrace

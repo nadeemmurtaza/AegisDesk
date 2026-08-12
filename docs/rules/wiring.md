@@ -9,7 +9,7 @@ Work the list for the ecosystem you touched. Anything you cannot edit yourself g
 Ask these regardless of language:
 
 - **Registration.** Does the runtime discover this by itself, or does something have to name it? For this repo: DAOs/entities in `@Database(entities = [...])`, agents in the registry, tools in the registry, expect/actuals in every compiled target source set, routes/UI screens mounted.
-- **UI surface (R13).** No user-facing capability ships headless-only. Every agent, tool, setting, memory view, and report is reachable and operable from the Compose UI (`platform/android/frontend`, and `platform/windows/frontend` as it grows) with real screens — navigation entry plus loading/empty/error/approval states — in the same change as its logic. Internal-only infrastructure is the exception and is named in the handoff.
+- **UI surface (R13).** No user-facing capability ships headless-only. Every agent, tool, setting, memory view, and report is reachable and operable from the Compose UI (`apps/android`, and `apps/desktop` as it grows) with real screens — navigation entry plus loading/empty/error/approval states — in the same change as its logic. Internal-only infrastructure is the exception and is named in the handoff.
 - **Dependency declared.** Every new import has a corresponding manifest line, at a version compatible with the baseline table in `AGENTS.md`. New KSP artifact for a new target. New module → `settings.gradle.kts` include.
 - **Configuration and secrets.** New env vars go through the Keys/API keys UI / `freebuff-deploy env` — never committed. Credentials are references, never values.
 - **Migration for existing state.** Schema change, stored format, cache shape, preference key → existing installs need a path forward. New installs are not the test.
@@ -22,7 +22,7 @@ Ask these regardless of language:
 - `AndroidManifest.xml` — permissions for anything touching media, storage, contacts, location, camera, mic, notifications, background work, network. Runtime permission requests for anything dangerous-level; a declared permission alone is not enough on modern API levels.
 - `AndroidManifest.xml` — every Activity, Service, BroadcastReceiver, ContentProvider declared, with correct `exported` and `foregroundServiceType`.
 - `build.gradle.kts` — `testInstrumentationRunner` set, `androidTestImplementation` present, or instrumented tests cannot compile or run.
-- `build.gradle.kts` — release buildType with minify/shrink and a signing config. Resolved: `platform/android/frontend/build.gradle.kts` reads `keystore.properties` (gitignored, template `keystore.properties.example`); absent → debug-signing fallback so `assembleRelease` still builds.
+- `build.gradle.kts` — release buildType with minify/shrink and a signing config. Resolved: `apps/android/build.gradle.kts` reads `keystore.properties` (gitignored, template `keystore.properties.example`); absent → debug-signing fallback so `assembleRelease` still builds.
 - ProGuard/R8 keep rules for anything reflective: serialization models, Room entities, JNI, dynamic class loading.
 - Room: entity declared, DAO registered, **version bumped, migration written**, schema exported, and anything created by raw SQL or callback also declared to the schema verifier.
 - WorkManager/AlarmManager: worker registered, constraints set, initialization path confirmed.
@@ -52,7 +52,7 @@ Ask these regardless of language:
 - The job fails the build on failure rather than warning.
 - New toolchain/SDK/service installed in the CI image.
 - Secrets the pipeline needs are configured — a job that silently skips on a missing secret is worse than one that fails.
-- Resolved: `.github/workflows/android.yml` triggers on `main` and uploads `platform/android/frontend/build/outputs/apk/debug/app-debug.apk`.
+- Resolved: `.github/workflows/android.yml` triggers on `main` and uploads `apps/android/build/outputs/apk/debug/app-debug.apk`.
 
 ## Containers and deployment (Freebuff preview/hosting)
 

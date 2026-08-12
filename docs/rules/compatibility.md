@@ -14,7 +14,7 @@ Versions do not stand alone. Each one below is bound to its neighbours, and chan
 | **Any annotation processor (Room)** | KSP2 compatibility. If an older release misbehaves under KSP2, pin `ksp.useKSP2=false` explicitly rather than relying on a changed default. |
 | **targetSdk (35)** | Behaviour changes for that API level: permissions, background limits, foreground service types, `exported` components. |
 | **minSdk (26)** | Every API called must exist at 26 or be guarded by a version check or desugaring. |
-| **Kotlin metadata** | `-Xskip-metadata-version-check` in `platform/android/frontend` is a *symptom* of a version mismatch (Room alpha / mixed Kotlin versions). Remove it only when versions align — never add more workarounds on top. |
+| **Kotlin metadata** | `-Xskip-metadata-version-check` in `apps/android` is a *symptom* of a version mismatch (Room alpha / mixed Kotlin versions). Remove it only when versions align — never add more workarounds on top. |
 | **Any native library (.so)** | 16 KB page size support for 64-bit — required by Play for recent target levels; older prebuilt artifacts do not have it. |
 
 ## The danger zones specific to this project

@@ -418,7 +418,7 @@ ciphertext and public ephemeral keys):
 | 6 / 8 (auditability) | The journal IS an audit trail; command lifecycle (sent → relayed → executed/refused/expired) is journaled end to end. |
 | 4 (credentials as references) | Only status syncs; values stay in per-device keystores. |
 | 5 (platform-free shared code) | Sync engine is pure KMP (`shared/sync` commonMain, zero platform imports); crypto/keystore/transport live behind expect/actual per target. |
-| 9 (Android green) | Every sync slice keeps `:platform:android:frontend:assembleDebug` green; S0 is migration + export, verified per AGENTS.md. |
+| 9 (Android green) | Every sync slice keeps `:apps:android:assembleDebug` green; S0 is migration + export, verified per AGENTS.md. |
 | R13 (no headless capability) | Pairing, per-category toggles, peer list, command permissions, and sync status all ship with screens in S5/S6. |
 
 ---
@@ -439,7 +439,7 @@ again. Each slice is a complete, verifiable unit (AGENTS.md R1–R6).
 | **S4** | Lead/W (infra) | **Relay path — LANDED.** Node service (`relay/`: `server.js` + `protocol.js` + `node --test` suite) implementing the section-10 contract: E2E-blind WebSocket rendezvous + ciphertext relay, pair-aware routing (GRANT allowlists per recipient — frames forwarded only from devices the recipient has paired), per-device in-memory store-and-forward queue (bounded + TTL, flushed on registration), PRESENCE fan-out to granting peers, `/health`, SIGTERM-clean shutdown, 16 MiB cap; env/CLI: PORT/HOST/QUEUE_TTL_MS/MAX_QUEUED_FRAMES/MAX_FRAME_BYTES. Client: `RelayTransport` in `shared/sync` jvmMain over `java.net.http.WebSocket` (zero new deps) — the S3 frame protocol was refactored into a shared seam (`FrameChannel` + `SessionHandshake` + `SealedConnection`) so the LAN socket and the relay WebSocket run the SAME handshake + sealing; relay demux routes handshake frames and sealed app frames per peer, PRESENCE → `onPeerDiscovered`. Tests: 5 server tests (`npm test`) + jvmTest E2E — two `RelayTransport`s converge journals THROUGH the real Node relay, and an un-granted initiator is rejected (skip-guarded when node/ws absent). | `cd relay && npm test`; `:shared:sync:jvmTest`; check-invariants |
 | **P1** | A (shared brain) | **Encrypted Quick Share protocol + discovery seam — LANDED.** `ProximityTransfer` in `shared/sync` commonMain: chunked, E2E-encrypted file transfer over any reliable `TransferChannel` — every message a `BlobCrypto` sealed blob (only the recipient's long-term ECDH key can unwrap; anonymous on the wire), flow INIT(sealed meta) → ACCEPT/reject (user-confirmation gate) → CHUNK i (BE index, sequential) → DONE(whole-file SHA-256) → COMPLETE; explicit `Result.Failed(stage, reason)` for wrong key / AEAD tamper / out-of-order / hash mismatch / decline / timeout. `ProximityDiscovery` contract + `expect fun proximityDiscovery()`; jvmAndroidMain actual `LanProximityDiscovery` (mDNS `_aegis-proximity._tcp.local.` — the desktop path and Android fallback). jvmTest: full round-trip (multi-chunk + empty file), wrong-recipient rejection, tampered-chunk AEAD failure, user-decline both sides, progress reporting. | `:shared:sync:jvmTest`; check-invariants |
 | **P2** | I + A (proximity) | **Android proximity actual + Quick Share UI — LANDED (Android half + desktop CLI).** `BleProximityDiscovery` (advertise/scan, `ProximityAdCodec` manufacturer-data payload — the byte format iOS's CoreBluetooth actual reuses); `P2pProximityChannel` (receiver = WiFi-Direct group owner on fixed port 47991, sender joins by P2P name `aegis-<deviceId>` via `setDeviceName` — API 30+); `AndroidProximityDiscovery` (the Android `proximityDiscovery()` actual: BLE + P2P + `ProximityHandshake` ECDH key exchange + the same `ProximityTransfer` over `TcpTransferChannel`); `TransferGate` accept/reject confirmation gate; `AndroidSyncKeyStore` (AES-GCM key in the Android Keystore/TEE wrapping the identity — the first production keystore actual; JVM seam moved to jvmMain with `FileKeyStore`); permissions (BLUETOOTH_*/NEARBY_WIFI_DEVICES/ACCESS_FINE_LOCATION) + `uses-feature` guards; Android **Nearby Share screen** (R13 — toggle, nearby list, send w/ progress, accept/decline dialog, received files to Downloads) and desktop CLI (`proximity listen/send/nearby`). iOS Multipeer actual + the desktop Compose Quick Share window remain (Track I / W1). | device tests (A/M/W) |
-| **S5** | A + W (UI, R13) | **Sensitive settings surface.** Pairing screen (QR/SAS), paired-device list + Unpair, per-category sync toggles, per-peer command allowlists, sync status/last-synced. Background sync loop wired into each app's bootstrap. | `:platform:android:frontend:testDebugUnitTest :platform:android:frontend:assembleDebug` (+ desktop) |
+| **S5** | A + W (UI, R13) | **Sensitive settings surface.** Pairing screen (QR/SAS), paired-device list + Unpair, per-category sync toggles, per-peer command allowlists, sync status/last-synced. Background sync loop wired into each app's bootstrap. | `:apps:android:testDebugUnitTest :apps:android:assembleDebug` (+ desktop) |
 | **S6** | A + W | **Commands.** Inbox/outbox, relay-queue semantics, targeted dispatch through the executor + PolicyEngine (AGENT origin), acks, command history UI. | android + desktop unit tests |
 | **S7** | W + M (files) | **File sync.** Metadata LWW + encrypted chunk transfer + resume + per-category policy + conflict rule. | platform + desktop tests |
 
@@ -523,14 +523,14 @@ driver — the "Native driver (planned)" matrix cell is stale).
    No schema change — v13 is frozen; this is a per-target builder only.
    Room KSP: add `kspIosArm64`/`kspIosX64`/`kspIosSimulatorArm64`
    configurations the moment the targets are declared (R5).
-5. **`platform/ios/frontend`: the shell.** Compose Multiplatform iOS app (CMP 1.7.1 +
-   Kotlin 2.1.0 already support iOS) mirroring `platform/macos/frontend`: the
+5. **`apps/ios`: the shell.** Compose Multiplatform iOS app (CMP 1.7.1 +
+   Kotlin 2.1.0 already support iOS) mirroring `apps/macos`: the
    `SyncScreen` (status, pairing code, SAS confirm, paired list) + the
    `SyncRuntime`-twin coordinator (WorkManager doesn't exist — use
    `UIApplication` lifecycle: sync on foreground + a background task
    permit). Needs an Xcode project / `MainViewController` entry.
 6. **Verify on the Mac:** `./gradlew :shared:sync:compileKotlinIosSimulatorArm64
-   :shared:database:compileKotlinIosSimulatorArm64 :platform:ios:frontend:build`,
+   :shared:database:compileKotlinIosSimulatorArm64 :apps:ios:build`,
    then a device smoke test: pair iOS↔Android over LAN, exchange memory +
    graph/people records, confirm convergence.
 
@@ -542,4 +542,4 @@ driver — the "Native driver (planned)" matrix cell is stale).
   `RoomJournalStore`, the LWW guard, the per-table materializers) — iOS
   reuses it unchanged once the targets + builder exist.
 - The iOS module must NOT be added to the Linux CI tasks (android.yml
-  builds `:platform:android:frontend` + `:platform:*` only — keep it that way).
+  builds `:apps:android` + `:platform-impl:*` only — keep it that way).

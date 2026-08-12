@@ -14,7 +14,7 @@ The "why" behind these rules is `ARCHITECTURE.md` (the invariants doc). The deep
 4. **Credentials are references, not content.** The LLM sees `GitHub authentication: AVAILABLE`, never a token. Credential values never land in source, prompts, or logs.
 5. **Shared code is platform-free.** `shared/**` commonMain has zero `android.*`, `java.awt`, Win32, or any platform imports. Platform behavior lives behind `expect`/`actual` in per-target source sets (`androidMain`, `desktopMain`, `iosMain`, …). A platform import in commonMain is a broken change.
 6. **Every consequential modification is auditable.** If it changed state, there is a record of who/what requested it and why.
-7. **Android keeps building throughout migration.** `:platform:android:frontend:assembleDebug` stays green on every PR. RULE 10 of ARCHITECTURE.md.
+7. **Android keeps building throughout migration.** `:apps:android:assembleDebug` stays green on every PR. RULE 10 of ARCHITECTURE.md.
 8. **Offline-first, deterministic-first.** Skills are tagged `OFFLINE_OK` / `REQUIRES_ONLINE` / `DEFER`. Prefer the deterministic path (exact lookup, typed tool) over loading the model. One loaded model serves many agents via prompt profiles — never one model per agent.
 
 ---
@@ -43,18 +43,18 @@ If any is unknown: **ask, or state the assumption in one line and take the conse
 | KSP | **2.3.11** | standalone versioning since Kotlin 2.x; no lockstep format anymore |
 | AGP | **9.3.1** | couples to Gradle 9.7.0 + JDK 17; AGP 9 has built-in Kotlin (`kotlin { compilerOptions { jvmTarget } }`, not `kotlinOptions`) |
 | compileSdk / targetSdk / minSdk | **36 / 36 / 26** | Android app; every API used must exist at 26 or be guarded |
-| Compose | **BOM 2026.06.01** (Android); windows/macos frontends: **Compose Multiplatform 1.11.1** | Compose compiler comes from the Kotlin plugin (Kotlin 2.0+); CMP 1.11.1 is the lockstep pairing for Kotlin 2.4.10 — keep them coupled |
+| Compose | **BOM 2026.06.01** (Android); windows/macos apps: **Compose Multiplatform 1.11.1** | Compose compiler comes from the Kotlin plugin (Kotlin 2.0+); CMP 1.11.1 is the lockstep pairing for Kotlin 2.4.10 — keep them coupled |
 | Room | **2.8.4 (stable KMP)** | `shared:database`; stable since 2.8.x — the 2.7.0-alpha13 pre-release line is gone |
 | sqlite driver | **androidx.sqlite:sqlite-bundled 2.7.0** (desktop); **sqlite-framework 2.7.0 / NativeSQLiteDriver** (appleMain, Track M2); SQLCipher 4.17.0 (androidMain) | stable line; per-target KSP configs (`kspAndroid`, `kspDesktop`, `kspIosNative`, …) — the `ksp()` KMP shorthand is deprecated |
 | coroutines / datetime | **1.11.0 / 0.8.0** | |
-| LiteRT LM | **0.16.0** (platform:android — engine + provider; app consumes via shared:model-api) | offline model runtime |
-| Modules | `:platform:android:frontend`, `:platform:windows:frontend`, `:platform:macos:frontend`, `:shared:core`, `:shared:database`, `:shared:platform-api`, `:shared:model-api`, `:shared:sync`, `:shared:desktop-sync`, `:platform:android:backend`, `:platform:windows:backend` | add new modules to `settings.gradle.kts` in the same change |
+| LiteRT LM | **0.16.0** (platform-impl:android — engine + provider; app consumes via shared:model-api) | offline model runtime |
+| Modules | `:apps:android`, `:apps:desktop`, `:apps:macos`, `:apps:ios`, `:platform-impl:android`, `:platform-impl:windows`, `:platform-impl:macos`, `:platform-impl:ios`, `:shared:core`, `:shared:database`, `:shared:platform-api`, `:shared:model-api`, `:shared:sync`, `:shared:desktop-sync` | add new modules to `settings.gradle.kts` in the same change |
 
 **Known blockers (do not silently inherit, do not silently "fix" unasked):**
 - ✅ RESOLVED — machine-specific `org.gradle.java.home` removed from `gradle.properties` (f1617ac); builds are portable across OSes again.
-- ✅ RESOLVED — `.github/workflows/android.yml` now triggers on `main` and uploads `platform/android/frontend/build/outputs/apk/debug/app-debug.apk` (f1617ac); APK named `app-debug.apk` via `base { archivesName }` (90a56a8).
+- ✅ RESOLVED — `.github/workflows/android.yml` now triggers on `main` and uploads `apps/android/build/outputs/apk/debug/app-debug.apk` (f1617ac); APK named `app-debug.apk` via `base { archivesName }` (90a56a8).
 - ✅ RESOLVED — release signing no longer commits plaintext passwords; credentials come from gitignored `keystore.properties` (template: `keystore.properties.example`), with debug-signing fallback when absent.
-- ✅ RESOLVED — `-Xskip-metadata-version-check` removed from androidApp; LiteRT-LM 0.16.0 ships Kotlin 2.3 metadata and Kotlin 2.4.10 reads it natively (version alignment, per platform/android/backend comment).
+- ✅ RESOLVED — `-Xskip-metadata-version-check` removed from apps/android; LiteRT-LM 0.16.0 ships Kotlin 2.3 metadata and Kotlin 2.4.10 reads it natively (version alignment, per platform-impl/android comment).
 
 ---
 
@@ -75,7 +75,7 @@ Declared-but-empty surface is worse than nothing: it looks finished, so callers 
 
 The single exception is a value only the user can supply — a secret, an account ID, a hostname. It goes in config under an obvious name (`WHATSAPP_ACCESS_TOKEN`, …), it is wired through the Keys/API keys UI or `freebuff-deploy env`, and it is called out in the handoff. Never buried mid-file, never hardcoded.
 
-**Deliberate scaffolding is allowed** (e.g. `:platform:android:backend`/`:platform:windows:backend` existing as empty adapters ahead of their consumers) — but it is named in the handoff as a known gap, not discovered later.
+**Deliberate scaffolding is allowed** (e.g. `:platform-impl:android`/`:platform-impl:windows` existing as empty adapters ahead of their consumers) — but it is named in the handoff as a known gap, not discovered later.
 
 ### Completeness
 
@@ -93,7 +93,7 @@ A new symbol gets its caller in the same change. New config gets its registratio
 **R13 — No headless capability. Backend never ships without its frontend.**
 No backend code, module, function, agent, tool, or setting is left without a proper, professional UI/UX. A user-facing capability is **not done** until the user can reach and operate it from the UI — it ships with its screen, not just its API.
 
-Concretely on this repo: every user-facing capability in `shared/**` (agents, tools, permissions, memory views, reports, settings) must be surfaced and usable in the Compose UI of `platform/android/frontend` (and `platform/windows/frontend` as it grows). A new DAO query that powers a new screen is wired; a new agent that only exists in the registry is a stub. The UI itself must meet the bar: real screens, not placeholders — with loading, empty, error, and approval/confirmation states — following the app's design system, matching the quality of the rest of the interface. Declared-but-unreachable capability is the UI twin of R3's declared-but-empty code: it looks finished and is discovered only from user confusion.
+Concretely on this repo: every user-facing capability in `shared/**` (agents, tools, permissions, memory views, reports, settings) must be surfaced and usable in the Compose UI of `apps/android` (and `apps/desktop` as it grows). A new DAO query that powers a new screen is wired; a new agent that only exists in the registry is a stub. The UI itself must meet the bar: real screens, not placeholders — with loading, empty, error, and approval/confirmation states — following the app's design system, matching the quality of the rest of the interface. Declared-but-unreachable capability is the UI twin of R3's declared-but-empty code: it looks finished and is discovered only from user confusion.
 
 The single exception is internal infrastructure with no user interaction surface (e.g. a background migration, a policy decision internal to `AuthorityManager`) — but any capability whose existence a user could reasonably want to see, configure, invoke, or audit gets its UI in the same change as its logic.
 
@@ -151,9 +151,9 @@ Cheapest first: **typecheck → build → lint → test → smoke run.** Stop at
 ./gradlew :shared:database:desktopJar :shared:database:assembleDebug
 ./gradlew :shared:core:compileKotlinJvm :shared:core:assembleDebug
 # Full app gates
-./gradlew :platform:android:frontend:assembleDebug :platform:android:frontend:testDebugUnitTest
-./gradlew :platform:android:frontend:lintDebug
-./gradlew :platform:android:frontend:connectedDebugAndroidTest   # emulator only — Room migration tests
+./gradlew :apps:android:assembleDebug :apps:android:testDebugUnitTest
+./gradlew :apps:android:lintDebug
+./gradlew :apps:android:connectedDebugAndroidTest   # emulator only — Room migration tests
 ```
 
 Critical notes for this repo:

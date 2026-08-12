@@ -33,11 +33,11 @@ Accessibility services are powerful. Install only builds you control. Banking, p
 
 ## Windows desktop (Track A)
 
-A JVM bootstrap (`platform/windows/frontend`) implements the shared platform capability contract on Windows via `platform/windows/backend`: real file access, process listing/launch/terminate, a bounded shell runner, User32/GDI desktop automation (window activation, SendInput click/type/scroll, screenshots), a DPAPI-protected secrets vault, and system info/connectivity/battery.
+A JVM app (`apps/desktop`) implements the shared platform capability contract on Windows via `platform-impl/windows`: real file access, process listing/launch/terminate, a bounded shell runner, User32/GDI desktop automation (window activation, SendInput click/type/scroll, screenshots), a DPAPI-protected secrets vault, and system info/connectivity/battery.
 
 ```bash
-sh ./gradlew :platform:windows:frontend:run   # prints the capability surface + operational statuses
-sh ./gradlew :platform:windows:backend:test # adapter unit tests — run on any OS; Win32 paths are OS-guarded
+sh ./gradlew :apps:desktop:run   # prints the capability surface + operational statuses
+sh ./gradlew :platform-impl:windows:test # adapter unit tests — run on any OS; Win32 paths are OS-guarded
 ```
 
 On non-Windows hosts the Win32-backed capabilities report `NOT_SUPPORTED` instead of crashing; the pure-JVM ones (files, shell, system) stay operational. The Compose Desktop UI (Track B) will consume this same process-wide registry.

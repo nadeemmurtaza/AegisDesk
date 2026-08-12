@@ -73,8 +73,8 @@ kotlin {
     }
 }
 
-// Keep the debug APK named app-debug.apk — the module dir is androidApp, which would
-// otherwise produce androidApp-debug.apk and break the CI artifact upload + preview link.
+// Keep the debug APK named app-debug.apk — the module dir is android, which would
+// otherwise produce android-debug.apk and break the CI artifact upload + preview link.
 base {
     archivesName.set("app")
 }

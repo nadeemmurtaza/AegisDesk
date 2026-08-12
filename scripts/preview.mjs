@@ -17,7 +17,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = "0.0.0.0";
 
 const ROOT = process.cwd();
-const APK_DIR = join(ROOT, "apps", "androidApp", "build", "outputs", "apk", "debug");
+const APK_DIR = join(ROOT, "apps", "android", "build", "outputs", "apk", "debug");
 const APK_PATH = join(APK_DIR, "app-debug.apk");
 const README_PATH = join(ROOT, "README.md");
 const MODEL_SETUP_PATH = join(ROOT, "MODEL_SETUP_S21.md");
@@ -36,15 +36,15 @@ function apkEntry() {
     return `<div class="card">
       <div class="tag ok">APK READY</div>
       <h2>Debug APK available</h2>
-      <p class="muted">Built at <code>platform/android/frontend/build/outputs/apk/debug/app-debug.apk</code> — ${mb} MB.</p>
+      <p class="muted">Built at <code>apps/android/build/outputs/apk/debug/app-debug.apk</code> — ${mb} MB.</p>
       <a class="btn" href="/apk" download>Download app-debug.apk</a>
     </div>`;
   }
   return `<div class="card">
       <div class="tag">NO APK YET</div>
       <h2>Build the APK to download it</h2>
-      <p class="muted">No APK found at <code>platform/android/frontend/build/outputs/apk/debug/app-debug.apk</code>.
-      The Gradle build requires JDK 17 + Android SDK 35 — run <code>sh ./gradlew :platform:android:frontend:assembleDebug</code>
+      <p class="muted">No APK found at <code>apps/android/build/outputs/apk/debug/app-debug.apk</code>.
+      The Gradle build requires JDK 17 + Android SDK 35 — run <code>sh ./gradlew :apps:android:assembleDebug</code>
       on a machine with the Android toolchain (or via the repo's GitHub Actions workflow), then
       this page will offer the file here.</p>
     </div>`;
@@ -152,8 +152,8 @@ function renderIndex() {
   <div class="card">
     <h2>Build it</h2>
     <p class="muted">Requires JDK 17 and Android SDK 35 (Android Studio syncs these). No env vars or API keys are needed.</p>
-    <pre>sh ./gradlew :platform:android:frontend:assembleDebug
-# APK → platform/android/frontend/build/outputs/apk/debug/app-debug.apk</pre>
+    <pre>sh ./gradlew :apps:android:assembleDebug
+# APK → apps/android/build/outputs/apk/debug/app-debug.apk</pre>
     <p class="muted">Continuous build &amp; instrumented DB migration tests already run in CI: <a class="link" href="https://github.com/nadeemmurtaza/AegisDesk/actions">.github/workflows/android.yml</a></p>
   </div>
 
