@@ -33,6 +33,12 @@ kotlin {
     macosX64()
     macosArm64()
 
+    // KGP no longer applies the shared hierarchy template implicitly — create
+    // the standard intermediates (appleMain/iosMain) explicitly or the
+    // appleMain actuals are never compiled and `findByName("appleMain")`
+    // silently returns null.
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
         commonMain.dependencies {
             api(project(":shared:core"))

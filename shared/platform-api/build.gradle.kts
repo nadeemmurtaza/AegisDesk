@@ -24,6 +24,11 @@ kotlin {
     macosX64()
     macosArm64()
 
+    // KGP no longer applies the shared hierarchy template implicitly — keep the
+    // standard intermediates explicit so Apple actuals can land (expect/actual
+    // balance on every compiled target, R4).
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
         val commonMain by getting {
             dependencies {
