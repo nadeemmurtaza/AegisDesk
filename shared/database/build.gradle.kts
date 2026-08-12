@@ -65,15 +65,17 @@ kotlin {
                 implementation(project(":shared:sync"))
             }
         }
-        androidMain.dependsOn(desktopAndroidMain)
-        androidMain.dependencies {
-            // SQLCipher for Android — the successor artifact (the old
-            // android-database-sqlcipher coordinate is deprecated). The API is
-            // net.zetetic.database.sqlcipher.SupportOpenHelperFactory, the drop-in
-            // for the former net.sqlcipher SupportFactory (see the builder).
-            implementation("net.zetetic:sqlcipher-android:4.17.0")
-            implementation("androidx.sqlite:sqlite-ktx:2.7.0")
-            implementation("androidx.room:room-ktx:2.8.4")
+        val androidMain by getting {
+            dependsOn(desktopAndroidMain)
+            dependencies {
+                // SQLCipher for Android — the successor artifact (the old
+                // android-database-sqlcipher coordinate is deprecated). The API is
+                // net.zetetic.database.sqlcipher.SupportOpenHelperFactory, the drop-in
+                // for the former net.sqlcipher SupportFactory (see the builder).
+                implementation("net.zetetic:sqlcipher-android:4.17.0")
+                implementation("androidx.sqlite:sqlite-ktx:2.7.0")
+                implementation("androidx.room:room-ktx:2.8.4")
+            }
         }
         val desktopMain by getting {
             dependsOn(desktopAndroidMain)
