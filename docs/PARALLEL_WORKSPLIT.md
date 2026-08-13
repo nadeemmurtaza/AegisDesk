@@ -1,4 +1,4 @@
-# PARALLEL WORK-SPLIT — Aegis Assistant (four agents, one repo)
+# PARALLEL WORK-SPLIT — Newax Aegis Assistant (four agents, one repo)
 
 Date: 2026-08-11. This document partitions the remaining work into **four
 parallel tracks — one per device: iOS, Android, macOS, Windows — labeled
@@ -422,7 +422,7 @@ interface.
 
 ### Agent W (Windows body)
 
-> You are Agent 2 of a four-agent parallel effort on the Aegis Assistant
+> You are Agent 2 of a four-agent parallel effort on the Newax Aegis Assistant
 > repository (Kotlin/KMP: Android + Windows + macOS + iOS bodies, shared KMP
 > brain). Your track is **Track W — Windows body** (formerly Track B). Agent A
 > owns Android + `shared/core`; you must **never edit those**.
@@ -484,7 +484,7 @@ interface.
 
 ### Agent M (macOS body)
 
-> You are Agent 3 of a four-agent parallel effort on the Aegis Assistant
+> You are Agent 3 of a four-agent parallel effort on the Newax Aegis Assistant
 > repository (Kotlin/KMP: Android + Windows + macOS + iOS bodies, shared KMP
 > brain). Your track is **Track M — macOS body**. Agent A owns Android +
 > `shared/core`; you must **never edit those**.
@@ -543,7 +543,7 @@ interface.
 
 ### Agent I (iOS body)
 
-> You are Agent 4 of a four-agent parallel effort on the Aegis Assistant
+> You are Agent 4 of a four-agent parallel effort on the Newax Aegis Assistant
 > repository (Kotlin/KMP: Android + Windows + macOS + iOS bodies, shared KMP
 > brain). Your track is **Track I — iOS body**. Agent A owns Android +
 > `shared/core`; you must **never edit those**.

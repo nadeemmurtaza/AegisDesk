@@ -17,7 +17,7 @@ The additional 8 GB Samsung RAM Plus setting is swap-backed storage and is not c
 
 ## Model installation design
 
-Model weights are not placed in the APK. Aegis imports a user-selected `.litertlm` model pack into private app storage, validates the bundle header and size, records its SHA-256 fingerprint, and initializes it on the CPU backend. If initialization fails, Aegis falls back to the deterministic command engine. GPU benchmarking remains disabled until it is validated on the actual handset.
+Model weights are not placed in the APK. Newax Aegis imports a user-selected `.litertlm` model pack into private app storage, validates the bundle header and size, records its SHA-256 fingerprint, and initializes it on the CPU backend. If initialization fails, Newax Aegis falls back to the deterministic command engine. GPU benchmarking remains disabled until it is validated on the actual handset.
 
 Gemma access may require accepting Google's model terms at the official distribution source. Do not redistribute model weights inside this project archive.
 

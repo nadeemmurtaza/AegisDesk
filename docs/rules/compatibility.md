@@ -20,7 +20,7 @@ Versions do not stand alone. Each one below is bound to its neighbours, and chan
 ## The danger zones specific to this project
 
 - **Room 2.7.0-alpha13 is a pre-release holding user data.** Do not "just upgrade" it. When moving it, the migration path, schema export, and `MigrationTest` are the first things that break.
-- **Adding a KMP target** (iOS/macOS/Linux later) means: new targets in `kotlin {}`, per-target KSP configs, per-target `actual`s for every `expect` (`TimeUtils`, `AegisDatabaseConstructor`), per-target schema directories, and a CI job that can actually compile that target. It is never a one-file change.
+- **Adding a KMP target** (iOS/macOS/Linux later) means: new targets in `kotlin {}`, per-target KSP configs, per-target `actual`s for every `expect` (`TimeUtils`, `NewaxDatabaseBuilder`), per-target schema directories, and a CI job that can actually compile that target. It is never a one-file change.
 - **Build DSL is version-specific and punishes memory:** properties that look assignable are often read-only; Kotlin DSL syntax differs from Groovy. Read the actual file. A broken `build.gradle.kts` fails every task in the module — it looks like a broken codebase.
 
 ## General couplings (any ecosystem)

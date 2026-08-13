@@ -210,7 +210,7 @@ object DesktopSync {
             }
         }.apply {
             isDaemon = true
-            name = "aegis-sync-auto"
+            name = "newax-sync-auto"
             start()
         }
     }

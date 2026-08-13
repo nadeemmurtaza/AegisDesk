@@ -2,7 +2,7 @@
   "name": "aegis-sync-relay",
   "version": "0.1.0",
   "private": true,
-  "description": "E2E-blind rendezvous + ciphertext relay for the Aegis 4-device sync mesh (docs/SYNC_DESIGN.md §10)",
+  "description": "E2E-blind rendezvous + ciphertext relay for the Newax Aegis 4-device sync mesh (docs/SYNC_DESIGN.md §10)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

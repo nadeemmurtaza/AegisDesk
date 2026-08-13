@@ -1,4 +1,4 @@
-# Aegis sync relay — E2E-blind rendezvous + ciphertext relay (docs/SYNC_DESIGN.md §10).
+# Newax Aegis sync relay — E2E-blind rendezvous + ciphertext relay (docs/SYNC_DESIGN.md §10).
 # Deployable on any container host (Fly/Render/Railway/K8s or a plain VPS):
 #   docker build -t aegis-relay relay/
 #   docker run -p 8080:8080 -e PORT=8080 aegis-relay

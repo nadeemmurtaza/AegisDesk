@@ -54,4 +54,4 @@ After the toolchain is green, execute the thing once with realistic input. Call 
 - first request **and** the retry
 - empty dataset **and** populated
 
-These pairs are where "it worked on my machine" comes from. Most shipped regressions live on the second item of one of these pairs — and for Aegis, the automated/background side is exactly the side with stricter policy, so it is the one most likely to be skipped and most dangerous to skip.
+These pairs are where "it worked on my machine" comes from. Most shipped regressions live on the second item of one of these pairs — and for Newax Aegis, the automated/background side is exactly the side with stricter policy, so it is the one most likely to be skipped and most dangerous to skip.

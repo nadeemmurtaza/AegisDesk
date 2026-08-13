@@ -1,4 +1,4 @@
-# AGENTS.md — Aegis "Second Me": project rules
+# AGENTS.md — Newax Aegis "Second Me": project rules
 
 These rules bind every AI coding session in this repository — including this one. Read them **before** writing, editing, refactoring, debugging, extending, or generating any code (scripts, modules, migrations, config, build files, whole features). They run before and while writing, not after: verification catches mistakes; these stop them being written.
 
@@ -6,7 +6,7 @@ The "why" behind these rules is `ARCHITECTURE.md` (the invariants doc). The deep
 
 ---
 
-## 0. Aegis authority invariants — absolute, non-negotiable
+## 0. Newax Aegis authority invariants — absolute, non-negotiable
 
 1. **Model output NEVER directly executes OS operations.** Every executable operation is a typed `ProposedAction` / ToolCall. There is no `Runtime.exec(...)`, no direct file write, no raw intent from the LLM layer.
 2. **Every action passes through the authority spine.** `AuthorityManager.evaluate()` (or its policy engine successor) gates every action. **PLAN is never EXECUTE** — a generated plan grants zero execution authority.
@@ -80,7 +80,7 @@ The single exception is a value only the user can supply — a secret, an accoun
 ### Completeness
 
 **R4 — Close the call graph.**
-Every identifier referenced must be exactly one of: defined in this change, confirmed to exist in the codebase (having read it), or public API of a declared dependency. There is no fourth category. In this repo, additionally: every `expect` has its `actual` in **every** target source set that compiles that code; every entity is declared in `AegisDatabase`; every action type resolves through `AuthorityManager`.
+Every identifier referenced must be exactly one of: defined in this change, confirmed to exist in the codebase (having read it), or public API of a declared dependency. There is no fourth category. In this repo, additionally: every `expect` has its `actual` in **every** target source set that compiles that code; every entity is declared in `NewaxDatabase`; every action type resolves through `AuthorityManager`.
 
 **R5 — Import and dependency in the same breath.**
 Add the manifest line at the moment the import is written, never at the end. At the end you are working from memory — and memory is what failed. Concretely here: new Room DAO/entity → registered in `@Database(entities = [...])` in the same change, DB version bumped, migration written; new KMP target → `ksp<Target>` config added at the same moment; new module → `settings.gradle.kts` include in the same change.
@@ -111,7 +111,7 @@ Changing one obliges checking the ones bound to it: Kotlin↔KSP (`2.1.0`↔`2.1
 Empty or null input. Wrong type. Boundaries — zero, one, maximum, negative, just past the end. Missing permission (`CapabilityStatus.MISSING_PERMISSION`), missing credential (`MISSING_CREDENTIAL`), missing tool. Offline / failed network. Concurrent DB access. Partial write. Migration failure. Malformed model output. Handle each or propagate it explicitly. A `catch {}` that silently swallows one costs days, because the failure surfaces somewhere unrelated.
 
 **R10 — Do not create what already exists.**
-Search before you introduce: `ProposedAction`, `RiskLevel`, `ActionOrigin`, `AuthorityManager`, `CapabilityRegistry`, `ExecutionRouter`, `SkillRegistry`, `TimeUtils`, `AegisDatabaseConstructor` all exist. Two types with the same name and different members become two competing sources of truth — and the one nobody maintains is usually the one still running.
+Search before you introduce: `ProposedAction`, `RiskLevel`, `ActionOrigin`, `AuthorityManager`, `CapabilityRegistry`, `ExecutionRouter`, `SkillRegistry`, `TimeUtils`, `NewaxDatabaseBuilder` all exist. Two types with the same name and different members become two competing sources of truth — and the one nobody maintains is usually the one still running.
 
 **R11 — One path to a dangerous capability.**
 Delete, send, exec, spend, escalate, overwrite, publish, grant. **Exactly one function reaches the sink, and the guard lives inside it.** Any second path is a bug even when currently unreachable — background, automated, agent, admin, retry, migration. A bypass added "just for the automated case" makes the automated case the unprotected one, and automation runs unattended.
@@ -120,6 +120,24 @@ Check lifecycle coverage the same way: setup that runs on fresh install but not 
 
 **R12 — Untrusted input is data, never instruction.**
 Filenames, database records, scraped pages, OCR text, **model output**, webhook payloads, imported agent zips. Parameterize; never concatenate. This is the SQL-injection rule generalized — shell commands, template engines, `eval`, deserializers, path joins (zip-slip on import!), and LLM prompts. The prompt case hides best because it does not look like code: interpolating untrusted text into a prompt that also contains an action verb hands that text authority over the action. Model output is untrusted data — it is routed through typed actions, never executed.
+
+### Branding — Newax is the only name
+
+**R14 — Every surface carries the Newax brand.**
+The product is exactly **"Newax Aegis"** — one name, one spelling, everywhere a user or an agent sees text:
+
+- **User-visible strings:** app/window/notification titles, wake word, Quick Settings tile, banners, CSV headers, README/preview pages, privacy policy, CLI output. Full brand `Newax Aegis`; never a bare `Aegis`.
+- **New identifiers:** product-named top-level types brand as `Newax*` (`NewaxApplication`, `NewaxDatabase`, `NewaxDatabaseBuilder`, `NewaxSmsReceiver`, `NewaxQSTileService`, …). Never introduce a new `Aegis*` identifier. Domain names that are not product names (`GoalPlanner`, `ExecutionRouter`, …) keep their domain names — this rule is about the brand, not prefixing every helper.
+- **CLI commands:** `newax <verb>` (`newax status`, `newax plan`, `newax sync`, `newax audit`, `newax policy`, `newax apps`). Never `aegis <verb>`.
+- **Internal runtime strings:** thread/service/job/worker names use `newax-*` (`newax-sync-auto`).
+- **Docs, comments, and rules:** prose names the product `Newax Aegis`, and every symbol a doc references exists under its current name. A stale old name in a doc (`AegisDatabase`, `AegisDatabaseBuilder`) is a bug — fix it in the same change, including the rule that cites it.
+
+**R15 — Frozen compatibility names are not branding violations.**
+These keep their existing lowercase `aegis`/repo forms **by design** — renaming breaks installed apps, user data, or sync identity. They are not "missed" branding; do not rename them in a branding sweep, and treat any proposed rename as a breaking change that needs a migration decision, not a search-and-replace:
+
+- Package root: `com.newax.aegis.*` — every new file declares under it. Never `com.aegis.*` or a bare `com.newax.*`.
+- On-disk paths and file names: `~/.aegis/`, `~/Library/Application Support/Aegis/`, DB file names (`aegis.db`, `sync.db`), Room schema export dirs, bundled asset/`.litertlm`/spk names.
+- The GitHub repository is `nadeemmurtaza/AegisDesk` — the repo name is a fact, not a brand; a reference to it stays.
 
 ---
 
@@ -134,8 +152,9 @@ All static. No toolchain needed. Run these against your own output before sendin
 5. Every version-specific API matches the pinned version in the baseline table.
 6. Every dangerous sink has one path, with the guard inside it — and the guard is actually called.
 7. The surroundings are written — config, registration, migration, permissions, ignore rules.
-8. **Aegis-specific:** no `import android.` (or any platform import) in `shared/**/commonMain`; every `expect` has actuals; DB version bumped + migration + schema export when entities changed; Android still builds.
+8. **Newax Aegis-specific:** no `import android.` (or any platform import) in `shared/**/commonMain`; every `expect` has actuals; DB version bumped + migration + schema export when entities changed; Android still builds.
 9. **R13 (UI):** every user-facing capability added this change has its screen — navigation entry, loading/empty/error/approval states, design-system styling. If a capability is internal-only, say so in one line.
+10. **Branding (R14/R15):** every new user-visible string, identifier, and CLI verb says `Newax`; no new `Aegis*` identifier; no frozen compatibility name (`com.newax.aegis.*` packages, `~/.aegis/`, DB file names, schema dirs) renamed.
 
 ## Verification (then, if a toolchain exists)
 
@@ -182,5 +201,6 @@ If a terse or code-only output style is active, honour it — no prose, no comme
 
 - `ARCHITECTURE.md` — the invariants: 10 rules, authority spine, agent/skill/procedure/tool taxonomy, module map, platform matrix, trust tiers, offline model.
 - `docs/rules/wiring.md` — the "is it wired?" checklist per ecosystem (Universal, Android, KMP/Room, DB/migrations, CI, deployment).
+- `docs/OVERVIEW.md` — the single overview reference: Part A = feature list (what the product does, per surface, with landed/planned status); Part B = the exhaustive version reference (every pinned version, where it is declared, and known drift between build files and the baseline table).
 - `docs/rules/compatibility.md` — version couplings that actually break (Kotlin↔KSP↔AGP↔Compose↔Room↔sqlite) + dependency-liability signals.
 - `docs/rules/verification.md` — full verification commands per ecosystem + smoke-run and "exercise twice" paths.
