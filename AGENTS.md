@@ -202,5 +202,6 @@ If a terse or code-only output style is active, honour it — no prose, no comme
 - `ARCHITECTURE.md` — the invariants: 10 rules, authority spine, agent/skill/procedure/tool taxonomy, module map, platform matrix, trust tiers, offline model.
 - `docs/rules/wiring.md` — the "is it wired?" checklist per ecosystem (Universal, Android, KMP/Room, DB/migrations, CI, deployment).
 - `docs/OVERVIEW.md` — the single overview reference: Part A = feature list (what the product does, per surface, with landed/planned status); Part B = the exhaustive version reference (every pinned version, where it is declared, and known drift between build files and the baseline table).
+- `docs/UI_DESIGN.md` — the shared Android/iOS UI design plan (ChatGPT-style): information architecture, page specs, shared component library, platform seams, phased implementation, and the current→new screen mapping.
 - `docs/rules/compatibility.md` — version couplings that actually break (Kotlin↔KSP↔AGP↔Compose↔Room↔sqlite) + dependency-liability signals.
 - `docs/rules/verification.md` — full verification commands per ecosystem + smoke-run and "exercise twice" paths.

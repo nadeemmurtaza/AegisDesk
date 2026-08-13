@@ -14,7 +14,7 @@ import org.vosk.android.SpeechService
 import org.vosk.android.StorageService
 
 /**
- * Service that continuously listens for a Wake Word ("hey aegis") using the open-source Vosk engine.
+ * Service that continuously listens for a Wake Word using the open-source Vosk engine.
  * Requires a Vosk acoustic model bundled in the app assets.
  */
 class VoiceRecognitionService : Service(), RecognitionListener {
