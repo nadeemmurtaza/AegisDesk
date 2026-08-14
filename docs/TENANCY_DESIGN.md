@@ -99,9 +99,9 @@ mechanical, and both are worth it.
 
 ## 3. Multi-device: enrollment, not login
 
-"Log in on my other device" normally means credentials → server → session. There
-is no server here, and adding one would mean adding the `INTERNET` permission
-the product refuses (§7).
+"Log in on my other device" normally means credentials → server → session.
+There is no server here, and adding one would mean holding user credentials and
+profile data off-device (§7).
 
 **It isn't needed.** `shared/sync` already contains the entire toolkit:
 `Identity.kt` (Ed25519), `Pairing.kt` (QR + SAS), `SessionCrypto.kt`
@@ -308,8 +308,10 @@ a hardware requirement on a fleet including Windows.
 
 Costed so it is a decision rather than a drift:
 
-- `android.permission.INTERNET` in the main manifest — discarding a guarantee
-  currently enforced by the OS rather than by a promise.
+- Accounts and cloud storage of user content. (Note: `INTERNET` is **already**
+  declared at `AndroidManifest.xml:6` for the sync relay, so that particular
+  line has already been crossed — `README.md:11` claiming otherwise is a defect,
+  see `ENGINEERING.md` §B11. The costs below are the ones that still bite.)
 - Accounts, identity provider, session management, password reset — and every
   attack that comes with them.
 - Cloud storage of memory and conversations: the most sensitive data the product
@@ -410,6 +412,12 @@ Insert into `ENGINEERING.md` Part A after slice 8.
 | **T-10** | Org link lifecycle: MDM/QR token → `LINK_PENDING` → consent → `LINKED`; signed tighten-only bundles; unlink with retire policy | T-9 | Loosening bundle rejected, logged, surfaced; linking without consent impossible; unlink always available; `WIPE` proven not to touch Personal |
 | **T-11** | Per-profile sync scoping + device revocation | T-6 | A peer enrolled for Work never sees Personal |
 | **T-12** | Tamper-evident per-profile audit export (hash-chained) | T-3 | Chain break detectable |
+| **T-13** | Profile triggers: time, Wi-Fi SSID, geofence → lock / switch-out / suggest | T-5 | No path exists by which a trigger unlocks a profile; location never leaves the device |
+| **T-14** | Focus filters + app→profile assignment | T-3 | Held notifications are never dropped; unassigned apps default to notifying |
+| **T-15** | Per-profile VIP allowlists | T-3, slice 13 | A Work VIP is absent from Personal's suggestions; VIP bypasses filters, never approval |
+| **T-16** | Notification digest (metadata by default) | T-14 | Bodies not persisted unless opted in; retention honoured |
+| **T-17** | Calendar busy projection | T-3 | The projected type has no detail field; org cannot enable it |
+| **T-18** | Per-profile connector registry + secrets namespace | T-3 | A connector in one profile is invisible to the other; revoked with the profile |
 
 **T-2 is the highest-risk slice in the project** — it moves every existing
 user's data. Migration test, backup-before-migrate, and a rollback path before
@@ -421,7 +429,180 @@ protect them.
 
 ---
 
-## 12. Refused by design
+## 12. Profile-aware behaviour
+
+Separate storage is the floor. What makes two profiles feel like two contexts is
+how the assistant *behaves* in each. This section specifies that, and resolves
+the three places where the requested behaviour collides with §2.
+
+### 12.1 Switching — automatic, but never automatically *in*
+
+Requested: switch profiles automatically by time of day, location, or Wi-Fi.
+
+**A trigger can never unlock a profile.** This is not a policy choice, it is
+forced by §2: a profile root key is user-auth-bound, so the bytes are
+unreadable until a human authenticates. A trigger that "switched into Work" at
+9am would have to hold an unlocked key all night, which defeats the entire
+mechanism.
+
+What triggers *can* do, and it covers most of the intent:
+
+| Trigger action | Allowed | Why |
+|---|---|---|
+| **Lock** the active profile | ✅ automatic | Locking needs no key. Leaving the office locks Work |
+| **Switch out** to a chosen default | ✅ automatic | Same — it locks one and opens nothing |
+| **Suggest** a switch | ✅ automatic | A notification: "At the office — switch to Work?" One tap, then auth |
+| **Switch in** without auth | ❌ never | Would require an unlocked key at rest |
+
+So the honest framing is **automatic lock-out and one-tap suggested lock-in**,
+not silent switching. The user gets the ergonomics; the boundary holds.
+
+**Signals** — all available today; the manifest already declares
+`ACCESS_COARSE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, and `ACCESS_WIFI_STATE`:
+
+| Signal | Cost | Note |
+|---|---|---|
+| Time / day of week | none | No permission, no sensor. The default trigger |
+| Wi-Fi SSID | location permission on modern Android | More precise than GPS for "at the office", and cheaper |
+| Coarse location / geofence | location + background location | Highest privacy cost; **off by default and opt-in per profile** |
+
+**Location is a privacy cost, and this is a privacy product.** Trigger rules are
+evaluated **on-device only**, never logged to the audit trail with coordinates,
+and never synced to an org. A `LINKED` Work profile may be *required* by policy
+to lock on leaving a geofence — tightening — but the org never receives the
+location that caused it.
+
+### 12.2 Manual switch
+
+Already specified: route 1.0, reached from the always-visible drawer header
+(`UI_DESIGN.md` §6.3). One tap to open, then authentication to complete.
+
+Switching **to** Personal may use a lighter gate than switching **to** Work, at
+the user's choice — the asymmetry is legitimate because the sensitive direction
+is the one into company data. A `LINKED` org policy can require full biometric
+in both directions and cannot require less.
+
+### 12.3 Focus filters
+
+Per-profile notification policy. Requires an **app → profile** assignment
+(Slack and work mail are Work; social and group chats are Personal;
+unassigned apps default to *both*, never to silent).
+
+| Rule | Behaviour |
+|---|---|
+| Profile active | Its own apps notify normally |
+| Profile inactive/locked | Its apps are **held**, not dropped |
+| Schedule (e.g. after hours) | Work apps held even while Work is active |
+| Meeting detected (calendar busy) | Personal apps held |
+
+**Held, never dropped.** A filter that silently discards a notification is a bug
+that looks like a feature. Everything held appears in the digest (§12.5).
+
+### 12.4 Urgency VIPs
+
+A per-profile allowlist of contacts whose messages bypass any active filter.
+
+- **VIP lists are per-profile**, stored in that profile's database. A manager
+  VIP'd in Work must not appear in Personal's contact suggestions — that is the
+  cross-contamination this design exists to prevent.
+- The same human may be VIP'd in both; they are then two independent entries
+  that share nothing.
+- A VIP bypasses *filters*, never *approval*. An urgent message from a spouse
+  still cannot send a reply without going through the authority spine.
+- Bypass is a per-profile user setting. An org may **narrow** the Work VIP list;
+  it can never read Personal's.
+
+### 12.5 Notification digest
+
+On switching into a profile, a summary of what was held while it was away.
+
+- **Metadata only by default**: app, sender, count, time. Not message bodies.
+  The existing `DetoxBuffer` is deliberately volatile and unpersisted
+  (`OVERVIEW.md` §A11), and a digest must not quietly turn the product into
+  something that stores everyone's messages.
+- Storing bodies is opt-in per profile, written into **that profile's**
+  encrypted database, and subject to a retention limit.
+- The digest is rendered as an in-thread block on entering the profile
+  (`UI_DESIGN.md` route 1.13), dismissible, and never itself a notification.
+
+### 12.6 Shared availability — the one place data crosses
+
+Requested: the work calendar should see that the user is busy during a personal
+event, without the details.
+
+**This is the only intentional cross-profile data path in the design**, so it is
+built to be structurally incapable of leaking more than intended.
+
+```
+PERSONAL calendar  ──projection──▶  WORK view
+    event {                             busy block {
+      start, end,                         start, end
+      title, location,     ══╳══▶         opaque = true
+      attendees, notes                  }
+    }                                   ← no field exists for a title
+```
+
+**Rules that make it safe:**
+
+1. **The projected type has no detail fields.** Not "we filter the title out" —
+   there is nowhere to put a title. A filter can be forgotten; a missing field
+   cannot. This is §2's principle applied to a data path instead of a query.
+2. **Opt-in, per direction, off by default.** Personal→Work and Work→Personal
+   are separate switches.
+3. **An organization cannot enable it.** An org that could turn on Personal→Work
+   projection would be reading into Personal by proxy — refused, and listed in
+   §13.
+4. **Projection is one-way and read-only.** Work can never write into Personal's
+   calendar.
+5. If the user separately syncs their work calendar to an enterprise service,
+   the busy blocks travel with it. That is the user's choice through that
+   integration, and the UI says so at the point of enabling.
+
+### 12.7 Tone
+
+Already supported: `PersonaSettings` carries communication style and response
+length per profile, and feeds `systemPromptAdditions()` (`UI_DESIGN.md` §6.7,
+route 5.1.1). Tenancy makes it per-profile; only the defaults are new.
+
+| | Work | Personal |
+|---|---|---|
+| Style | Formal | Casual |
+| Length | Short | Balanced |
+
+User-editable in both, and **never org-controlled** — it speaks in the user's
+voice, not the company's (§4.2).
+
+### 12.8 Integration silos — the open product decision
+
+Requested: Work connects to Teams, Google Workspace, Asana; Personal to smart
+home, Spotify, grocery lists.
+
+**Per-profile siloing of connectors is straightforward** — a connector is
+registered in one profile's database, its credentials live in that profile's
+secrets namespace, and it is invisible to the other. That part follows from §2
+and needs no new decision.
+
+**How the connectors reach those services does.** Two routes:
+
+| Route | Fits the architecture? | Cost |
+|---|---|---|
+| **Accessibility + deep links** — drive the installed Teams/Spotify app the way the assistant already drives any app | ✅ Yes. No new network surface, no OAuth tokens at rest, works offline-ish | Brittle against app UI changes; limited to what the UI exposes |
+| **Network APIs** — OAuth to Microsoft Graph, Google, Asana, Spotify | ⚠️ Needs a real decision | OAuth tokens at rest, per-provider trust, and it makes the app a network client for user content — the thing the privacy story rests on |
+
+**Recommendation: default to the accessibility/deep-link route**, which is what
+the product is already architecturally good at, and treat network connectors as
+a separate, explicitly-scoped decision with their own threat model. If network
+connectors are adopted, tokens are per-profile, hardware-wrapped, and revoked
+with the profile.
+
+Note the correction in `ENGINEERING.md` §B5: `INTERNET` is already declared for
+the sync relay, so the argument here is not "we have no network permission" —
+it is that user content currently never leaves the device, and connectors would
+change that.
+
+---
+
+## 13. Refused by design
 
 - `tenant_id` row filtering as the isolation mechanism.
 - Cross-profile data movement, automated or manual.
@@ -435,13 +616,21 @@ protect them.
 - Silent org administration.
 - Selective wipe of "org data only" inside a profile — that is §2's
   `tenant_id` trap wearing a different hat.
+- **Automatic switching *into* a profile.** A trigger may lock, switch out, or
+  suggest; it may never unlock. §12.1.
+- **An organization enabling Personal→Work calendar projection.** That is
+  reading into Personal by proxy. §12.6.
+- **Cross-profile VIP lists or contact suggestions.** §12.4.
+- **Dropping a filtered notification.** Held and digested, never discarded. §12.3.
+- **Persisting message bodies for the digest by default.** Metadata only unless
+  the user opts in, per profile. §12.5.
 - Password-based login (there is no password to phish, and no server to hold one).
 - Claiming on-device isolation equals device separation.
-- Adding `INTERNET` to the main manifest for tenancy.
+- Cloud storage of profile content, in any tier.
 
 ---
 
-## 13. Sequencing
+## 14. Sequencing
 
 **Prerequisites, in order:** Gate 0 (the build compiles) → slice 6 (decompose
 the god objects) → T-1.

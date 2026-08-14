@@ -297,6 +297,7 @@ TEAR DOWN the current profile
   clear ambient transcript · clear voiceprint embedding · clear clipboard staging
         ▼
 Open target profile ─▶ 1.2 Thread, announced assertively
+                       └─▶ ⊞1.13 digest, if anything was held while away
 ```
 
 The teardown step is not housekeeping — it is the boundary. Anything carried
@@ -665,6 +666,7 @@ use the type-to-confirm variant.
   1.7 Image viewer               1.8 Document viewer
   1.9 Step detail                1.10 Voice capture
   1.11 Conversation search       1.12 Export conversation
+  1.13 Notification digest
 
 2 MEMORY
   2.1 Timeline ★                 2.2 Search results
@@ -707,7 +709,9 @@ use the type-to-confirm variant.
                          5.6.3 Advanced (Dev) · 5.6.3.1 Feature flags
                          5.6.3.2 Dev console · 5.6.3.3 Diagnostics
   5.7 Profiles           5.7.1 Profile detail · 5.7.2 Organization
-                         5.7.3 Recovery kit
+                         5.7.3 Recovery kit · 5.7.4 Automatic switching
+                         5.7.5 Focus & notifications · 5.7.6 VIPs
+                         5.7.7 Shared availability · 5.7.8 Connections
 
 9 GLOBAL OVERLAYS (dismiss returns to the caller)
   9.1 Command palette · 9.2 Blocking error · 9.3 Confirm dialog
@@ -954,6 +958,7 @@ Back: `↩1.1` on compact; none on expanded, where it is the centre pane.
 | New chat (pencil-square) | `⚡` `→1.2` fresh |
 | Overflow ⋯ | `⊞1.6` |
 | Degraded banner action | the route named by the banner — `⊞1.4` / `→5.6.1` / `→5.3.1` |
+| Digest block (on profile entry) | `⊞1.13`; row actions go through FLOW C |
 | Suggestion chip (6, empty state) | `⚡ send as first message` |
 | Attach (paperclip) | `⊞1.5` |
 | Send | `⚡ submit` |
@@ -1538,6 +1543,26 @@ The drawer sync badge is a read-only mirror of 5.4.1.
 The dev console remains reachable by shake gesture on Android; the gesture is a
 shortcut to 5.6.3.2, not a separate surface.
 
+#### 1.13 Notification digest
+Overlay on entering a profile. Dismiss returns to `↩1.2`.
+
+What was held while this profile was away (`TENANCY_DESIGN.md` §12.5).
+
+1. "While you were away" + the span covered.
+2. Grouped rows — app, sender, count, most recent time. **Metadata only** unless
+   the user opted into bodies for this profile.
+3. **Dismiss** · **Open filter settings**.
+
+| Control | Destination |
+|---|---|
+| Row | `⚡ open that app` (via FLOW C — it is an action, not a link) |
+| Dismiss | `↩1.2` |
+| Open filter settings | `→5.7.5` |
+
+*Empty* — not shown at all. A digest saying "nothing happened" is noise.
+*A11y* — polite live region, never assertive: it is a summary of the past, not a
+demand. Announced once, after the thread is ready.
+
 #### 5.7 · Profiles
 
 Specified by `docs/TENANCY_DESIGN.md`. Every route here is **scoped to the
@@ -1571,7 +1596,9 @@ Back: `↩5.7`.
 4. Storage breakdown.
 5. Devices holding this profile → 5.1.2.
 6. **Organization** row — Work only; never rendered for Personal.
-7. Export · Wipe this profile.
+7. **Behaviour** — Automatic switching · Focus & notifications ·
+   Shared availability · Connections (§12 of `TENANCY_DESIGN.md`).
+8. Export · Wipe this profile.
 
 | Control | Destination |
 |---|---|
@@ -1579,6 +1606,10 @@ Back: `↩5.7`.
 | Custody tier | `⚡`, or disabled with "Required by <org>" when governed |
 | Devices | `→5.1.2` |
 | Organization | `→5.7.2` |
+| Automatic switching | `→5.7.4` |
+| Focus & notifications | `→5.7.5` |
+| Shared availability | `→5.7.7` |
+| Connections | `→5.7.8` |
 | Export | `⚡`+`⇱` per-profile encrypted backup |
 | Wipe this profile | `⊞9.3` **type-to-confirm** + `⊞9.4` → `⚡ destroy key` |
 
@@ -1621,6 +1652,113 @@ Back: `↩5.7`.
 | Verify | `⚡` + inline result |
 | Regenerate | `⊞9.3` + `⊞9.4` → `⚡` → shows the new code (same layout as 0.3) |
 | "Who else can recover this?" | `⊞` expands — org escrow covers **Work only**; nobody can recover Personal |
+
+##### 5.7.4 Automatic switching
+Back: `↩5.7.1`.
+
+Triggers can **lock**, **switch out**, or **suggest** — never switch *in*
+without authentication (`TENANCY_DESIGN.md` §12.1). The screen says so in plain
+language at the top, because a user who expects silent switching will otherwise
+read the absence as a bug.
+
+1. Explainer: *Newax Aegis can lock this profile automatically, or offer to
+   switch. It can never unlock a profile without you.*
+2. **Schedule** rules — days + time range → Lock / Switch out / Suggest.
+3. **Wi-Fi** rules — SSID → action.
+4. **Location** rules — a named place → action. **Off by default**, with the
+   permission cost stated before enabling.
+5. Default profile to switch out to.
+
+| Control | Destination |
+|---|---|
+| Add rule | `⊞ rule editor` `⚡` |
+| Rule row | `⊞ edit` `⚡` · Delete `⊞9.3` |
+| Location master switch | `⇱ location permission` → `⚡`; shows what is collected and that it never leaves the device |
+| Default profile | `⊞ picker` `⚡` |
+
+*Governed* — when an org requires a lock rule, that rule is shown as org-set and
+cannot be deleted or weakened; user rules can still be added alongside.
+*A11y* — each rule row's accessible name reads as a sentence: "Weekdays, 6pm to
+8am, lock Work."
+
+##### 5.7.5 Focus & notifications
+Back: `↩5.7.1`.
+
+1. Master switch — hold this profile's notifications when it is not active.
+2. **Apps in this profile** — assignment list; unassigned apps notify in both.
+3. **Schedules** — e.g. hold Work apps after 18:00.
+4. **During meetings** — hold the *other* profile's apps while the calendar
+   shows busy.
+5. **VIPs** → 5.7.6.
+6. **Digest** — on / metadata only / include message bodies (with a retention
+   picker and a plain warning that bodies are then stored).
+
+| Control | Destination |
+|---|---|
+| App assignment row | `⚡` |
+| Schedule | `⊞ editor` `⚡` |
+| VIPs | `→5.7.6` |
+| Digest detail level | `⚡` — choosing bodies opens `⊞9.3` naming what will be stored |
+
+**Held, never dropped** is stated on the screen: nothing filtered is lost, it
+appears in the digest.
+
+##### 5.7.6 VIPs
+Back: `↩5.7.5`. **Scoped to this profile** — a VIP here is invisible to the
+other profile, including its contact suggestions.
+
+1. Search + add from this profile's contacts.
+2. VIP rows — name, what they bypass.
+3. Note: *VIPs bypass filters. They never bypass approval — an urgent message
+   still cannot send a reply on its own.*
+
+| Control | Destination |
+|---|---|
+| Add | `⊞ picker` (this profile's contacts only) `⚡` |
+| VIP row | `→2.5` person detail |
+| Remove | `⚡` |
+
+*Governed* — an org may narrow the Work list; the row then shows why. It can
+never read or alter Personal's.
+
+##### 5.7.7 Shared availability
+Back: `↩5.7.1`.
+
+The **only** intentional cross-profile data path (`TENANCY_DESIGN.md` §12.6),
+so the screen is explicit about exactly what crosses.
+
+1. Diagram/explainer: only **start and end times** cross. No title, no location,
+   no attendees — *there is no field for them*.
+2. **Show my Personal busy times in Work** — off by default.
+3. **Show my Work busy times in Personal** — off by default, independent.
+4. Preview: what the other profile will actually see.
+5. Warning shown when enabling: if the work calendar is synced to an enterprise
+   service, these busy blocks travel with it.
+
+| Control | Destination |
+|---|---|
+| Either direction switch | `⊞9.3` showing the preview → `⚡` |
+| "What exactly is shared?" | `⊞` expands the field list |
+
+**Neither switch is available to an organization.** When a Work profile is
+`LINKED`, the Personal→Work switch remains the user's alone; the screen says so.
+
+##### 5.7.8 Connections
+Back: `↩5.7.1`. Connectors registered in **this profile only**.
+
+1. Connected services list.
+2. **Add a connection**.
+3. Per-connection: what it can do, when it was last used, Remove.
+
+| Control | Destination |
+|---|---|
+| Add a connection | `→3.7`-style install flow, deny-by-default permissions |
+| Connection row | `⊞ detail` — scopes, last use, Remove `⊞9.3` |
+| Remove | `⚡` — revokes credentials from this profile's secrets namespace |
+
+A connection is invisible to the other profile and is destroyed with the profile
+(§12.8). Where a connector needs network access rather than driving an installed
+app, the screen states that plainly before it is added.
 
 ---
 
@@ -1791,7 +1929,7 @@ table. An unmarked control is a specification bug, not a design choice.
 
 Every route in §6.1 is reachable from 1.2 in ≤ 3 pushes, has at least one
 inbound edge, and declares a back target (overlays excepted). No orphans.
-Verified at 99 routes.
+Verified at 105 routes.
 
 ### 11.2a · Profile scoping
 

@@ -148,7 +148,12 @@ when its gate passes — not when the code looks right.
 ### Slices T-1 … T-12 — Tenancy, identity & multi-device ⬜
 - **Goal:** organizations and people; every person gets a Work and a Personal
   profile; profiles follow the person across Android, iOS, Windows and macOS.
-- **Spec:** `docs/TENANCY_DESIGN.md` — full slice table in §11.
+- **Spec:** `docs/TENANCY_DESIGN.md` — slice table in §11 (T-1…T-18).
+- **Profile-aware behaviour** (§12): triggers, focus filters, VIPs, digest,
+  calendar busy projection, tone, connector silos. Three collisions resolved
+  there rather than papered over — a trigger can never unlock a profile, the
+  calendar projection uses a type with no detail field, and network connectors
+  are flagged as an open product decision.
 - **Depends on:** Gate 0 and slice 6. Layering this onto eight process-wide
   singletons and a 1400-line Activity would have to be redone.
 - **Key decisions:**
@@ -422,11 +427,22 @@ biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
 
 ### Privacy as an architectural property
 
-The app ships with **no Internet permission on Android**. That is a stronger
-privacy guarantee than any policy document, and it is worth defending: adding it
-for one feature discards it for the whole product. If a feature needs network,
-it belongs behind an explicit, separately-gated boundary (the `relay/` service
-is the existing example) — never in the main app's manifest.
+> **Correction — verify claims against the manifest, not the README.**
+> `README.md:11` states "No Internet permission, analytics, account, or cloud
+> storage." **`AndroidManifest.xml:6` declares `android.permission.INTERNET`.**
+> The permission is legitimately used — `shared/sync` reaches the relay over
+> WebSockets (`WsClient.kt`) — but the README claim is false as written, and it
+> is a *privacy* claim, which is the worst kind to get wrong.
+>
+> This needs a product decision, not a silent edit: either remove the permission
+> and move relay transport behind a separately-installed component, or amend the
+> README to describe what is actually true ("no analytics, no account, no cloud
+> storage; network used only for peer-to-peer relay"). Tracked in B11.
+
+The defensible version of the guarantee is narrower and still valuable: **no
+analytics, no account, no cloud storage of user content, and network used only
+to relay ciphertext between the user's own paired devices.** Defend *that*, and
+keep any new network use behind an explicit, separately-gated boundary.
 
 ## B6 — Performance & resource budgets
 
@@ -601,6 +617,7 @@ Fix these; do not copy them.
 | Unused capability | `ModelProvider.stream()`, `AgentStream` | Built, never wired — dead weight that looks live |
 | Inline `Color(0x…)` | (fixed in slice 2) | 189 copies of one palette across 18 files |
 | Docs referencing ghosts | (fixed) | `REFINED_THEME.md` cited in 6 files, never existed |
+| **False privacy claim** | `README.md:11` vs `AndroidManifest.xml:6` | README says "No Internet permission"; the manifest declares it. Needs a product decision (remove the permission, or correct the claim) — not a silent edit |
 
 ---
 
