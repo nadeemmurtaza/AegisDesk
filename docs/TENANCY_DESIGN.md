@@ -11,19 +11,27 @@ macOS — without discarding the property that makes it worth using.
 Four concepts. Getting these separate is what makes the rest work.
 
 ```
-Organization  (a company — optional; only exists for managed deployments)
-    │  governs Work profiles only, by signed tighten-only policy
-    │
-    └── Person  (the identity that "logs in" — an Ed25519 keypair, not an account)
+Organization  (a company — optional; exists only for managed deployments)
+    ╎  governs LINKED Work profiles only, by signed tighten-only policy
+    ╎
+    └╌╌ Person  (the identity that "logs in" — an Ed25519 keypair, not an account)
           │
-          ├── Profile: WORK      ← isolation boundary: own key, own database
-          │     └── governed by the Organization when enrolled
+          ├── Profile: WORK       ← isolation boundary: own key, own database
+          │     ├── UNLINKED  → self-governed; the user sets their own policy
+          │     └── LINKED    → a bounded set of controls is org-owned (§4)
           │
-          └── Profile: PERSONAL  ← isolation boundary: own key, own database
-                └── never governed, never visible to the Organization
+          └── Profile: PERSONAL   ← isolation boundary: own key, own database
+                └── never linkable. No org, ever, under any policy.
                           │
-                          └── present on N devices (Android / iOS / Windows / macOS)
+                          └── each profile present on N devices
+                              (Android / iOS / Windows / macOS)
 ```
+
+**The link between Organization and Person is dashed because it is optional and
+severable.** A Work profile is fully usable with no organization at all — a
+freelancer, a sole trader, or an employee whose company does not deploy Newax
+Aegis has a Work profile that is simply self-governed. Linking is a state the
+user enters, sees, and can leave (§4.4).
 
 | Concept | What it is | Isolation? |
 |---|---|---|
@@ -150,26 +158,97 @@ already trust — is the delivery mechanism. Android Enterprise
 
 ---
 
-## 4. Organization governance — bounded
+## 4. Organization governance — optional, and bounded
 
-What an enrolled Work profile accepts from its org:
+### 4.1 Governance states
 
-| Org can | Org cannot |
+A Work profile is always in exactly one state. Personal has no state — it is
+permanently ungoverned.
+
+| State | Meaning |
 |---|---|
-| Set policy modes **more strict** | Loosen any policy mode |
-| Add to the hard-deny list | Remove from it |
-| Require biometric / STRONG_CONFIRMATION | Disable an approval requirement |
-| Scope the sync mesh to org devices | Read memory, conversations, or files |
-| Request audit export | Silently pull data |
-| Revoke the Work profile (remote wipe) | Touch the Personal profile |
+| `UNLINKED` | Self-governed. Governance is identical to Personal. The default, and a fully supported end state — not a half-configured one |
+| `LINK_PENDING` | An enrollment token has arrived (via MDM or QR). **Nothing is applied yet.** The user sees exactly what the org would control and must consent |
+| `LINKED` | The §4.2 surface is org-owned; everything else stays user-owned |
+| `UNLINKING` | User- or org-initiated separation in progress; §4.4 runs |
 
-**Tighten-only is verified, not trusted.** A bundle that would loosen any
-setting is rejected and the rejection is logged and shown to the user. An admin
-silently granting `AUTO` to dangerous action classes is precisely the attack
-this product exists to prevent.
+**Consent is required to enter `LINKED`.** An enrollment token that arrives by
+MDM does not silently take control — it produces a request the user approves or
+declines, showing the full control surface first. An org that could link without
+consent could take control of a personal device.
 
-**Every org-applied restriction is visible** in route 5.7.2, with what changed
-and who applied it. Silent administration is prohibited.
+### 4.2 The controlled surface — exhaustive
+
+When `LINKED`, the organization owns exactly these and nothing else. This list
+is the specification; anything not on it is user-owned by definition.
+
+| Org-controlled | Direction | Note |
+|---|---|---|
+| Policy modes per action class | **Tighten only** | Never toward `AUTO` |
+| Hard-deny list | **Add only** | Cannot remove a user's own entries |
+| Biometric / STRONG_CONFIRMATION requirement | **Raise only** | Cannot disable an approval |
+| Minimum device custody tier | **Raise only** | §6 — can require hardware-backed |
+| Sync scope | Restrict to org peers | Cannot widen to unknown peers |
+| Agent / skill allowance | **Deny only** | Can forbid; cannot force-install |
+| Audit export | May require | Pull is user-initiated or scheduled and visible |
+| Remote revoke of **this** profile | Yes | Key destruction; §4.4 |
+
+**User-retained, even when `LINKED`:**
+
+- Persona settings — name, language, communication style. It speaks in their
+  voice, not the company's.
+- Memory and conversation **content**. The org sets rules, never reads data.
+- Which devices they enroll (subject to the custody tier above).
+- Full visibility of every applied restriction, and who applied it.
+- **The right to unlink.** Always. See §4.4.
+
+### 4.3 Enforcement, not trust
+
+- **Tighten-only is verified at application.** A bundle that would loosen any
+  setting is rejected, logged, and surfaced to the user. An admin silently
+  granting `AUTO` to dangerous action classes is precisely the attack this
+  product exists to prevent.
+- **Bundles are signature-verified** against a pinned org key before parsing.
+- **Every applied restriction is visible** in route 5.7.2 — what changed, which
+  org, when. Silent administration is prohibited.
+- An unlinked Work profile applies no org policy at all; there is no residue.
+
+### 4.4 Linking and unlinking
+
+```
+UNLINKED ──enrollment token (MDM or QR)──▶ LINK_PENDING
+                                              │
+                    user reviews the full control surface
+                    ├── Decline ──▶ UNLINKED (token discarded, logged)
+                    └── Approve ──▶ LINKED
+
+LINKED ──┬── user unlinks         ──▶ UNLINKING ──▶ UNLINKED or wiped
+         └── org revokes remotely ──▶ key destroyed, profile gone
+```
+
+**The user can always unlink.** An organization that could prevent it would
+effectively own the person's device. What unlinking *costs* is set by the org's
+retire policy, declared in the bundle and shown before confirmation:
+
+| Org retire policy | On unlink |
+|---|---|
+| `WIPE` (default) | The Work profile is destroyed — key destruction, per §2 |
+| `RETAIN` | The profile survives, org policy lifts, it becomes `UNLINKED` |
+
+**Why `WIPE` is the default.** Once linked, a Work profile holds a mixture of
+org-provisioned and user-created content. Separating them on the way out means
+classifying every row — which is the `tenant_id`-filtering trap from §2, with
+the same failure mode: one mis-classification and company data walks out, or the
+user's own work is destroyed. Cryptographic erasure of the whole profile is the
+only operation that is reliably correct.
+
+**Export before unlink** is offered when the org bundle permits it
+(`allowExportOnUnlink`), producing the standard per-profile encrypted backup.
+When the org forbids it, the UI says so plainly *before* the user commits —
+never after.
+
+**Personal is untouched by every path above.** Remote revoke, unlink, wipe: all
+operate on one key, and it is not Personal's.
 
 ---
 
@@ -298,7 +377,7 @@ New routes for `UI_DESIGN.md` §6:
 | **1.0 Profile switcher** | Drawer header: current profile + colour + org badge if governed; switch (re-auth); Personal / Work |
 | **5.7 Profiles** | The two profiles, storage per profile, auto-lock, Export, custody tier of this device |
 | **5.7.1 Profile detail** | Name/colour, lock timeout, minimum custody tier, Export, Wipe this profile |
-| **5.7.2 Organization** | Enrollment state, org identity, **every applied restriction with what and who**, Leave organization |
+| **5.7.2 Organization** | **Work profile only, and shown in all four states.** `UNLINKED`: "Not linked to an organization" + Link with a code. `LINK_PENDING`: the full control surface with Approve / Decline. `LINKED`: org identity, **every applied restriction with what and who**, retire policy (what unlinking will cost), Leave organization. Never rendered for Personal |
 | **5.7.3 Recovery kit** | View/regenerate, last-verified date, plain statement of what is lost without it |
 | **5.1.2 Devices** *(exists — extend)* | Per-device: platform, custody tier, which profiles are present, last synced, **Revoke** |
 
@@ -328,7 +407,7 @@ Insert into `ENGINEERING.md` Part A after slice 8.
 | **T-7** | Recovery kit + Argon2id backup KDF | T-4 | Restore from kit on a clean device |
 | **T-8** | Custody tiers + minimum-tier enforcement; Windows TPM via CNG | T-6 | Sub-tier device refused with a stated reason |
 | **T-9** | UI: switcher, Profiles, Organization, Recovery, Devices | T-5, slice 10 | TalkBack announces switch; profile always visible |
-| **T-10** | Org enrollment via MDM + signed tighten-only bundles | T-9 | Loosening bundle rejected, logged, surfaced |
+| **T-10** | Org link lifecycle: MDM/QR token → `LINK_PENDING` → consent → `LINKED`; signed tighten-only bundles; unlink with retire policy | T-9 | Loosening bundle rejected, logged, surfaced; linking without consent impossible; unlink always available; `WIPE` proven not to touch Personal |
 | **T-11** | Per-profile sync scoping + device revocation | T-6 | A peer enrolled for Work never sees Personal |
 | **T-12** | Tamper-evident per-profile audit export (hash-chained) | T-3 | Chain break detectable |
 
@@ -347,8 +426,15 @@ protect them.
 - `tenant_id` row filtering as the isolation mechanism.
 - Cross-profile data movement, automated or manual.
 - Any org visibility into a Personal profile, including escrow.
+- Linking a Personal profile to an organization, under any policy or token.
+- Linking a Work profile **without explicit user consent**, however the token
+  arrived.
+- Preventing a user from unlinking. The cost of unlinking is the org's to set;
+  the right to unlink is not.
 - Org policies that loosen.
 - Silent org administration.
+- Selective wipe of "org data only" inside a profile — that is §2's
+  `tenant_id` trap wearing a different hat.
 - Password-based login (there is no password to phish, and no server to hold one).
 - Claiming on-device isolation equals device separation.
 - Adding `INTERNET` to the main manifest for tenancy.
