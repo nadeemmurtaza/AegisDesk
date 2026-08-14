@@ -32,63 +32,55 @@ them; it never overrides them.
 
 ---
 
-# Gate 0 — the build must go green
+# Gate 0 — CLEARED
 
 `main` had never had a green CI run in its recorded history: `android.yml`
-30/30 failures, `apple.yml` 24/24. Diagnosed and largely fixed — the causes
-were three ordinary compile errors, not an exotic Room/KSP incompatibility.
+30/30 failures, `apple.yml` 24/24. The causes were **five ordinary compile
+errors**, not the Room/KSP incompatibility the error message suggested.
 
 Room's `[ksp] [MissingType]: Element 'com.newax.aegis.db.NewaxDatabase'
-references a type that is not present` was a **downstream symptom**, not the
-cause. Room emits it when the `@Database` class fails to resolve — which
-happens whenever that file has a compile error. Chasing it as a Room problem
-was the wrong tree; the compiler names the real fault.
+references a type that is not present` was a **downstream symptom**. Room emits
+it whenever the `@Database` class fails to resolve — which happens for any
+compile error in that file. It named Room; the fault was two missing imports.
 
-| Fault | Where | Fix |
-|---|---|---|
-| `kotlinx.datetime.Clock.System` | `NewaxDatabase.kt:825` | Moved to `kotlin.time` in kotlinx-datetime 0.8.0. Replaced with the module's own `currentTimeMillis()` expect/actual seam, which commonMain should have used anyway (AGENTS.md §0.5) |
-| `@Volatile` | `NewaxDatabase.kt:90` | `kotlin.jvm.Volatile` is auto-imported on JVM targets and absent from metadata. Explicit `import kotlin.concurrent.Volatile` |
-| `EnterTransition` | `MainActivity.kt:451` | Missing import from the slice-3 reduced-motion work |
+| # | Fault | Where | Fix |
+|---|---|---|---|
+| 1 | `kotlinx.datetime.Clock.System` | `NewaxDatabase.kt:825` | Moved to `kotlin.time` in kotlinx-datetime 0.8.0. Replaced with the module's own `currentTimeMillis()` seam |
+| 2 | `@Volatile` | `NewaxDatabase.kt:90` | `kotlin.jvm.Volatile` is auto-imported on JVM only, so *only* the metadata compile failed. Explicit `kotlin.concurrent.Volatile` |
+| 3 | `EnterTransition` | `MainActivity.kt:451` | Missing import from the slice-3 work |
+| 4 | Bare `@Fts4` | `FileIndexEntity.kt:102` | Room cannot resolve the *implicit* default `contentEntity` on Kotlin/Native. Stating Room's own default explicitly — `@Fts4(contentEntity = Any::class)` — resolves it. **Exported schema is byte-identical**, so no migration |
+| 5 | `kotlinx.datetime.Clock.System` | `appleMain/TimeUtils.kt:5` | Same as #1, in the Apple actual. Now `NSDate().timeIntervalSince1970` — Foundation is always present and needs no dependency |
 
-**Verified locally** (Android SDK installed, JDK 17, real compiles):
+Faults surfaced one at a time: each fix let the compiler reach the next.
 
-```
-:shared:database:desktopJar          SUCCESS
-:shared:database:assemble (android)  SUCCESS
-:shared:core:compileKotlinJvm        SUCCESS
-:shared:platform-api:jvmTest         SUCCESS
-:shared:ui:compileKotlinJvm          SUCCESS
-:shared:ui:jvmTest                   SUCCESS  ← ContrastTest, 84 assertions
-:apps:android:compileDebugKotlin     SUCCESS
-```
+## Verified locally, against a real compiler
 
-## What remains: Apple targets only
+Android SDK installed, JDK 17 matching CI. Kotlin/Native cross-compiles the
+Apple targets from Linux, so those are genuinely verified too — only linking a
+final framework needs a Mac.
 
 ```
-e: [ksp] FileIndexEntity.kt:104: Cannot find external content entity class.
-   kspKotlinMacosArm64 · kspKotlinIosArm64 · kspKotlinIosSimulatorArm64
+invariants.yml build-gates (full list)                    BUILD SUCCESSFUL
+  shared:core · platform-api (+jvmTest) · database
+  shared:ui compile + assemble + jvmTest  ← ContrastTest, 84 assertions
+  apps:android compileDebugKotlin + testDebugUnitTest
+  platform-impl:windows:test
+
+apple.yml (exact task list)                               BUILD SUCCESSFUL
+  database macosArm64 / iosArm64 / iosSimulatorArm64 / commonMain metadata
+  core · platform-api · model-api macosArm64
+  shared:ui iosArm64 / iosSimulatorArm64
 ```
 
-Fires **only** on the three native targets; JVM and Android pass. `FileTextFts`
-uses a bare `@Fts4`, whose default `contentEntity` resolves to `Any::class` →
-`java.lang.Object`, which does not exist on Kotlin/Native. `PersonFactFts`,
-which sets `contentEntity` explicitly, is unaffected — that contrast is the
-evidence.
+`shared:ui`'s iOS targets were previously "declared, not verified". They now
+compile.
 
-**Not fixed here, deliberately.** The obvious change — giving `FileTextFts` an
-explicit `contentEntity` — alters the generated `CREATE VIRTUAL TABLE` and is
-therefore a **schema change on a v19 database**, requiring a migration and a
-version bump. `PARALLEL_RULES.md` Rule 1 says schema work is serialized and
-claimed, and it cannot be verified from a Linux host without a Mac. It needs
-its own change, by whoever owns Track 2.
+**Only unverified step:** `:apps:android:assembleDebug`'s `checkDebugAarMetadata`,
+which requires SDK platform 37 — absent from older `cmdline-tools` indexes.
+`compileDebugKotlin` passes; CI has platform 37.
 
-Interim options: set the explicit `contentEntity` with a migration; make
-`file_text_fts` a standalone (non-Room) FTS table created by callback; or
-accept Apple targets red until a Mac is available.
-
-**Rule: no slice is "done" while it cannot be compiled.** A slice may be
-*written* against a red build, but it must be marked unverified, and the
-verification debt is tracked until its gate clears.
+**Rule: no slice is "done" while it cannot be compiled.** That rule now has
+teeth, because there is a compiler.
 
 ---
 
@@ -107,7 +99,7 @@ when its gate passes — not when the code looks right.
 - **Touches:** the 7 modules with an `android {}` block, `AGENTS.md` baseline.
 - **Gate:** `build` progresses past `CheckAarMetadataTask`. ✅ confirmed.
 
-### Slice 0b — Fix the Room KSP blocker ✅ (Apple targets remain)
+### Slice 0b — Fix the build ✅ **Gate 0 cleared, all four bodies**
 - **Goal:** Gate 0. Make the project compile.
 - **Touches:** `shared/database` — DAOs, entities, or the Room/KSP version pair.
 - **Gate:** `build`, `KMP compile gates`, and `apple-compile` all green.

@@ -1,266 +1,296 @@
 # Five Tracks — parallel agent assignment
 
-The current split of Newax Aegis into five independently-workable tracks.
+The split of Newax Aegis into five independently-workable tracks, with a
+self-contained brief for each.
 
-Read `docs/PARALLEL_RULES.md` first — this document applies those rules; it does
-not replace them. `docs/PARALLEL_WORKSPLIT.md` is an earlier, narrower split by
-platform body for one specific effort.
-
----
-
-## Read this before assigning anyone
-
-**Five agents cannot start today.** Two rules from `PARALLEL_RULES.md` bind:
-
-- **Rule 0** — the build has never been green. Nothing any track produces can be
-  verified until Gate 0 clears.
-- **Rule 1** — the decomposition of `MainActivity` (1403 lines) and
-  `MainViewModel` (1207 lines) is touched by nearly every feature. Parallel work
-  on top of it conflicts continuously.
-
-So the ramp is:
-
-```
-WAVE 0   Track 1 alone.        Gate 0 · version catalog · CODEOWNERS · lint guards
-           ↓
-WAVE 1   Track 1 + Track 3.    Track 3 does the decomposition (slice 6) alone in
-         Others: docs/specs    apps/android UI; nobody else edits that module
-           ↓
-WAVE 2   All five, fanned out. Disjoint ownership holds from here
-           ↓
-WAVE 3   Synchronized wave.    Tenancy T-1/T-2 lands in Track 2, then all five
-                               do their own tenancy slices together
-```
-
-Assigning five agents at Wave 0 produces four agents writing unverifiable code
-against a shape that is about to change. That is the failure this split exists
-to prevent.
+Read `docs/PARALLEL_RULES.md` first — this applies those rules, it does not
+replace them.
 
 ---
 
-## The five tracks
+## Current state
 
-| # | Track | Owns | Cannot touch |
+**Gate 0 is cleared. The build compiles on all four bodies.**
+
+It had never had a green CI run; the causes were five ordinary compile errors,
+not the Room/KSP incompatibility the error suggested — including a bare `@Fts4`
+whose implicit default Room cannot resolve on Kotlin/Native. Full fault list and
+verification log in `ENGINEERING.md` Gate 0.
+
+| Gate | State |
+|---|---|
+| `Static invariants` | ✅ green in CI |
+| `Windows adapter tests` | ✅ green in CI |
+| invariants build-gates (full list) | ✅ verified locally |
+| `apple.yml` (exact task list) | ✅ verified locally — Kotlin/Native cross-compiles from Linux |
+| `:shared:ui:jvmTest` | ✅ ContrastTest, 84 assertions |
+| `:apps:android:assembleDebug` | ⏳ `compileDebugKotlin` verified; the AAR check needs SDK 37, which CI has |
+
+**There is no longer a blocking issue.** Every track can start.
+
+Environment: **JDK 17** (not 21) and Android SDK **platform 37**. If a
+`cmdline-tools` index has no `platforms;android-37`, update the tooling — it is
+not a project problem.
+
+## The ramp
+
+Wave 0 is done. What remains serialized:
+
+```
+WAVE 1  ← YOU ARE HERE. All five tracks start.
+  Track 3 does slice 6 (decomposition) ALONE inside apps/android;
+  Tracks 1, 2, 4, 5 are elsewhere in the tree and unaffected.
+
+WAVE 2  After slice 6 merges: Track 3 fans out across the route tree.
+
+WAVE 3  Synchronized. Track 2 lands tenancy T-1/T-2, then all five do their
+        own tenancy slices together.
+```
+
+**All five tracks can start now.** The only ordering constraint left is that
+nobody else edits `apps/android` until Track 3's decomposition merges — and that
+is Track 3's first task.
+
+---
+
+## Ownership map
+
+| # | Track | Owns | Never touches |
 |---|---|---|---|
-| **1** | **Build, CI & Release** | build files, CI, tooling | any `src/` |
-| **2** | **Core, Data & Policy** | `shared/core`, `shared/database`, `shared/platform-api`, `shared/model-api` | UI, agents, platform adapters |
-| **3** | **Design System & Android UI** | `shared/ui`, `apps/android` UI | `agents/`, `engine/`, other modules |
-| **4** | **Platform Bodies** | `platform-impl/*`, `apps/desktop`, `apps/macos`, `apps/ios` | `apps/android`, `shared/*` |
-| **5** | **Agents, Automation & Safety** | `apps/android/…/agents`, `…/engine`, `relay` | UI files, `shared/*` |
+| 1 | Build, CI & Release | all `build.gradle.kts`, `settings.gradle.kts`, `gradle/`, `.github/`, `scripts/`, AGENTS.md baseline | any `src/` |
+| 2 | Core, Data & Policy | `shared/core`, `shared/database`, `shared/platform-api`, `shared/model-api` | UI, agents, platform adapters |
+| 3 | Design System & Android UI | `shared/ui`, `apps/android/**` UI + `res/` | `agents/`, `engine/`, other modules |
+| 4 | Platform Bodies | `platform-impl/**`, `apps/desktop`, `apps/macos`, `apps/ios` | `apps/android`, `shared/**` |
+| 5 | Agents, Automation & Safety | `apps/android/**/agents`, `**/engine`, `relay/` | UI files, `shared/**` |
 
-The test from Rule 1 holds: no two tracks own the same file.
-
----
-
-## Track 1 — Build, CI & Release
-
-**Owns:** `*/build.gradle.kts` · `settings.gradle.kts` · `gradle/` ·
-`.github/workflows/` · `scripts/` · the `AGENTS.md` baseline table ·
-`keystore.properties.example`
-
-**Why it owns all build files:** every other track needs to add dependencies,
-and build files are the single most conflict-prone surface in a multi-module
-repo. Other tracks **request** a dependency; Track 1 adds it. This is Rule 2
-applied where it matters most.
-
-**Work, in order:**
-
-1. **Gate 0** — the Room KSP `MissingType` failure. Blocks everything.
-2. **Version catalog** (`gradle/libs.versions.toml`) + CI check banning inline
-   version literals. AGP and Kotlin are each declared in three files today.
-3. `CODEOWNERS` and branch protection.
-4. The guard table from `PARALLEL_RULES.md`: lint rules (no `Color(0x` outside
-   `shared:ui`, no hardcoded user strings), doc link-check, banned-symbol list.
-5. Slices 22 (supply chain: dependency verification, SBOM, reproducible builds)
-   and the release pipeline.
-
-**Publishes:** a green build, and the guards every other track is measured by.
-
-**Blocked by:** nothing. **Blocks:** everyone.
+No two tracks own the same file — the Rule 1 test holds.
 
 ---
 
-## Track 2 — Core, Data & Policy
+## Every agent, before your first commit
+
+1. Read `AGENTS.md` (invariants + Gate 0's five questions), then
+   `docs/PARALLEL_RULES.md`.
+2. Confirm you can build:
+   ```
+   ./gradlew :shared:core:compileKotlinJvm :shared:ui:jvmTest
+   ```
+   If that fails on your machine and not in CI, fix your environment before
+   writing code. You need **JDK 17** (not 21) and an Android SDK with
+   **platform 37**.
+3. Claim your track in the PR title: `[T3] …`.
+4. Never edit a file outside your ownership column. Request it instead.
+
+---
+
+# Track 1 — Build, CI & Release
+
+**Owns:** every build file · `gradle/` · `.github/workflows/` · `scripts/` ·
+the AGENTS.md baseline table
+
+**Why you own all build files:** every track needs dependencies added, and build
+files are the most conflict-prone surface in a multi-module repo. They request;
+you add. That single rule removes an entire class of merge conflict.
+
+### Do these in order
+
+1. **`gradle/libs.versions.toml`** — a version catalog. AGP `9.3.1` and Kotlin
+   `2.4.10` are each declared in three separate files today, and that is exactly
+   how Compose Multiplatform drifted to `1.7.1` against a `1.11.1` baseline. Move
+   every version into the catalog; modules reference aliases.
+2. **CI check: no inline version literals** in any `build.gradle.kts`.
+3. **`CODEOWNERS`** from the ownership map above, plus branch protection.
+4. **The guard table** in `PARALLEL_RULES.md` — lint rules banning `Color(0x`
+   outside `shared:ui` and hardcoded user strings; a doc link-check.
+5. Slice 22 — dependency verification, SBOM, reproducible builds.
+
+### Your gate
+Every workflow green on a PR that changes only build files.
+
+### Watch for
+`platforms;android-37` is not in older `cmdline-tools` indexes. If a contributor
+cannot install it, that is a tooling-version problem, not a project one.
+
+---
+
+# Track 2 — Core, Data & Policy
 
 **Owns:** `shared/core/**` · `shared/database/**` · `shared/platform-api/**` ·
-`shared/model-api/**` · schema migrations · `docs/MEMORY_DESIGN.md`
+`shared/model-api/**` · **all schema migrations** · `docs/MEMORY_DESIGN.md`
 
-**Work:**
+### Do these in order
 
-- Slice 7 — unify the three risk vocabularies (`Risk`, `RiskLevel`,
-  `PolicyMode`). Serialized: it changes a type everyone reads.
-- Slice 8 — conversation persistence. There is no conversation/message table
-  among the 24 DAOs; chat is an in-memory list wiped on process death.
-- Slice 9 — wire `ModelProvider.stream()`, which exists and is called nowhere.
-- Tenancy **T-1, T-2, T-3** — profile scope, per-profile keys and databases,
-  namespaced storage. **The highest-risk work in the project**: T-2 migrates
-  every existing user's data.
-- Property-based tests over the policy engine (`ENGINEERING.md` §B7) — the
-  highest-value tests available.
+1. **Slice 7** — unify the three risk vocabularies (`Risk`, `RiskLevel`,
+   `PolicyMode`). Three names for "how dangerous is this action", and a
+   mis-mapping silently downgrades a safety requirement. Serialized: everyone
+   reads this type.
+2. **Property tests over the policy engine** (`ENGINEERING.md` §B7) — the
+   highest-value tests in the project. Four invariants are already stated there.
+3. **Slice 8** — conversation persistence. No conversation/message table exists
+   among the 24 DAOs; chat is an in-memory list wiped on process death. Blocks
+   Track 3's routes 1.1, 1.6, 1.11, 1.12.
+4. **Slice 9** — wire `ModelProvider.stream()`. It exists and is called nowhere.
+5. **Tenancy T-1/T-2/T-3** — Wave 3. T-2 migrates every existing user's data and
+   is the highest-risk slice in the project: migration test,
+   backup-before-migrate, rollback path.
 
-**Publishes:** the data and policy interfaces every other track consumes.
-**Consumes:** nothing from other tracks.
+### Your gate
+`:shared:database:assemble` · `:shared:database:desktopJar` ·
+`:shared:platform-api:jvmTest` · your new property tests.
 
-**Rule 1 note:** schema versions are claimed in the tracker before writing.
-Two agents writing "v20" is unmergeable, not merely conflicting — and Track 2
-is the only track that writes migrations.
-
----
-
-## Track 3 — Design System & Android UI
-
-**Owns:** `shared/ui/**` · `apps/android/src/main/java/com/newax/aegis/*Screen.kt`
-· `MainActivity.kt` · `MainViewModel.kt` · `ui/**` · `res/**` ·
-`docs/UI_DESIGN.md`
-
-**Work:**
-
-- **Slice 6 — decomposition, first and alone.** The god Activity and ViewModel
-  become per-screen composables and testable state holders. Copy the pattern
-  from `apps/desktop/.../ui/state/*.kt`, which already does this correctly.
-- Verify slices 1–3 (`shared:ui` tokens, adoption, a11y primitives) once Gate 0
-  clears — they are written but have never compiled.
-- Slice 4 — string externalization. **Early**, because every later slice adds
-  strings.
-- Slice 5 — dark theme completion; unpin `NewaxTheme(darkTheme = false)`.
-- Slice 10 — the component library, accessibility-first from each component's
-  first commit.
-- Slices 11–15 — chat shell, authority surface, Memory/Tasks/Capabilities, the
-  Settings subtree, onboarding — the 105-route tree in `UI_DESIGN.md` §6.
-
-**Consumes:** Track 2's data interfaces, Track 5's action/approval types.
-**Publishes:** `shared:ui` components used by Track 4's desktop bodies.
+### Rules that bind you hardest
+You are the **only** track that writes migrations. Claim the schema version in
+the tracker before writing one — two agents writing "v20" is unmergeable, not
+merely conflicting.
 
 ---
 
-## Track 4 — Platform Bodies
+# Track 3 — Design System & Android UI
+
+**Owns:** `shared/ui/**` · `apps/android/**` UI and `res/` · `docs/UI_DESIGN.md`
+
+### Do these in order
+
+1. **Slice 6 — decomposition. First, alone, and everyone is waiting.** The
+   1403-line `MainActivity` and 1207-line `MainViewModel` become per-screen
+   composables and testable state holders. **Copy the pattern from
+   `apps/desktop/.../ui/state/*.kt`** — desktop already does this correctly and
+   Android does not. Until this merges, no other track should touch
+   `apps/android`.
+2. **Slice 4 — string externalization.** Early, because every later slice adds
+   strings. Currently every screen hardcodes them, which is why RTL and Urdu
+   cannot be verified.
+3. **Slice 5 — dark theme.** Unpin `NewaxTheme(darkTheme = false)` and migrate
+   screens from the light-only aliases to `NewaxTheme.colors`. ContrastTest
+   already covers both palettes.
+4. **Slice 10 — the component library**, accessibility-first from each
+   component's first commit. Retrofitting a11y is how it never happens.
+5. **Slices 11–15** — the 105-route tree in `UI_DESIGN.md` §6.
+
+### Your gate
+`:apps:android:assembleDebug` · `:apps:android:testDebugUnitTest` ·
+`:shared:ui:jvmTest` · screenshot tests once they exist.
+
+### Already done for you
+Slices 1–3 are landed and verified: the token layer, its adoption across 189
+call sites, and the accessibility primitives. ContrastTest enforces 84 contrast
+assertions on every build — **do not change a brand colour without recomputing.**
+
+---
+
+# Track 4 — Platform Bodies
 
 **Owns:** `platform-impl/**` · `apps/desktop/**` · `apps/macos/**` ·
 `apps/ios/**` · `docs/SYNC_DESIGN.md`
 
-**Work:**
+### Hard prerequisite
+You need **real hardware**: a Mac with Xcode for Apple targets, a Windows
+machine for TPM work. Without them your work cannot be verified and must be
+marked unverified under Rule 9. Sort this before starting.
 
-- Slice 17 — the iOS body. **Requires a macOS host with Xcode**; Apple targets
-  cannot compile from a Linux sandbox.
-- Slice 18 — desktop parity. Desktop has no chat surface at all today; chat is
-  a `--cli` REPL.
-- Slice 16 — expanded layout: three panes, menu bar, keyboard shortcuts, command
-  palette. The repo has **zero** key handling today, so this is greenfield.
-- Tenancy **T-8** — device custody tiers, and raising Windows from DPAPI
-  (user-account-scoped, not hardware-backed) to TPM via CNG. The highest-value
-  platform-security work available.
-- Tenancy **T-6** — multi-device enrollment across all four bodies.
+### Do these in order
 
-**Consumes:** `shared:ui` from Track 3, capability contracts from Track 2.
+1. **Desktop parity (slice 18).** Desktop has no chat surface at all — chat is a
+   `--cli` REPL. `shared:ui` is ready for you to consume.
+2. **Expanded layout (slice 16)** — three panes, menu bar, keyboard shortcuts,
+   command palette. The repo has **zero** key handling, so this is greenfield.
+   The shortcut table is in `UI_DESIGN.md` §5.2; approve/reject must be
+   reachable but never single-key.
+3. **Windows custody (tenancy T-8).** DPAPI is user-account-scoped, **not
+   hardware-backed** — a profile is only as protected as the weakest device
+   holding it. Raising Windows to TPM via CNG is the highest-value
+   platform-security work available.
+4. **iOS body (slice 17)** — unblocked; the Apple targets compile.
+5. **T-6** — multi-device enrollment across all four bodies.
 
-**Hard constraint:** this track needs real hardware — a Mac for Apple targets, a
-Windows machine for TPM work. Assigning it to an agent without them produces
-unverifiable code, which Rule 9 says must be marked as such.
+### Your gate
+`:platform-impl:windows:test` (runs anywhere) · the Windows-only job for
+DPAPI/Toolhelp32 paths · `apple-compile` once unblocked.
 
 ---
 
-## Track 5 — Agents, Automation & Safety
+# Track 5 — Agents, Automation & Safety
 
-**Owns:** `apps/android/src/main/java/com/newax/aegis/agents/**` ·
-`…/engine/**` · `relay/**` · `docs/AGENTS_DESIGN.md` · `docs/COMPUTER_USE.md`
+**Owns:** `apps/android/**/agents` · `**/engine` · `relay/` ·
+`docs/AGENTS_DESIGN.md` · `docs/COMPUTER_USE.md`
 
-**Work:**
+You carry the most safety-critical work in the project. The approval spine is
+what stands between a model's output and the user's device.
 
-- **Slices C-1…C-9 — computer use.** C-2 (the untrusted-screen boundary) first,
-  with the injection corpus built alongside the capability rather than after it.
-- The agent-system gaps from `AGENTS_DESIGN.md` "Coverage status": no sandbox
-  runtime ships (WASM is the only mobile option — Docker cannot run there), and
-  no concurrency control exists despite atomic sequential writes being claimed.
-- Tenancy **T-19** — per-profile agent memory. Collective learning must
-  propagate within a profile and never across one.
-- Slice 19 — security hardening: `CryptoObject`-bound biometrics, agent package
-  signing, hash-chained audit.
+### Do these in order
 
-**Consumes:** Track 2's policy engine and typed actions.
-**Publishes:** the action vocabulary Track 3 renders approvals for.
+1. **The prompt-injection corpus.** Screens seeded with payloads; assert the
+   plan is unchanged. Pure data, needs no compiler, and every payload that works
+   is a bug with a test. Build it before the capability, not after.
+2. **C-2 — the untrusted-screen boundary.** Screen content is **data, never
+   instruction**: it may fill a parameter of an action the user already asked
+   for, never select the action, retarget it, or escalate its risk class.
+3. **C-1 — consequence classes** with their approval floors. `SPEND` and
+   `RECORD` at `STRONG_CONFIRMATION`; `CREDENTIAL` refused outright. Coordinate
+   with Track 2 — the floors are enforced at the spine.
+4. **C-3/C-4** — the verify/match/locate/confirm pre-flight loop; coordinate
+   clicking demoted to the last rung with its own approval.
+5. **The agent-system gaps** in `AGENTS_DESIGN.md` "Coverage status": no sandbox
+   runtime ships (WASM is the only mobile option — Docker cannot run there), and
+   no concurrency control exists despite atomic sequential writes being claimed.
+6. **T-19** — per-profile agent memory. Collective learning propagates within a
+   profile and never across one.
 
-**This track carries the most safety-critical work in the project.** The
-approval spine is what stands between a model's output and the user's device.
+### Your gate
+`:apps:android:testDebugUnitTest` · the injection corpus · property tests over
+the guard.
+
+### Two invariants you must not break
+The router routes and **never decides permission** — otherwise influencing
+routing becomes privilege escalation. And **no agent holds execution
+authority** — every agent is a planner emitting typed actions into the one
+spine, or you get authority laundering.
 
 ---
 
 ## Cross-cutting waves
 
-Two efforts do not fit in one track. They are **synchronized waves** where every
-track does its own slices at the same time, against an interface Track 2 lands
-first.
+Two efforts span every track and are **synchronized**, not assigned:
 
-### Tenancy (T-1 … T-19)
+**Tenancy.** Track 2 lands T-1/T-2/T-3 first; everyone else then does their own
+slices — Track 3 the UI (T-9), Track 4 enrollment and custody (T-6, T-8),
+Track 5 agent memory (T-19). Building tenancy UI before the profile boundary
+exists is the specific mistake this ordering prevents.
 
-```
-Track 2: T-1 profile scope · T-2 per-profile DB · T-3 namespacing
-              │  ← everyone waits here
-   ┌──────────┼──────────┬──────────────┐
-   ▼          ▼          ▼              ▼
-Track 3    Track 4    Track 5      Track 2
-T-9 UI     T-6 enroll T-19 agent   T-4/5/7
-           T-8 custody memory      identity, lifecycle, recovery
-```
-
-Attempting T-9 before T-2 means building UI for a profile boundary that does not
-exist yet.
-
-### Computer use (C-1 … C-9)
-
-Track 5 owns the safety architecture; Track 3 renders the approvals; Track 4
-provides per-platform automation. C-1 (consequence classes) lands in Track 2's
-policy engine first, because the floors are enforced at the spine.
+**Computer use.** Track 5 owns the safety architecture, Track 3 renders the
+approvals, Track 4 provides per-platform automation. C-1 lands in Track 2's
+policy engine first.
 
 ---
 
-## Shared files — the conflict surface
+## Shared files
 
-These are touched by everyone and belong to no one:
+Touched by everyone, owned by no one:
 
 | File | Rule |
 |---|---|
-| `settings.gradle.kts`, all `build.gradle.kts` | **Track 1 only.** Others request |
-| `AGENTS.md` baseline table | Track 1 only |
-| `AGENTS.md` reference index | Append-only; integrator resolves |
-| `.github/workflows/*` | Track 1 only — a new module invisible to CI is not built |
-| `docs/ENGINEERING.md` slice list | Append-only; each track updates its own status |
-| `ARCHITECTURE.md` concept registry | Append-only, and **read before naming any new type** |
+| All build files, `settings.gradle.kts` | **Track 1 only.** Others request |
+| `.github/workflows/*` | Track 1 only — a module invisible to CI is not built |
+| AGENTS.md baseline table | Track 1 only |
+| AGENTS.md reference index | Append-only; integrator resolves |
+| `ENGINEERING.md` slice list | Append-only; each track updates its own status |
+| `ARCHITECTURE.md` concept registry | Append-only — **read before naming any new type** |
 
 ---
 
-## The inter-track contract
+## What every PR records
 
-Because tracks publish interfaces to each other, `PARALLEL_RULES.md` Rule 6
-binds hardest here: **change a contract and all its call sites in one commit.**
-
-Every track, on finishing a task, records in its PR:
-
-1. What was verified, and by which gate.
+1. What was verified, **and by which gate** — name the command.
 2. What was **not** verified, and why.
-3. **Interfaces added or changed, and which tracks now depend on them.**
+3. Interfaces added or changed, and which tracks now depend on them.
 4. Anything discovered that invalidates a doc another track owns — raised to
    that track, not silently edited.
 5. Assumptions taken, stated as assumptions.
 
-Point 3 is the one that prevents the half-wired interfaces already in this repo:
+Point 3 prevents the half-wired interfaces already in this repo:
 `ModelProvider.stream()` and `AgentStream` both look like live capability and
 are called from nowhere.
 
----
-
-## If you must start five agents immediately
-
-Not recommended — but if the constraint is fixed, this is the least-bad
-arrangement, because it keeps four agents off code that cannot compile:
-
-| Track | Pre-Gate-0 work |
-|---|---|
-| 1 | Gate 0. Real work |
-| 2 | Design the conversation schema and the unified risk vocabulary. Write migrations without merging |
-| 3 | Route-by-route component specs from `UI_DESIGN.md` §6; screenshot-test fixtures |
-| 4 | Provision a Mac and a Windows machine; audit per-platform key custody |
-| 5 | **Build the prompt-injection corpus.** Pure data, needs no compiler, and is the highest-value artifact available before the build is green |
-
-Four of those five produce specifications and test data rather than shipping
-code — which is the honest answer to what parallelism is worth before there is
-a gate.
+Point 1 has teeth now. Before this week nothing compiled, so "done" could only
+ever mean "looks right" — which is how a missing import sat in `MainActivity`
+undetected. There is a compiler again. Use it.
