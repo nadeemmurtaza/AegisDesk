@@ -11,6 +11,7 @@ include(":shared:platform-api")
 include(":shared:model-api")
 include(":shared:sync")
 include(":shared:desktop-sync")
+include(":shared:ui")
 
 include(":apps:android")
 include(":apps:desktop")

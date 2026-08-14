@@ -43,12 +43,13 @@ If any is unknown: **ask, or state the assumption in one line and take the conse
 | KSP | **2.3.11** | standalone versioning since Kotlin 2.x; no lockstep format anymore |
 | AGP | **9.3.1** | couples to Gradle 9.7.0 + JDK 17; AGP 9 has built-in Kotlin (`kotlin { compilerOptions { jvmTarget } }`, not `kotlinOptions`) |
 | compileSdk / targetSdk / minSdk | **37 / 37 / 26** | Android app + every module with an `android {}` block (7 total — keep them identical); every API used must exist at 26 or be guarded. 37 is the floor required by androidx `core[-ktx]:1.19.0` and `lifecycle-*-compose:2.11.0` — below it AGP's AAR-metadata check fails the build |
-| Compose | **BOM 2026.06.01** (Android); windows/macos apps: **Compose Multiplatform 1.11.1** | Compose compiler comes from the Kotlin plugin (Kotlin 2.0+); CMP 1.11.1 is the lockstep pairing for Kotlin 2.4.10 — keep them coupled |
+| Compose | **BOM 2026.06.01** (Android); **Compose Multiplatform 1.11.1** for `shared:ui` + the windows/macos apps | Compose compiler comes from the Kotlin plugin (Kotlin 2.0+); CMP 1.11.1 is the lockstep pairing for Kotlin 2.4.10 — keep them coupled. The CMP version is declared **once**, root `build.gradle.kts` (`apply false`); modules apply `id("org.jetbrains.compose")` with no version. Two CMP versions in one build do not resolve |
 | Room | **2.8.4 (stable KMP)** | `shared:database`; stable since 2.8.x — the 2.7.0-alpha13 pre-release line is gone |
 | sqlite driver | **androidx.sqlite:sqlite-bundled 2.7.0** (desktop); **sqlite-framework 2.7.0 / NativeSQLiteDriver** (appleMain, Track M2); SQLCipher 4.17.0 (androidMain) | stable line; per-target KSP configs (`kspAndroid`, `kspDesktop`, `kspIosNative`, …) — the `ksp()` KMP shorthand is deprecated |
 | coroutines / datetime | **1.11.0 / 0.8.0** | |
 | LiteRT LM | **0.16.0** (platform-impl:android — engine + provider; app consumes via shared:model-api) | offline model runtime |
-| Modules | `:apps:android`, `:apps:desktop`, `:apps:macos`, `:apps:ios`, `:platform-impl:android`, `:platform-impl:windows`, `:platform-impl:macos`, `:platform-impl:ios`, `:shared:core`, `:shared:database`, `:shared:platform-api`, `:shared:model-api`, `:shared:sync`, `:shared:desktop-sync` | add new modules to `settings.gradle.kts` in the same change |
+| Modules | `:apps:android`, `:apps:desktop`, `:apps:macos`, `:apps:ios`, `:platform-impl:android`, `:platform-impl:windows`, `:platform-impl:macos`, `:platform-impl:ios`, `:shared:core`, `:shared:database`, `:shared:platform-api`, `:shared:model-api`, `:shared:sync`, `:shared:desktop-sync`, `:shared:ui` | add new modules to `settings.gradle.kts` in the same change |
+| `:shared:ui` targets | `androidTarget`, `jvm()`, `iosArm64`, `iosSimulatorArm64` — **no `macosArm64`** | CMP has no macosArm64 UI artifacts; macOS renders via Compose Desktop on `jvm()`. Unlike `shared:core`, which is platform-free logic and does declare `macosArm64` |
 
 **Known blockers (do not silently inherit, do not silently "fix" unasked):**
 - ✅ RESOLVED — machine-specific `org.gradle.java.home` removed from `gradle.properties` (f1617ac); builds are portable across OSes again.

@@ -1,11 +1,13 @@
 plugins {
     id("org.jetbrains.kotlin.jvm")
     // Compose Multiplatform (desktop) — the UI surface replacing the CLI (Phase B1).
-    // 1.7.1 is the CMP line locked to Kotlin 2.1.0 (the repo baseline); the compose
-    // compiler comes from org.jetbrains.kotlin.plugin.compose (2.1.0, root-declared).
+    // Version is root-declared (CMP 1.11.1, the lockstep pairing for Kotlin 2.4.10
+    // per the AGENTS.md baseline) so this app, apps/macos, and shared:ui cannot
+    // drift apart — two CMP versions in one build do not resolve. The compose
+    // compiler comes from org.jetbrains.kotlin.plugin.compose (2.4.10).
     // NB: no `application` plugin here — compose.desktop.application already owns
     // the run/package tasks, and applying both fails with "task 'run' already exists".
-    id("org.jetbrains.compose") version "1.7.1"
+    id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
