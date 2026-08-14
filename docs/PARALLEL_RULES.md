@@ -3,9 +3,9 @@
 How multiple agents work this repo at once without producing conflicts,
 duplicates, or two of everything.
 
-`docs/PARALLEL_WORKSPLIT.md` is a *specific* split (four platform bodies, with
-per-agent briefs). This document is the *general* rule set that applies to any
-split.
+`docs/TRACKS.md` applies these rules as the current five-track assignment.
+`docs/PARALLEL_WORKSPLIT.md` is an earlier, narrower split (four platform
+bodies). This document is the *general* rule set behind both.
 
 **Every rule here is stated as a guard, not a convention.** Conventions decay
 under parallel work — nobody violates them on purpose, they just don't know.
