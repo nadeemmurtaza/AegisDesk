@@ -44,22 +44,32 @@ verification log in `ENGINEERING.md` Gate 0.
 Those are the **first green runs of `build`, `KMP compile gates` and
 `apple-compile` in the project's recorded history.**
 
-### The one red check is new information, not a regression
+### The one red check is not a migration bug — it is a crash on launch
 
-`instrumented-tests` runs `MigrationTest` on an API-29 emulator, gated on
-`needs: build`. Because `build` had never passed, **this test had never executed
-once.** It runs now, and it fails.
+`instrumented-tests` runs on an API-29 emulator, gated on `needs: build`. Because
+`build` had never passed, **`MigrationTest` had never executed once.** It now
+runs — and the log says `Starting 0 tests`, because the app process dies first:
 
-That is Gate 0 paying off immediately: a suite that was structurally unable to
-report is now reporting. Treat the failure as a **finding about the schema**,
-not as something this week's changes broke — the exported schema JSON is
-byte-identical across these commits.
+```
+java.lang.IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
+  (requires JDK 15+ / Android 12+); refusing to fall back to weaker crypto.
+    at com.newax.aegis.SyncRuntime.init(SyncRuntime.kt:183)
+    at com.newax.aegis.NewaxApplication.onCreate(NewaxApplication.kt:61)
+```
 
-**Owned by Track 2** (migrations). First job: get the failure detail from the
-emulator run and decide whether it is a real migration defect or a test-harness
-problem.
+`minSdk = 26`, but `JavaCrypto` requires **API 31**, and identity generation is
+forced eagerly in `Application.onCreate`. **The app cannot start on Android 8
+through 11.** That is a shipped defect, not a test-harness problem — and it was
+invisible until Gate 0 made the emulator job able to run at all.
 
-**Nothing blocks any track.** All five can start; the instrumented failure is Track 2's to chase and holds up no one else.
+An earlier revision of this file called it a schema finding. It was not; that
+was a guess made from the Gradle stack trace before the emulator log was read.
+
+**Owned by Track 2**, with a caveat: the crashing files sit in `apps/android` but
+are not UI, and **`shared/sync` has no owner in the map below** — a real gap.
+Agree the boundary before editing.
+
+**Nothing blocks any track.** All five can start.
 
 Environment: **JDK 17** (not 21) and Android SDK **platform 37**. If a
 `cmdline-tools` index has no `platforms;android-37`, update the tooling — it is

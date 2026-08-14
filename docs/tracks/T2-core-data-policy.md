@@ -61,46 +61,88 @@ verification without a Mac. Only linking a final framework needs one.
 
 ---
 
-## Slice T2.1 — The `instrumented-tests` failure ← start here
+## Slice T2.1 — The app crashes on launch below Android 12 ← start here
 
-**Goal:** the last red check goes green, or is proven to be a harness problem.
+**This slice was written expecting a migration defect. It is not one.** The
+emulator log has since been read, and the diagnosis below replaces the earlier
+guess. Recorded rather than quietly rewritten, because the wrong hypothesis was
+acted on and the correction is the useful part.
 
-**Why:** `MigrationTest` runs on an emulator gated on `needs: build`. Because
-`build` had never passed in the project's history, **this test had never
-executed once.** It now runs and fails. That is new information about the
-schema, not a regression — the exported schema JSON is byte-identical across
-the commits that turned the build green.
+**The actual failure:**
 
-**Already ruled out — do not repeat this work:**
+```
+Starting 0 tests on test(AVD) - 10
+Test run failed to complete. Instrumentation run failed due to Process crashed.
 
-- ✅ All 19 schema JSONs exist (`shared/database/schemas/com.newax.aegis.db.NewaxDatabase/1.json` … `19.json`)
-- ✅ Schemas *are* wired into the test APK assets — `apps/android/build.gradle.kts:63`
-- ✅ `androidTest` deps present, including `room-testing:2.8.4`
+java.lang.RuntimeException: Unable to create application com.newax.aegis.NewaxApplication:
+  java.lang.IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
+  (requires JDK 15+ / Android 12+); refusing to fall back to weaker crypto.
+    at com.newax.aegis.sync.JavaCrypto.<init>(JavaCrypto.kt:36)
+    at com.newax.aegis.SyncRuntime.init(SyncRuntime.kt:183)
+    at com.newax.aegis.NewaxApplication.onCreate(NewaxApplication.kt:61)
+Caused by: java.security.NoSuchAlgorithmException: Ed25519 KeyPairGenerator not available
+```
+
+**`Starting 0 tests`.** `MigrationTest` still has not run — the process dies in
+`Application.onCreate` before any test executes. Every conclusion about the
+schema was drawn from a suite that never started.
+
+### What this actually means
+
+This is not a test problem. It is a **shipped crash on launch**:
+
+| | |
+|---|---|
+| `apps/android/build.gradle.kts:24` | `minSdk = 26` — Android 8.0 |
+| `JavaCrypto.<init>` | throws below **API 31** (Android 12) |
+| `NewaxApplication.onCreate` → `SyncRuntime.init` → `identityHolder` → `platformCrypto()` | **unconditional, at startup** |
+
+**The app cannot start on any device from API 26 through API 30.** The CI
+emulator runs API 29 (`android.yml:103`), which is why it caught this the moment
+`build` first went green — and why it looked like a migration failure to anyone
+reading only the Gradle stack trace.
+
+`JavaCrypto`'s refusal to downgrade is **correct** and must stay. The defect is
+that identity generation is forced eagerly at app startup, so a device that
+merely cannot *sync* cannot *run*.
+
+### Fix options — this needs a product decision, not just a patch
+
+1. **Make sync degrade instead of crash.** `SyncRuntime.init` stops forcing
+   `identityHolder`; sync reports unavailable on API < 31 with a visible reason.
+   The app runs everywhere. **Recommended** — it is the only option that keeps
+   `minSdk = 26` honest.
+2. **Bundle a provider** (Tink or BouncyCastle) supplying Ed25519/X25519 on API
+   26+. Keeps full functionality; adds a crypto dependency, which
+   `ENGINEERING.md` §B5 treats as a supply-chain commitment.
+3. **Raise `minSdk` to 31.** Truthful and one line, but drops Android 8–11
+   users. A product call, not an engineering convenience.
+
+**Whichever is chosen, `minSdk` and the actual runtime requirement must agree.**
+They do not today, and that mismatch is the bug.
 
 **Steps:**
 
-1. Get the real failure. The CI log tail lands in Gradle's stack trace, so pull
-   the **test report artifact**, or run locally with an emulator:
-   ```bash
-   ./gradlew :apps:android:connectedDebugAndroidTest \
-     -Pandroid.testInstrumentationRunnerArguments.class=com.newax.aegis.db.MigrationTest
-   ```
-   You need an emulator with KVM. If you cannot get one, add a step to
-   `android.yml` that uploads `apps/android/build/reports/androidTests/` as an
-   artifact — ask Track 1, it is their file.
-2. Identify **which** `migrateNToN+1` fails. There are 18.
-3. `runMigrationsAndValidate(..., validateDroppedTables = true, ...)` is strict:
-   it compares the post-migration schema against the exported JSON for that
-   version. A mismatch means the migration SQL and the entity definitions
-   disagree — usually a column default, an index, or a dropped table.
-4. Fix the **migration**, not the exported JSON. The JSON is the record of what
-   that version was; rewriting it to match a broken migration hides the bug.
+1. Fix the startup crash.
+2. Re-run `instrumented-tests` and read what `MigrationTest` reports **for the
+   first time in the project's history**. It may pass. It may not. Nobody knows
+   yet, and no schema claim should be made until it has actually run.
+3. Ask Track 1 to add an API-31 emulator to the matrix *alongside* API 29 — the
+   low level is the one that found this, and dropping it would lose the only
+   check on the `minSdk` claim.
 
-**Done when:** `instrumented-tests` is green, or you have posted a diagnosis
-showing it is a harness limitation with a named workaround.
+**Still true and still ruled out** — do not repeat:
 
-**Do not** delete or skip the failing test to get green. It is the only thing
-that has ever checked these migrations.
+- ✅ All 19 schema JSONs exist
+- ✅ Schemas are wired into the test APK assets (`apps/android/build.gradle.kts:63`)
+- ✅ `androidTest` deps present, including `room-testing:2.8.4`
+
+**Ownership note:** `SyncRuntime.kt` and `NewaxApplication.kt` sit in
+`apps/android` but are not UI, and **`shared/sync` has no owner in the ownership
+map at all** — an ordinary gap, flagged rather than assumed. Agree the boundary
+with Track 3 before editing app-root files.
+
+**Do not** delete or skip `MigrationTest` to get green. It has still never run.
 
 ---
 
