@@ -145,6 +145,17 @@ when its gate passes — not when the code looks right.
 - **Blocks:** routes 1.1, 1.6, 1.11, 1.12 in `UI_DESIGN.md` §6.
 - **Gate:** migration test (the repo already has `MigrationTest` — extend it).
 
+### Slices T-1 … T-8 — Multi-tenancy ⬜
+- **Goal:** isolated workspaces per device (T1) and organization fleets (T2).
+- **Spec:** `docs/TENANCY_DESIGN.md` — full slice table in §8.
+- **Depends on:** Gate 0 and slice 6. Tenancy layered onto eight process-wide
+  singletons and a 1400-line Activity would have to be redone.
+- **Key decision:** isolation by **key**, not by `tenant_id` query filtering.
+  One missing `WHERE` clause is a silent cross-tenant leak; a missing key is
+  unreadable bytes.
+- **Not in scope:** hosted server tenancy (T3) — it would require adding the
+  `INTERNET` permission the product deliberately refuses. Costed in §2.
+
 ### Slice 9 — Streaming ⬜
 - **Goal:** wire `ModelProvider.stream()`. It exists and is never called;
   `MainViewModel` uses `complete()`, so replies arrive whole with no stop button.
