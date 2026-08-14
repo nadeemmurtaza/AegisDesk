@@ -70,9 +70,36 @@ sync entry point is guarded by `SyncRuntime.isAvailable`. The Sync screen states
 the limit instead of showing controls that would throw. `minSdk = 26` is now
 truthful. 9 tests cover the degradation path in `shared/sync`.
 
-**Still open, and Track 2's:** `MigrationTest` has *still* never completed a run.
-Whether the 18 migrations pass is genuinely unknown — make no schema claims until
-it has actually reported.
+### And behind it, a second crash on launch
+
+With the Ed25519 crash gone, the emulator reached the next one:
+
+```
+UnsatisfiedLinkError: No implementation found for
+  net.zetetic.database.sqlcipher.SQLiteConnection.nativeOpen(...)
+```
+
+`net.zetetic:sqlcipher-android` 4.x ships `libsqlcipher.so` for all four ABIs
+but — unlike the retired `net.sqlcipher:android-database-sqlcipher` — has **no
+static initializer that loads it**. Not one class in the 4.17.0 artifact calls
+`System.loadLibrary`, and neither did this repo. Verified against both the APK
+(the `.so` is present for x86_64, so it was never an ABI gap) and the artifact's
+own bytecode.
+
+**This one broke every device and every ABI**, not just old ones: the app could
+never open its database. It was invisible because the Ed25519 crash fired first.
+
+**Fixed** — `getNewaxDatabase` loads the library before opening, and turns a
+linker error naming a method into one naming the actual problem.
+
+**Still open, and Track 2's:** `MigrationTest` has *still* never completed a
+run — two startup crashes in a row stopped it before it began. Whether the 18
+migrations pass is genuinely unknown. Make no schema claims until it reports.
+
+**The pattern worth noting:** each fix reveals the next fault, because
+`Application.onCreate` does a great deal of eager work and the first throw masks
+everything after it. Expect more, and read the *runner* output rather than the
+Gradle tail each time.
 
 **Ownership gap:** `shared/sync` has no owner in the map below. Flagged rather
 than assumed.

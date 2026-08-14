@@ -80,7 +80,22 @@ IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
 at startup — so the app could not launch on Android 8 through 11, and
 `MigrationTest` never got to run.
 
-**That crash is fixed.** Sync now degrades instead of dying:
+3. With that fixed, the emulator reached the **next** crash on launch:
+
+```
+UnsatisfiedLinkError: No implementation found for
+  net.zetetic.database.sqlcipher.SQLiteConnection.nativeOpen(...)
+```
+
+`net.zetetic:sqlcipher-android` 4.x ships `libsqlcipher.so` for all four ABIs but
+has **no static initializer that loads it** — unlike the retired
+`net.sqlcipher:android-database-sqlcipher`. Not one class in the 4.17.0 artifact
+calls `System.loadLibrary`, and neither did this repo. **This broke every device
+and every ABI**: the app could never open its database. Fixed in
+`getNewaxDatabase`. (Checked properly: the `.so` *is* in the APK for x86_64, so
+it was never an ABI gap.)
+
+**Both crashes are fixed.** Sync degrades instead of dying:
 `shared/sync/SyncAvailability.kt` classifies the failure, `SyncRuntime`'s
 identity resolution never throws, every entry point is guarded by
 `SyncRuntime.isAvailable`, and the Sync screen states the limit rather than
@@ -90,8 +105,11 @@ is untouched — it was always correct.
 ### Your actual job
 
 **Nobody knows whether the 18 migrations pass.** `MigrationTest` has still never
-completed a run in the project's history. Make no claim about the schema until
-it has reported.
+completed a run in the project's history — two startup crashes in a row stopped
+it before it began. Make no claim about the schema until it has reported.
+
+Expect the possibility of a third. `Application.onCreate` does a lot of eager
+work, and every throw there masks everything after it.
 
 **Steps:**
 
@@ -110,7 +128,8 @@ it has reported.
 - ✅ All 19 schema JSONs exist
 - ✅ Schemas are wired into the test APK assets (`apps/android/build.gradle.kts:63`)
 - ✅ `androidTest` deps present, including `room-testing:2.8.4`
-- ✅ The startup crash (fixed; not a schema problem)
+- ✅ Both startup crashes (fixed; neither was a schema problem)
+- ✅ Native-library ABI coverage — x86_64 carries every `.so` arm64 does
 
 **The lesson worth carrying:** both wrong diagnoses came from reading the Gradle
 stack trace instead of the test output. `Starting 0 tests` was in the log the
