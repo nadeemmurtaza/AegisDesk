@@ -261,6 +261,115 @@ binds the same schemas. One source of truth for tools.
   Abort/Freeze, the health ledger with Check/Restore, Thaw + Continue for
   frozen state, and the MCP stream feed.
 
+---
+
+## Profile scoping — what tenancy changes here
+
+`docs/TENANCY_DESIGN.md` was written after this document, and it invalidates one
+assumption running through the memory design: that the swarm shares **one**
+database. It no longer does. Each profile has its own key and its own store
+(`TENANCY_DESIGN.md` §2), so every layer below needs a scope.
+
+**Default: every agent-memory layer is per-profile.**
+
+| Layer | Table | Scope after tenancy |
+|---|---|---|
+| L1 Global "Library" | `library_entries` | **Per profile.** Syncs across the *person's devices* for that profile — never across profiles |
+| L2 Scratchpad | `agent_scratchpad` | Per profile, already isolated per agent. Destroyed on profile switch, not just TTL-expired |
+| L3 Handoff | `handoffs` | Per profile. An agent in Work cannot hand off to an agent in Personal — there is no channel, by construction |
+| Episodic | `episodes` | Per profile |
+| Work log | `work_log` | Per profile — "the swarm shares one DB" is no longer true |
+| Embeddings | `embeddings` | Per profile. A vector index over Work content is Work content |
+
+### Collective learning is the sharp edge
+
+"Distribute a fix swarm-wide, instantly" is exactly right *within* a profile and
+a breach *across* one.
+
+- "The CRM's submit button moved to the right" — harmless, and genuinely worth
+  sharing.
+- "Client X's account numbers are formatted NNN-X" — a lesson that encodes Work
+  data, and propagating it into Personal is a leak.
+
+**These cannot be told apart reliably by a classifier**, and a classifier that is
+wrong 1% of the time on a channel that fires constantly is a leak with extra
+steps. So the rule is structural, matching §2's logic:
+
+> Collective learning propagates **within one profile, across that person's
+> devices**. It never crosses the profile boundary — not filtered, not
+> reviewed-then-crossed. There is no cross-profile channel to filter.
+
+The cost is real: a procedure learned in Work must be re-learned in Personal.
+That is the correct trade, and it is the same trade §2 already makes for every
+other kind of data.
+
+### Cross-agent pollination, bounded
+
+The debate-room mechanism (agents negotiating a shared schema after a handoff
+mismatch) operates **within a profile**. Two agents in different profiles cannot
+have a schema disagreement, because they cannot hand off to each other at all.
+
+### Routing and authority
+
+Covered above under *Profile-aware routing*: the router resolves the active
+profile before scoring, never decides permission, and no agent holds execution
+authority of its own.
+
+---
+
+## Coverage status
+
+What is schema-backed and wired, versus what is a declared seam. Keeping this
+honest matters because several items below *look* shipped in the design docs and
+are not.
+
+| Capability | Status |
+|---|---|
+| L1/L2/L3 memory, episodic, work log, embeddings | ✅ schema v14, tables exist |
+| Capabilities vs skills | ✅ schema v17 |
+| Modular skill packaging, `manifest.json` / `skillsets.json` | ✅ schema v16 |
+| Permission Guard (PBAC), GLOBAL system-skill scope | ✅ `SkillGuard` |
+| Prompt-injection containment (untrusted-source flag, HITL) | ✅ designed + guarded |
+| HITL `requires_approval`, `skill_approvals`, staging gatekeeper | ✅ schema v19 |
+| Agent lifecycle: import/install/uninstall/upgrade/enable/disable | ✅ `AgentRegistry`, `ZipPackages` |
+| Routing, contextual domination, pipelines, swarm assembly, P2P via handoff | ✅ `AgentRouter`, `AgentOrchestrator` |
+| PRAM core, `run/abort/get_status/health_check`, self-healing | ✅ schema v18, `AgentRuntimeEngine` |
+| MCP structured exchange | ✅ present in `AgentController`, `AgentStream`, `SkillManager` |
+| Freeze / thaw | ✅ `StateArchiver` |
+| RLAIF-E: evolution ledger, exploit/explore, fuzzer, three learning protocols | ✅ schema v19 |
+| **Execution sandboxing runtime** | ⚠️ **Seam only.** `SkillGuard.sandboxProvider` returns `false`; no runtime ships. Unsandboxed requests correctly demote to human approval |
+| **Concurrency control** | ⚠️ **Gap.** No mutex or event-sourced write path found in the agents package. "Atomic, sequential memory writes" is claimed but not implemented |
+| **Profile scoping of all of the above** | ⬜ Not started — this section is the specification |
+| **RAR import** | ⬜ ZIP only. RAR needs a proprietary decoder; recommend dropping it rather than adding the dependency |
+| **LLM agnosticism to hosted APIs** | ⚠️ Split decision — see below |
+
+### Three items needing a decision, not just implementation
+
+**1 · Sandboxing on mobile.** "Docker or WASM" treats the two as
+interchangeable. On the primary platform they are not: Docker cannot run on
+Android or iOS. **WASM is the only viable mobile sandbox**, and the desktop
+bodies could use either. Pick WASM for the shared seam or accept that
+host-filesystem skills stay approval-gated forever on mobile — which is the
+current, safe, default.
+
+**2 · Concurrency.** Per-profile databases reduce contention but do not remove
+it: multiple agents write `handoffs`, `work_log`, and `episodes` concurrently
+within one profile. Room gives transactional atomicity; what is missing is the
+ordering guarantee across a multi-step handoff. Event sourcing is a reasonable
+answer, and `sync_journal` already provides an append-only precedent worth
+reusing rather than inventing a second mechanism.
+
+**3 · Hosted LLM APIs.** Supporting the OpenAI/Anthropic **request schema** is
+free and worth doing — it makes the tool-calling loop portable and testable
+without a device model. **Calling those endpoints is a different decision**: it
+sends user content off-device, which is the same open question as network
+connectors (`TENANCY_DESIGN.md` §12.8) and now carries extra weight given the
+`INTERNET` permission correction in `ENGINEERING.md` §B5. Recommendation: build
+to the schema, keep the on-device provider the default, and treat a hosted
+provider as an explicit per-profile opt-in that an organization can forbid.
+
+---
+
 ## Self-learning — the RLAIF-E engine (schema v19)
 
 Skills are not static files: they are **dynamic mutations**, tracked over time

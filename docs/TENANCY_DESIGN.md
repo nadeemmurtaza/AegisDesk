@@ -418,6 +418,7 @@ Insert into `ENGINEERING.md` Part A after slice 8.
 | **T-16** | Notification digest (metadata by default) | T-14 | Bodies not persisted unless opted in; retention honoured |
 | **T-17** | Calendar busy projection | T-3 | The projected type has no detail field; org cannot enable it |
 | **T-18** | Per-profile connector registry + secrets namespace | T-3 | A connector in one profile is invisible to the other; revoked with the profile |
+| **T-19** | Per-profile agent memory: library, scratchpad, handoffs, episodes, work log, embeddings | T-3 | A lesson learned in Work never reaches Personal; no cross-profile handoff channel exists |
 
 **T-2 is the highest-risk slice in the project** — it moves every existing
 user's data. Migration test, backup-before-migrate, and a rollback path before

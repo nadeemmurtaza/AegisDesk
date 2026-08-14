@@ -185,6 +185,20 @@ when its gate passes — not when the code looks right.
 - **Highest-value slice:** C-2, the untrusted-screen boundary, with an injection
   corpus built alongside the capability rather than after it.
 
+### Agent system — coverage, not greenfield ⬜
+- **Read first:** `docs/AGENTS_DESIGN.md` "Coverage status". Most of the
+  multi-agent stack is already schema-backed (v14–v19): the three memory layers,
+  episodic memory, work log, PBAC guard, PRAM controller, MCP exchange,
+  freeze/thaw, RLAIF-E with its evolution ledger, fuzzer and staging gatekeeper.
+- **Real gaps:** no sandbox runtime ships (seam only, and Docker cannot run on
+  mobile — WASM or nothing); no concurrency control in the agents package
+  despite "atomic sequential writes" being claimed; ZIP import only.
+- **The architectural conflict:** the memory design assumes the swarm shares one
+  database. Tenancy replaces that with one per profile. Collective learning
+  "swarm-wide" is correct within a profile and a leak across one — a lesson can
+  encode the data it was learned from, and no classifier separates those
+  reliably. Fixed structurally (T-19), not by filtering.
+
 ### Slice 9 — Streaming ⬜
 - **Goal:** wire `ModelProvider.stream()`. It exists and is never called;
   `MainViewModel` uses `complete()`, so replies arrive whole with no stop button.
