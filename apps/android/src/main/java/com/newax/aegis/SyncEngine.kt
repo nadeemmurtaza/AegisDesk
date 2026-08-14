@@ -152,6 +152,12 @@ object SyncEngine {
      * retry policy (worker → Result.retry, service → backoff loop).
      */
     suspend fun runCycle(): CycleResult = withContext(Dispatchers.IO) {
+        // journalStore() needs the device identity; on a platform without
+        // Ed25519 there is none, and asking for it throws.
+        if (!SyncRuntime.isAvailable) {
+            SyncRuntime.recordStatus(SyncRuntime.unavailableReason ?: "Sync unavailable on this device")
+            return@withContext CycleResult(0, 0, 0)
+        }
         val store = journalStore()
         val transport = startLan(store)
         var applied = 0
@@ -200,6 +206,10 @@ object SyncEngine {
      * is turned off the loop idles (the Sync screen stops the service).
      */
     suspend fun runContinuous(): Unit = withContext(Dispatchers.IO) {
+        if (!SyncRuntime.isAvailable) {
+            SyncRuntime.recordStatus(SyncRuntime.unavailableReason ?: "Sync unavailable on this device")
+            return@withContext
+        }
         var lan: JvmLanTransport? = null
         var backoff = MIN_BACKOFF_MS
         var relayLastMs = 0L

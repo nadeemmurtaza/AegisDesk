@@ -18,6 +18,10 @@ import androidx.work.WorkerParameters
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // Success, not retry: an unsupported platform will never become
+        // supported by trying again, and a retrying worker burns battery
+        // forever on Android 8-11 (SyncAvailability.CRYPTO_UNSUPPORTED).
+        if (!SyncRuntime.isAvailable) return Result.success()
         if (!SyncRuntime.enabled()) return Result.success()
         return try {
             SyncEngine.runCycle()

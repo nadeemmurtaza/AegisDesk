@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,6 +80,15 @@ private val AccentRed = NewaxLightColors.error
 @Composable
 fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
     val context = LocalContext.current
+
+    // Every control below needs the device identity, and on a platform without
+    // Ed25519 (below Android 12) there is none. Say so plainly rather than
+    // showing a screen whose every button throws.
+    if (!SyncRuntime.isAvailable) {
+        SyncUnavailable(padding, SyncRuntime.unavailableReason)
+        return
+    }
+
     var autoOn by remember { mutableStateOf(SyncRuntime.enabled()) }
     var statusText by remember { mutableStateOf(SyncRuntime.status()) }
     var peers by remember { mutableStateOf(SyncRuntime.peers()) }
@@ -692,6 +702,60 @@ private fun PairedPeerRow(
             IconButton(onClick = onUnpair) {
                 Icon(Icons.Rounded.Delete, contentDescription = "Unpair", tint = AccentRed, modifier = Modifier.size(18.dp))
             }
+        }
+    }
+}
+
+/**
+ * Shown instead of the Sync screen when this device cannot hold a sync identity.
+ *
+ * Names the limit and its boundary. A user on Android 10 seeing "sync is off"
+ * with no explanation reasonably concludes the app is broken; the fix for the
+ * crash is only half a fix if the replacement is silence.
+ */
+@Composable
+private fun SyncUnavailable(
+    padding: androidx.compose.foundation.layout.PaddingValues,
+    reason: String?,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(NewaxLightColors.bg)
+            .padding(padding)
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Outlined.Sync,
+                contentDescription = null,
+                tint = TextTer,
+                modifier = Modifier.size(44.dp),
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "Device sync isn't available here",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPri,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                reason ?: "This device can't set up the secure keys sync needs.",
+                fontSize = 14.sp,
+                color = TextSec,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Nothing else is affected — memory, tasks and the assistant all " +
+                    "work normally, and everything stays on this device.",
+                fontSize = 13.sp,
+                color = TextTer,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

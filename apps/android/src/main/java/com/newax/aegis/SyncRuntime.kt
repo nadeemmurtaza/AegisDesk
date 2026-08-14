@@ -32,8 +32,10 @@ import com.newax.aegis.sync.Pairing
 import com.newax.aegis.sync.Pairing.PairingRequest
 import com.newax.aegis.sync.PeerEndpoint
 import com.newax.aegis.sync.StoredIdentity
+import com.newax.aegis.sync.SyncAvailability
 import com.newax.aegis.sync.SyncEntry
 import com.newax.aegis.sync.SyncPolicy
+import com.newax.aegis.sync.probeSyncIdentity
 import com.newax.aegis.sync.platformCrypto
 import com.newax.aegis.sync.platformKeyStore
 import kotlinx.coroutines.CoroutineScope
@@ -169,18 +171,66 @@ object SyncRuntime {
     @Volatile
     private var memory: EncryptedMemory? = null
 
-    private val keyStoreHolder: KeyStore by lazy { platformKeyStore() }
-    private val cryptoHolder: Crypto by lazy { platformCrypto() }
-    private val identityHolder: StoredIdentity by lazy {
-        keyStoreHolder.loadIdentity()
-            ?: Identity.generate(cryptoHolder, "Android " + Build.MODEL)
-                .also { keyStoreHolder.saveIdentity(it) }
+    /**
+     * Identity, resolved once and **without throwing**.
+     *
+     * `JavaCrypto` refuses to construct without Ed25519/X25519 — Android 12 /
+     * API 31 — and that refusal is correct. Forcing it eagerly was not: this
+     * ran from `Application.onCreate`, so the throw was a crash on launch for
+     * every device from `minSdk = 26` up to API 30, Android 8.0 through 11.
+     *
+     * Sync is one feature; the assistant is the product. Unsupported is now a
+     * state to report ([availability]) rather than an error to propagate.
+     */
+    @Volatile private var cryptoRef: Crypto? = null
+    @Volatile private var keyStoreRef: KeyStore? = null
+
+    private val resolved: Pair<SyncAvailability, StoredIdentity?> by lazy {
+        probeSyncIdentity(
+            crypto = { platformCrypto().also { cryptoRef = it } },
+            keyStore = { platformKeyStore().also { keyStoreRef = it } },
+            loadOrCreate = { crypto, keyStore ->
+                keyStore.loadIdentity()
+                    ?: Identity.generate(crypto, "Android " + Build.MODEL)
+                        .also { keyStore.saveIdentity(it) }
+            },
+        )
     }
 
-    /** Call once from Application.onCreate — primes identity + memory target. */
+    /** Whether this device can sync, and why not when it cannot. */
+    val availability: SyncAvailability get() = resolved.first
+
+    /** Cheap guard for every sync entry point. */
+    val isAvailable: Boolean get() = availability.isAvailable
+
+    /** User-facing explanation when sync is off, or null when it is available. */
+    val unavailableReason: String?
+        get() = (availability as? SyncAvailability.Unavailable)?.reason
+
+    /**
+     * These stay non-null accessors rather than becoming nullable everywhere:
+     * they are reached only from paths already guarded by [isAvailable], and a
+     * loud, named failure beats a silent no-op if a guard is ever missed. The
+     * message says which guard to add.
+     */
+    private fun <T : Any> requireSync(value: T?, what: String): T = value ?: error(
+        "Sync $what is unavailable on this device ($unavailableReason). " +
+            "Guard the call site with SyncRuntime.isAvailable.",
+    )
+
+    private val keyStoreHolder: KeyStore get() = requireSync(resolved.let { keyStoreRef }, "key storage")
+    private val cryptoHolder: Crypto get() = requireSync(resolved.let { cryptoRef }, "crypto")
+    private val identityHolder: StoredIdentity get() = requireSync(resolved.second, "identity")
+
+    /**
+     * Call once from Application.onCreate.
+     *
+     * Primes the memory target and *attempts* identity. **Never throws** — a
+     * device that cannot sync must still start.
+     */
     fun init(context: Context) {
         memory = EncryptedMemory(context.applicationContext)
-        identityHolder
+        resolved // resolve now so availability is known, but do not propagate failure
     }
 
     fun identity(): StoredIdentity = identityHolder
@@ -207,7 +257,8 @@ object SyncRuntime {
 
     // ── Peers ───────────────────────────────────────────────────────────────
 
-    fun peers(): List<PairedPeer> = keyStoreHolder.pairedPeers()
+    /** Empty rather than throwing when sync is unavailable — the Sync screen reads this during composition. */
+    fun peers(): List<PairedPeer> = if (isAvailable) keyStoreHolder.pairedPeers() else emptyList()
 
     fun unpair(deviceId: String) {
         keyStoreHolder.removePeer(deviceId)

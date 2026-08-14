@@ -58,6 +58,9 @@ class NewaxApplication : Application() {
         // set before any sync API is touched.
         AndroidSyncContext.init(this)
         // Sync identity + memory target (the auto-sync loop, SyncWorker).
+        // Never throws: a device without Ed25519 (below Android 12) reports
+        // sync unavailable rather than failing to start. This call used to
+        // crash the app on launch for every device on API 26-30.
         SyncRuntime.init(this)
         // Initialize encrypted DB before any workers or viewmodels access it
         val memory = EncryptedMemory(this)
@@ -142,7 +145,7 @@ class NewaxApplication : Application() {
         // device at any moment (auto-sync default on; the Sync screen toggles
         // it and stops/starts the service). START_STICKY restarts it if the
         // system kills it; the worker stays as the catch-up net.
-        if (SyncRuntime.enabled()) {
+        if (SyncRuntime.isAvailable && SyncRuntime.enabled()) {
             SyncForegroundService.start(this)
         }
     }
@@ -153,6 +156,9 @@ class NewaxApplication : Application() {
      * explicit in the Sync screen.
      */
     private fun scheduleSyncWork() {
+        // Don't enqueue a 15-minute periodic job that can only ever no-op.
+        // The worker bails too, but scheduling it would still wake the device.
+        if (!SyncRuntime.isAvailable) return
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()

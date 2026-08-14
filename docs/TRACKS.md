@@ -44,30 +44,38 @@ verification log in `ENGINEERING.md` Gate 0.
 Those are the **first green runs of `build`, `KMP compile gates` and
 `apple-compile` in the project's recorded history.**
 
-### The one red check is not a migration bug — it is a crash on launch
+### The one red check was a crash on launch — now fixed
 
 `instrumented-tests` runs on an API-29 emulator, gated on `needs: build`. Because
-`build` had never passed, **`MigrationTest` had never executed once.** It now
-runs — and the log says `Starting 0 tests`, because the app process dies first:
+`build` had never passed, **`MigrationTest` had never executed once.** When it
+finally ran, the log said `Starting 0 tests` — the app process died first:
 
 ```
-java.lang.IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
-  (requires JDK 15+ / Android 12+); refusing to fall back to weaker crypto.
-    at com.newax.aegis.SyncRuntime.init(SyncRuntime.kt:183)
-    at com.newax.aegis.NewaxApplication.onCreate(NewaxApplication.kt:61)
+IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
+  at SyncRuntime.init(SyncRuntime.kt:183)
+  at NewaxApplication.onCreate(NewaxApplication.kt:61)
 ```
 
-`minSdk = 26`, but `JavaCrypto` requires **API 31**, and identity generation is
-forced eagerly in `Application.onCreate`. **The app cannot start on Android 8
-through 11.** That is a shipped defect, not a test-harness problem — and it was
-invisible until Gate 0 made the emulator job able to run at all.
+`minSdk = 26`, `JavaCrypto` requires **API 31**, and identity generation ran
+eagerly in `Application.onCreate`. **The app could not start on Android 8
+through 11.** A shipped defect, not a test-harness problem — invisible until
+Gate 0 made the emulator job able to run at all.
 
 An earlier revision of this file called it a schema finding. It was not; that
-was a guess made from the Gradle stack trace before the emulator log was read.
+was a guess from the Gradle stack trace, made before the emulator log was read.
 
-**Owned by Track 2**, with a caveat: the crashing files sit in `apps/android` but
-are not UI, and **`shared/sync` has no owner in the map below** — a real gap.
-Agree the boundary before editing.
+**Fixed** by making sync degrade instead of crash: `SyncAvailability` in
+`shared/sync` classifies the failure, identity resolution never throws, and every
+sync entry point is guarded by `SyncRuntime.isAvailable`. The Sync screen states
+the limit instead of showing controls that would throw. `minSdk = 26` is now
+truthful. 9 tests cover the degradation path in `shared/sync`.
+
+**Still open, and Track 2's:** `MigrationTest` has *still* never completed a run.
+Whether the 18 migrations pass is genuinely unknown — make no schema claims until
+it has actually reported.
+
+**Ownership gap:** `shared/sync` has no owner in the map below. Flagged rather
+than assumed.
 
 **Nothing blocks any track.** All five can start.
 

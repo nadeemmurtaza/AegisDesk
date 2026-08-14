@@ -96,13 +96,15 @@ This is why **adding a device is a physical act** between two devices the owner
 holds, not a form submission — and why revoking one is a key operation rather
 than a database flag.
 
-> **Live defect affecting this half.** `JavaCrypto` requires Ed25519/X25519 JCA
-> providers — **Android 12 (API 31)** — while `apps/android` declares
-> `minSdk = 26`, and `NewaxApplication.onCreate` forces identity generation
-> eagerly. The app crashes on launch on API 26–30. Device identity is therefore
-> unavailable on those versions, so any A-slice below depending on it inherits
-> that constraint. Tracked as Track 2's first slice; found by the API-29
-> emulator, not by review.
+> **Platform limit affecting this half.** `JavaCrypto` requires Ed25519/X25519
+> JCA providers — **Android 12 (API 31)** — so device identity does not exist
+> below that, and any A-slice depending on it inherits the constraint.
+>
+> This was a crash on launch until recently: identity was generated eagerly from
+> `Application.onCreate`, so every device from `minSdk = 26` to API 30 died at
+> startup. Fixed — `SyncAvailability` in `shared/sync` makes "unsupported" a
+> reported state rather than a thrown error, and the Sync screen says so. The
+> refusal to fall back to weaker curves stays; only the consequence changed.
 
 ---
 

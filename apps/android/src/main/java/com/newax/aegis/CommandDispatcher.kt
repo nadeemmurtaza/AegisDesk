@@ -49,6 +49,9 @@ object CommandDispatcher {
 
     /** Routes an incoming LOG entry from the command journal namespace. */
     fun onIncoming(entry: SyncEntry) {
+        // Unreachable while sync is down — no transport delivers entries — but
+        // both calls below need the identity, so fail closed rather than throw.
+        if (!SyncRuntime.isAvailable) return
         val myId = SyncRuntime.deviceId()
         val key = entry.key
         when {

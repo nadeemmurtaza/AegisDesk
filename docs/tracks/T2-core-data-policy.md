@@ -61,88 +61,66 @@ verification without a Mac. Only linking a final framework needs one.
 
 ---
 
-## Slice T2.1 — The app crashes on launch below Android 12 ← start here
+## Slice T2.1 — Find out what `MigrationTest` actually reports ← start here
 
-**This slice was written expecting a migration defect. It is not one.** The
-emulator log has since been read, and the diagnosis below replaces the earlier
-guess. Recorded rather than quietly rewritten, because the wrong hypothesis was
-acted on and the correction is the useful part.
+**Read this history before starting; two earlier diagnoses were wrong.**
 
-**The actual failure:**
+1. First recorded as a probable **migration/schema defect**, guessed from the
+   Gradle stack trace. Wrong.
+2. The emulator log then showed the real cause — a **crash on launch**:
 
 ```
 Starting 0 tests on test(AVD) - 10
-Test run failed to complete. Instrumentation run failed due to Process crashed.
-
-java.lang.RuntimeException: Unable to create application com.newax.aegis.NewaxApplication:
-  java.lang.IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
-  (requires JDK 15+ / Android 12+); refusing to fall back to weaker crypto.
-    at com.newax.aegis.sync.JavaCrypto.<init>(JavaCrypto.kt:36)
-    at com.newax.aegis.SyncRuntime.init(SyncRuntime.kt:183)
-    at com.newax.aegis.NewaxApplication.onCreate(NewaxApplication.kt:61)
-Caused by: java.security.NoSuchAlgorithmException: Ed25519 KeyPairGenerator not available
+IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
+  at SyncRuntime.init(SyncRuntime.kt:183)
+  at NewaxApplication.onCreate(NewaxApplication.kt:61)
 ```
 
-**`Starting 0 tests`.** `MigrationTest` still has not run — the process dies in
-`Application.onCreate` before any test executes. Every conclusion about the
-schema was drawn from a suite that never started.
+`minSdk = 26`, `JavaCrypto` requires API 31, and identity generation ran eagerly
+at startup — so the app could not launch on Android 8 through 11, and
+`MigrationTest` never got to run.
 
-### What this actually means
+**That crash is fixed.** Sync now degrades instead of dying:
+`shared/sync/SyncAvailability.kt` classifies the failure, `SyncRuntime`'s
+identity resolution never throws, every entry point is guarded by
+`SyncRuntime.isAvailable`, and the Sync screen states the limit rather than
+showing controls that would throw. `JavaCrypto`'s refusal to use weaker curves
+is untouched — it was always correct.
 
-This is not a test problem. It is a **shipped crash on launch**:
+### Your actual job
 
-| | |
-|---|---|
-| `apps/android/build.gradle.kts:24` | `minSdk = 26` — Android 8.0 |
-| `JavaCrypto.<init>` | throws below **API 31** (Android 12) |
-| `NewaxApplication.onCreate` → `SyncRuntime.init` → `identityHolder` → `platformCrypto()` | **unconditional, at startup** |
-
-**The app cannot start on any device from API 26 through API 30.** The CI
-emulator runs API 29 (`android.yml:103`), which is why it caught this the moment
-`build` first went green — and why it looked like a migration failure to anyone
-reading only the Gradle stack trace.
-
-`JavaCrypto`'s refusal to downgrade is **correct** and must stay. The defect is
-that identity generation is forced eagerly at app startup, so a device that
-merely cannot *sync* cannot *run*.
-
-### Fix options — this needs a product decision, not just a patch
-
-1. **Make sync degrade instead of crash.** `SyncRuntime.init` stops forcing
-   `identityHolder`; sync reports unavailable on API < 31 with a visible reason.
-   The app runs everywhere. **Recommended** — it is the only option that keeps
-   `minSdk = 26` honest.
-2. **Bundle a provider** (Tink or BouncyCastle) supplying Ed25519/X25519 on API
-   26+. Keeps full functionality; adds a crypto dependency, which
-   `ENGINEERING.md` §B5 treats as a supply-chain commitment.
-3. **Raise `minSdk` to 31.** Truthful and one line, but drops Android 8–11
-   users. A product call, not an engineering convenience.
-
-**Whichever is chosen, `minSdk` and the actual runtime requirement must agree.**
-They do not today, and that mismatch is the bug.
+**Nobody knows whether the 18 migrations pass.** `MigrationTest` has still never
+completed a run in the project's history. Make no claim about the schema until
+it has reported.
 
 **Steps:**
 
-1. Fix the startup crash.
-2. Re-run `instrumented-tests` and read what `MigrationTest` reports **for the
-   first time in the project's history**. It may pass. It may not. Nobody knows
-   yet, and no schema claim should be made until it has actually run.
-3. Ask Track 1 to add an API-31 emulator to the matrix *alongside* API 29 — the
-   low level is the one that found this, and dropping it would lose the only
-   check on the `minSdk` claim.
+1. Re-run `instrumented-tests` and read the result — for the first time ever.
+2. If it fails, *now* the migration hunt is justified. `runMigrationsAndValidate(..., validateDroppedTables = true, ...)`
+   compares the post-migration schema against the exported JSON for that version;
+   a mismatch is usually a column default, an index, or a dropped table.
+   Fix the **migration**, not the exported JSON — the JSON records what that
+   version was, and rewriting it to match a broken migration hides the bug.
+3. Ask Track 1 to add an **API-31 emulator alongside API 29**, not instead of it.
+   The low level is the one that found the crash, and it is the only check on the
+   `minSdk = 26` claim.
 
-**Still true and still ruled out** — do not repeat:
+**Already ruled out — do not repeat:**
 
 - ✅ All 19 schema JSONs exist
 - ✅ Schemas are wired into the test APK assets (`apps/android/build.gradle.kts:63`)
 - ✅ `androidTest` deps present, including `room-testing:2.8.4`
+- ✅ The startup crash (fixed; not a schema problem)
 
-**Ownership note:** `SyncRuntime.kt` and `NewaxApplication.kt` sit in
-`apps/android` but are not UI, and **`shared/sync` has no owner in the ownership
-map at all** — an ordinary gap, flagged rather than assumed. Agree the boundary
-with Track 3 before editing app-root files.
+**The lesson worth carrying:** both wrong diagnoses came from reading the Gradle
+stack trace instead of the test output. `Starting 0 tests` was in the log the
+whole time. Read the runner's own output first.
 
-**Do not** delete or skip `MigrationTest` to get green. It has still never run.
+**Ownership note:** the fix touched `SyncRuntime.kt` and `NewaxApplication.kt` —
+`apps/android` but not UI — and `shared/sync`, which **has no owner in the
+ownership map**. An ordinary gap; agree the boundary before editing further.
+
+**Do not** delete or skip `MigrationTest` to get green.
 
 ---
 
