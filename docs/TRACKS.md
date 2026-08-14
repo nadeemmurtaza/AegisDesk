@@ -6,6 +6,21 @@ self-contained brief for each.
 Read `docs/PARALLEL_RULES.md` first — this applies those rules, it does not
 replace them.
 
+**This file is the map. Each track has its own detailed brief**, with setup
+commands, slice-by-slice instructions (goal, why, files, steps, verification,
+done-when, and what not to touch), escalation paths, and a PR checklist:
+
+| Track | Brief |
+|---|---|
+| 1 — Build, CI & Release | [`docs/tracks/T1-build-ci-release.md`](tracks/T1-build-ci-release.md) |
+| 2 — Core, Data & Policy | [`docs/tracks/T2-core-data-policy.md`](tracks/T2-core-data-policy.md) |
+| 3 — Design System & Android UI | [`docs/tracks/T3-design-system-android-ui.md`](tracks/T3-design-system-android-ui.md) |
+| 4 — Platform Bodies | [`docs/tracks/T4-platform-bodies.md`](tracks/T4-platform-bodies.md) |
+| 5 — Agents, Automation & Safety | [`docs/tracks/T5-agents-automation-safety.md`](tracks/T5-agents-automation-safety.md) |
+
+An agent assigned to a track should need that brief, `AGENTS.md`, and
+`docs/PARALLEL_RULES.md` — nothing else — to start.
+
 ---
 
 ## Current state
@@ -103,6 +118,8 @@ No two tracks own the same file — the Rule 1 test holds.
 
 # Track 1 — Build, CI & Release
 
+**Full brief: [`docs/tracks/T1-build-ci-release.md`](tracks/T1-build-ci-release.md)** — read that, not this summary, before starting.
+
 **Owns:** every build file · `gradle/` · `.github/workflows/` · `scripts/` ·
 the AGENTS.md baseline table
 
@@ -132,6 +149,8 @@ cannot install it, that is a tooling-version problem, not a project one.
 ---
 
 # Track 2 — Core, Data & Policy
+
+**Full brief: [`docs/tracks/T2-core-data-policy.md`](tracks/T2-core-data-policy.md)** — read that, not this summary, before starting.
 
 **Owns:** `shared/core/**` · `shared/database/**` · `shared/platform-api/**` ·
 `shared/model-api/**` · **all schema migrations** · `docs/MEMORY_DESIGN.md`
@@ -169,6 +188,8 @@ merely conflicting.
 
 # Track 3 — Design System & Android UI
 
+**Full brief: [`docs/tracks/T3-design-system-android-ui.md`](tracks/T3-design-system-android-ui.md)** — read that, not this summary, before starting.
+
 **Owns:** `shared/ui/**` · `apps/android/**` UI and `res/` · `docs/UI_DESIGN.md`
 
 ### Do these in order
@@ -202,6 +223,8 @@ assertions on every build — **do not change a brand colour without recomputing
 
 # Track 4 — Platform Bodies
 
+**Full brief: [`docs/tracks/T4-platform-bodies.md`](tracks/T4-platform-bodies.md)** — read that, not this summary, before starting.
+
 **Owns:** `platform-impl/**` · `apps/desktop/**` · `apps/macos/**` ·
 `apps/ios/**` · `docs/SYNC_DESIGN.md`
 
@@ -232,6 +255,8 @@ DPAPI/Toolhelp32 paths · `apple-compile` once unblocked.
 ---
 
 # Track 5 — Agents, Automation & Safety
+
+**Full brief: [`docs/tracks/T5-agents-automation-safety.md`](tracks/T5-agents-automation-safety.md)** — read that, not this summary, before starting.
 
 **Owns:** `apps/android/**/agents` · `**/engine` · `relay/` ·
 `docs/AGENTS_DESIGN.md` · `docs/COMPUTER_USE.md`
