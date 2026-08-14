@@ -65,7 +65,13 @@ class ContrastTest {
      * and `surface` is a different colour from `bg` in both themes.
      */
     private fun assertPaletteMeetsAA(label: String, c: NewaxColors) {
-        for ((surfaceName, background) in listOf("bg" to c.bg, "surface" to c.surface)) {
+        val textBearing = listOf(
+            "bg" to c.bg,
+            "surface" to c.surface,
+            "surfaceSelected" to c.surfaceSelected,
+            "surfaceMuted" to c.surfaceMuted,
+        )
+        for ((surfaceName, background) in textBearing) {
             assertContrast("$label textPrimary on $surfaceName", c.textPrimary, background, TEXT_FLOOR)
             assertContrast("$label textSecondary on $surfaceName", c.textSecondary, background, TEXT_FLOOR)
             assertContrast("$label textTertiary on $surfaceName", c.textTertiary, background, TEXT_FLOOR)
@@ -79,6 +85,14 @@ class ContrastTest {
         // Paired fills: each carries its own designated foreground.
         assertContrast("$label onAccentFill on accentFill", c.onAccentFill, c.accentFill, TEXT_FLOOR)
         assertContrast("$label warning on warningFill", c.warning, c.warningFill, TEXT_FLOOR)
+
+        // surfaceStrong is the strongest neutral fill — progress/switch tracks
+        // and unselected chips. It is documented as NOT text-bearing, with one
+        // sanctioned exception (textPrimary, on the risk chip), so that is the
+        // only foreground asserted here. Asserting the full set would fail, and
+        // weakening the palette to satisfy a fill that carries no body text
+        // would be the wrong trade.
+        assertContrast("$label textPrimary on surfaceStrong", c.textPrimary, c.surfaceStrong, TEXT_FLOOR)
     }
 
     @Test

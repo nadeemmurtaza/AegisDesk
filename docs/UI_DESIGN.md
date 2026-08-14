@@ -368,6 +368,8 @@ against that background unless stated otherwise.
 | `bg` | `#F7F7F5` | — | app background |
 | `surface` | `#FFFFFF` | — | cards, sheets, composer |
 | `surfaceSelected` | `#EFEFEC` | — | selected rows, user bubbles |
+| `surfaceMuted` | `#F2F2EF` | — | recessed fills, inset rows — **text-bearing** |
+| `surfaceStrong` | `#E7E7E2` | — | progress/switch tracks, unselected chips — **not text-bearing** |
 | `textPrimary` | `#1B1B1A` | 16.1:1 | body, titles, icons |
 | `textSecondary` | `#4A4A45` | 8.3:1 | supporting text |
 | `textTertiary` | `#6B6B65` | 5.0:1 | timestamps, hints |
@@ -376,9 +378,23 @@ against that background unless stated otherwise.
 | `warning` | `#8A5200` | 6.0:1 | blocked text, icon, border |
 | `warningFill` | `#FEF3C7` | 5.7:1 vs `warning` | blocked-card background |
 | `error` | `#B3261E` | 6.1:1 | failures, hard deny |
-| `success` | `#15803D` | 4.7:1 | ready, online, in sync |
+| `success` | `#14762F` | 5.4:1 | ready, online, in sync |
 | `border` | `#D8D8D3` | 1.3:1 | **decorative dividers only** |
 | `borderStrong` | `#767671` | 4.3:1 | composer, inputs, unselected controls |
+
+**Two surface levels beyond the original three.** The Android screens use five
+neutral levels, not three — `surfaceMuted` appears at 64 call sites and
+`surfaceStrong` at 9. Omitting them would have forced the migration to
+approximate, changing appearance for no reason. They carry different
+obligations: `surfaceMuted` is text-bearing and every foreground token clears
+4.5:1 on it; `surfaceStrong` is a fill for tracks and unselected chips, where
+only `textPrimary` is sanctioned (13.9:1). A sixth level, `PrimaryPr #30302E`,
+was dropped — it had exactly one reference, its own declaration.
+
+**`success` moved from `#15803D` to `#14762F`.** The original cleared 4.68:1 on
+`bg` but only **4.47:1** on `surfaceMuted` — passing on the page and failing on
+the recessed surface it is routinely drawn on. Testing every token against
+every text-bearing surface, rather than against `bg` alone, is what caught it.
 
 **Why these values changed.** The previous palette shipped four measurable
 failures, and one of them was a safety signal:
@@ -409,20 +425,28 @@ semantics. An earlier draft inverted this.
 | `bg` | `#171717` | — | app background |
 | `surface` | `#212121` | — | cards, sheets, composer |
 | `surfaceSelected` | `#2E2E2E` | — | selected rows, user bubbles |
+| `surfaceMuted` | `#1E1E1E` | — | recessed fills — text-bearing |
+| `surfaceStrong` | `#333333` | — | tracks, unselected chips — not text-bearing |
 | `textPrimary` | `#ECECEC` | 15.2:1 | body, titles |
 | `textSecondary` | `#A8A8A2` | 7.5:1 | supporting text |
-| `textTertiary` | `#8A8A85` | 5.2:1 | timestamps, hints |
+| `textTertiary` | `#9A9A95` | 6.3:1 | timestamps, hints |
 | `accent` | `#3DD9A8` | 10.0:1 | links, focus ring |
 | `warning` | `#F2B233` | 9.6:1 | blocked |
+| `warningFill` | `#3A2A08` | 7.4:1 vs `warning` | blocked-card background |
 | `error` | `#FF8A80` | 7.9:1 | failures |
 | `success` | `#4ADE80` | 10.3:1 | ready, online |
 | `border` | `#2E2E2E` | — | decorative dividers |
-| `borderStrong` | `#767671` | 3.9:1 | inputs, unselected controls |
+| `borderStrong` | `#84847F` | 4.8:1 | inputs, unselected controls |
 
-`borderStrong` is deliberately the same value in both themes: `#767671` is
-4.3:1 on the light background and 3.9:1 on the dark one, and — the case that
-actually matters, since inputs sit on cards — 3.5:1 on the dark `surface`.
-One value clears the 3:1 floor everywhere it is used.
+Dark `textTertiary` and `borderStrong` are **not** the values a first pass
+produces. `#8A8A85` and `#767671` clear `bg` and `surface` comfortably but
+measure **3.92:1** and **2.97:1** against `surfaceSelected` — the user-bubble
+background, where timestamps actually sit. Both were lightened until their
+*worst* surface passed, not their best: 4.80:1 and 3.61:1 respectively.
+
+Ratios in these tables are quoted against `bg`. The binding constraint is the
+worst case across all four text-bearing surfaces, which is what
+`ContrastTest` enforces.
 
 Dark theme follows the system setting, with an in-app override in 5.1.4.
 

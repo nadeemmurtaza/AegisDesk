@@ -26,6 +26,25 @@ data class NewaxColors(
     val surface: Color,
     /** Selected rows, user message bubbles. */
     val surfaceSelected: Color,
+    /**
+     * A recessed surface one step from [bg] — section fills, inset rows, code
+     * wells. **Text-bearing**: every foreground token clears 4.5:1 here, and
+     * [ContrastTest][../../../../../commonTest] enforces it. 64 call sites in
+     * the Android screens rely on this level.
+     */
+    val surfaceMuted: Color,
+    /**
+     * The strongest neutral fill — progress tracks, switch tracks, unselected
+     * chip fills.
+     *
+     * **Not text-bearing**, with one sanctioned exception: [textPrimary], which
+     * clears 13.89:1 here (the "Sensitive" risk chip). Do not place
+     * [textTertiary], [accent], or [success] on it — they do not clear 4.5:1
+     * against a fill this dark, which is why the contrast test asserts only
+     * [textPrimary] for this level. If you need text on a neutral fill, use
+     * [surfaceMuted].
+     */
+    val surfaceStrong: Color,
     /** Body copy, titles, icons. */
     val textPrimary: Color,
     /** Supporting text. */
@@ -63,6 +82,8 @@ val NewaxLightColors: NewaxColors = NewaxColors(
     bg = Color(0xFFF7F7F5),
     surface = Color(0xFFFFFFFF),
     surfaceSelected = Color(0xFFEFEFEC),
+    surfaceMuted = Color(0xFFF2F2EF),
+    surfaceStrong = Color(0xFFE7E7E2),
     textPrimary = Color(0xFF1B1B1A),      // 16.07:1
     textSecondary = Color(0xFF4A4A45),    //  8.31:1
     textTertiary = Color(0xFF6B6B65),     //  5.00:1
@@ -72,7 +93,10 @@ val NewaxLightColors: NewaxColors = NewaxColors(
     warning = Color(0xFF8A5200),          //  5.96:1
     warningFill = Color(0xFFFEF3C7),      //  5.74:1 vs warning
     error = Color(0xFFB3261E),            //  6.09:1
-    success = Color(0xFF15803D),          //  4.68:1
+    // Darkened from the #15803D in UI_DESIGN §4.1: that value measured 4.47:1
+    // on surfaceMuted — passing on bg but failing on the recessed surface it is
+    // routinely drawn on. This clears 5.11:1 there and 5.35:1 on bg.
+    success = Color(0xFF14762F),          //  5.35:1
     border = Color(0xFFD8D8D3),           //  1.33:1 — decorative only
     borderStrong = Color(0xFF767671),     //  4.26:1
     isLight = true,
@@ -92,9 +116,14 @@ val NewaxDarkColors: NewaxColors = NewaxColors(
     bg = Color(0xFF171717),
     surface = Color(0xFF212121),
     surfaceSelected = Color(0xFF2E2E2E),
+    surfaceMuted = Color(0xFF1E1E1E),
+    surfaceStrong = Color(0xFF333333),
     textPrimary = Color(0xFFECECEC),      // 15.18:1
     textSecondary = Color(0xFFA8A8A2),    //  7.50:1
-    textTertiary = Color(0xFF8A8A85),     //  5.17:1
+    // Lightened from #8A8A85: that value cleared bg and surface but measured
+    // 3.92:1 on surfaceSelected — the user-bubble background. Worst case is now
+    // 4.80:1 across all four text-bearing surfaces.
+    textTertiary = Color(0xFF9A9A95),     //  6.34:1 on bg, 4.80:1 worst case
     accent = Color(0xFF3DD9A8),           //  9.98:1
     accentFill = Color(0xFF10A37F),
     onAccentFill = Color(0xFF1B1B1A),
@@ -103,7 +132,9 @@ val NewaxDarkColors: NewaxColors = NewaxColors(
     error = Color(0xFFFF8A80),            //  7.85:1
     success = Color(0xFF4ADE80),          // 10.29:1
     border = Color(0xFF2E2E2E),           // decorative only
-    borderStrong = Color(0xFF767671),     //  3.93:1 on bg, 3.53:1 on surface
+    // Not the light theme's #767671: that measured 2.97:1 on surfaceSelected,
+    // just under the SC 1.4.11 floor. Worst case is now 3.61:1.
+    borderStrong = Color(0xFF84847F),     //  4.77:1 on bg, 3.61:1 worst case
     isLight = false,
 )
 
