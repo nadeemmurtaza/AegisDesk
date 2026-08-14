@@ -75,9 +75,17 @@ apple.yml (exact task list)                               BUILD SUCCESSFUL
 `shared:ui`'s iOS targets were previously "declared, not verified". They now
 compile.
 
-**Only unverified step:** `:apps:android:assembleDebug`'s `checkDebugAarMetadata`,
-which requires SDK platform 37 — absent from older `cmdline-tools` indexes.
-`compileDebugKotlin` passes; CI has platform 37.
+## Confirmed in CI
+
+`build`, `KMP compile gates + Android green`, `apple-compile`, `Static
+invariants` and the Windows adapter tests are **all green** — the first green
+runs of the first three in the project's recorded history.
+
+One check is red: `instrumented-tests`, which runs `MigrationTest` on an
+emulator and is gated on `needs: build`. Since `build` had never passed, **that
+test had never run once.** It runs now and fails. That is a finding about the
+schema surfaced by clearing Gate 0, not a regression — the exported schema JSON
+is byte-identical across these commits. Assigned to Track 2.
 
 **Rule: no slice is "done" while it cannot be compiled.** That rule now has
 teeth, because there is a compiler.

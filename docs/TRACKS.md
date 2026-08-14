@@ -19,14 +19,32 @@ verification log in `ENGINEERING.md` Gate 0.
 
 | Gate | State |
 |---|---|
-| `Static invariants` | ✅ green in CI |
-| `Windows adapter tests` | ✅ green in CI |
-| invariants build-gates (full list) | ✅ verified locally |
-| `apple.yml` (exact task list) | ✅ verified locally — Kotlin/Native cross-compiles from Linux |
-| `:shared:ui:jvmTest` | ✅ ContrastTest, 84 assertions |
-| `:apps:android:assembleDebug` | ⏳ `compileDebugKotlin` verified; the AAR check needs SDK 37, which CI has |
+| `Static invariants` | ✅ green |
+| `build` (Android + adapters) | ✅ **green** |
+| `KMP compile gates + Android green` | ✅ **green** |
+| `apple-compile` | ✅ **green** |
+| `Windows adapter tests` | ✅ green |
+| `instrumented-tests` | ❌ see below |
 
-**There is no longer a blocking issue.** Every track can start.
+Those are the **first green runs of `build`, `KMP compile gates` and
+`apple-compile` in the project's recorded history.**
+
+### The one red check is new information, not a regression
+
+`instrumented-tests` runs `MigrationTest` on an API-29 emulator, gated on
+`needs: build`. Because `build` had never passed, **this test had never executed
+once.** It runs now, and it fails.
+
+That is Gate 0 paying off immediately: a suite that was structurally unable to
+report is now reporting. Treat the failure as a **finding about the schema**,
+not as something this week's changes broke — the exported schema JSON is
+byte-identical across these commits.
+
+**Owned by Track 2** (migrations). First job: get the failure detail from the
+emulator run and decide whether it is a real migration defect or a test-harness
+problem.
+
+**Nothing blocks any track.** All five can start; the instrumented failure is Track 2's to chase and holds up no one else.
 
 Environment: **JDK 17** (not 21) and Android SDK **platform 37**. If a
 `cmdline-tools` index has no `platforms;android-37`, update the tooling — it is
@@ -120,17 +138,21 @@ cannot install it, that is a tooling-version problem, not a project one.
 
 ### Do these in order
 
-1. **Slice 7** — unify the three risk vocabularies (`Risk`, `RiskLevel`,
+1. **The `instrumented-tests` failure.** `MigrationTest` has never run in the
+   project's history and now does. Get the emulator failure detail; decide
+   whether it is a genuine migration defect or a harness issue. Nothing else is
+   blocked on it, but it is the only red check.
+2. **Slice 7** — unify the three risk vocabularies (`Risk`, `RiskLevel`,
    `PolicyMode`). Three names for "how dangerous is this action", and a
    mis-mapping silently downgrades a safety requirement. Serialized: everyone
    reads this type.
-2. **Property tests over the policy engine** (`ENGINEERING.md` §B7) — the
+3. **Property tests over the policy engine** (`ENGINEERING.md` §B7) — the
    highest-value tests in the project. Four invariants are already stated there.
-3. **Slice 8** — conversation persistence. No conversation/message table exists
+4. **Slice 8** — conversation persistence. No conversation/message table exists
    among the 24 DAOs; chat is an in-memory list wiped on process death. Blocks
    Track 3's routes 1.1, 1.6, 1.11, 1.12.
-4. **Slice 9** — wire `ModelProvider.stream()`. It exists and is called nowhere.
-5. **Tenancy T-1/T-2/T-3** — Wave 3. T-2 migrates every existing user's data and
+5. **Slice 9** — wire `ModelProvider.stream()`. It exists and is called nowhere.
+6. **Tenancy T-1/T-2/T-3** — Wave 3. T-2 migrates every existing user's data and
    is the highest-risk slice in the project: migration test,
    backup-before-migrate, rollback path.
 
