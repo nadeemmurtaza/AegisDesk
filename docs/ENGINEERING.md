@@ -34,35 +34,61 @@ them; it never overrides them.
 
 # Gate 0 — the build must go green
 
-**Nothing in Part A is verifiable until this is done.**
+`main` had never had a green CI run in its recorded history: `android.yml`
+30/30 failures, `apple.yml` 24/24. Diagnosed and largely fixed — the causes
+were three ordinary compile errors, not an exotic Room/KSP incompatibility.
 
-`main` has never had a green CI run in its recorded history: `android.yml`
-30/30 failures, `apple.yml` 24/24, back to the earliest retained run. This is
-not a regression to bisect — a working build gate has never existed.
+Room's `[ksp] [MissingType]: Element 'com.newax.aegis.db.NewaxDatabase'
+references a type that is not present` was a **downstream symptom**, not the
+cause. Room emits it when the `@Database` class fails to resolve — which
+happens whenever that file has a compile error. Chasing it as a Room problem
+was the wrong tree; the compiler names the real fault.
 
-Current known blocker:
+| Fault | Where | Fix |
+|---|---|---|
+| `kotlinx.datetime.Clock.System` | `NewaxDatabase.kt:825` | Moved to `kotlin.time` in kotlinx-datetime 0.8.0. Replaced with the module's own `currentTimeMillis()` expect/actual seam, which commonMain should have used anyway (AGENTS.md §0.5) |
+| `@Volatile` | `NewaxDatabase.kt:90` | `kotlin.jvm.Volatile` is auto-imported on JVM targets and absent from metadata. Explicit `import kotlin.concurrent.Volatile` |
+| `EnterTransition` | `MainActivity.kt:451` | Missing import from the slice-3 reduced-motion work |
+
+**Verified locally** (Android SDK installed, JDK 17, real compiles):
 
 ```
-e: [ksp] [MissingType]: Element 'com.newax.aegis.db.NewaxDatabase'
-        references a type that is not present
+:shared:database:desktopJar          SUCCESS
+:shared:database:assemble (android)  SUCCESS
+:shared:core:compileKotlinJvm        SUCCESS
+:shared:platform-api:jvmTest         SUCCESS
+:shared:ui:compileKotlinJvm          SUCCESS
+:shared:ui:jvmTest                   SUCCESS  ← ContrastTest, 84 assertions
+:apps:android:compileDebugKotlin     SUCCESS
 ```
 
-It fails identically on JVM, Android, and Apple, stopping `build`,
-`KMP compile gates`, and `apple-compile`.
+## What remains: Apple targets only
 
-Ruled out so far: all 46 declared entities are defined; no `commonMain` file
-imports the sync package; `schemas/` exists for `exportSchema = true`.
+```
+e: [ksp] FileIndexEntity.kt:104: Cannot find external content entity class.
+   kspKotlinMacosArm64 · kspKotlinIosArm64 · kspKotlinIosSimulatorArm64
+```
 
-Remaining candidates: a DAO return type that doesn't resolve, or a
-Room 2.8.4 / KSP 2.3.11 / Kotlin 2.4.10 incompatibility.
+Fires **only** on the three native targets; JVM and Android pass. `FileTextFts`
+uses a bare `@Fts4`, whose default `contentEntity` resolves to `Any::class` →
+`java.lang.Object`, which does not exist on Kotlin/Native. `PersonFactFts`,
+which sets `contentEntity` explicitly, is unaffected — that contrast is the
+evidence.
+
+**Not fixed here, deliberately.** The obvious change — giving `FileTextFts` an
+explicit `contentEntity` — alters the generated `CREATE VIRTUAL TABLE` and is
+therefore a **schema change on a v19 database**, requiring a migration and a
+version bump. `PARALLEL_RULES.md` Rule 1 says schema work is serialized and
+claimed, and it cannot be verified from a Linux host without a Mac. It needs
+its own change, by whoever owns Track 2.
+
+Interim options: set the explicit `contentEntity` with a migration; make
+`file_text_fts` a standalone (non-Room) FTS table created by callback; or
+accept Apple targets red until a Mac is available.
 
 **Rule: no slice is "done" while it cannot be compiled.** A slice may be
 *written* against a red build, but it must be marked unverified, and the
-verification debt is tracked until Gate 0 clears.
-
-**Practical prerequisite for whoever takes this on:** get a local Android SDK
-and a warm Gradle cache. Blind CI round-trips (~4 minutes each, no ability to
-confirm a fix before pushing) are the wrong loop for a compiler error.
+verification debt is tracked until its gate clears.
 
 ---
 
@@ -81,25 +107,25 @@ when its gate passes — not when the code looks right.
 - **Touches:** the 7 modules with an `android {}` block, `AGENTS.md` baseline.
 - **Gate:** `build` progresses past `CheckAarMetadataTask`. ✅ confirmed.
 
-### Slice 0b — Fix the Room KSP blocker ⬜ 🔒 **← the critical path**
+### Slice 0b — Fix the Room KSP blocker ✅ (Apple targets remain)
 - **Goal:** Gate 0. Make the project compile.
 - **Touches:** `shared/database` — DAOs, entities, or the Room/KSP version pair.
 - **Gate:** `build`, `KMP compile gates`, and `apple-compile` all green.
 - **Note:** everything below inherits this dependency.
 
-### Slice 1 — `shared:ui` token layer 🟡
+### Slice 1 — `shared:ui` token layer ✅
 - **Goal:** one source of truth for colour, type, spacing, shape.
 - **Touches:** new `shared/ui` module; CMP unified on 1.11.1.
 - **Gate:** `:shared:ui:jvmTest` (ContrastTest) + `assemble`.
-- **Verified:** contrast arithmetic, 84 assertions. **Unverified:** compilation.
+- **Verified:** compiles, and `:shared:ui:jvmTest` runs ContrastTest's 84 assertions green.
 
-### Slice 2 — Token adoption 🟡
+### Slice 2 — Token adoption ✅
 - **Goal:** delete 189 duplicated colour declarations across 18 files.
 - **Also fixed:** `@style/Theme.NewaxNewax` (a theme that does not exist),
   `android:label="Newax Newax"`, contradictory `styles.xml` chrome.
 - **Gate:** `assembleDebug` + visual parity check on a device.
 
-### Slice 3 — Accessibility primitives 🟡
+### Slice 3 — Accessibility primitives ✅
 - **Goal:** `reducedMotionEnabled()` seam + semantics helpers; applied to the
   typing indicator and bubble width.
 - **Gate:** compiles; TalkBack pass on the chat surface.
