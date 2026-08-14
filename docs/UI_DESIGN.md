@@ -77,6 +77,16 @@ was opened most recently.
 - **Typographic restraint.** Hierarchy from type and spacing rather than
   borders and fills; reading-grade line-height for long answers.
 
+### One thing neither product has
+
+Both are single-identity: one account, one context. Newax Aegis carries a
+**Person with a Work and a Personal profile**, each a separate encrypted store,
+optionally governed by an organization
+(`docs/TENANCY_DESIGN.md`). Nothing in either reference app models that, so the
+profile switcher (1.0) and the Profiles subtree (5.7) are designed here rather
+than borrowed. The governing rule: **the active profile is always visible**, and
+switching always re-authenticates.
+
 ### Deliberately not borrowed
 
 Accounts and billing, cloud sync UI, sharing and publishing, plugin
@@ -137,6 +147,12 @@ Launch
      ├─ model failed to load     → red dot + Tap to retry ──▶ ⊞1.4 Model sheet
      ├─ Screen Access revoked    → banner; action controls disabled, with reason
      └─ storage/decrypt failure  → ⊞9.2 blocking error, recovery paths only
+
+Before any of the above: **which profile?** The active profile is restored from
+the last session and its key unlocked by authentication. If it is locked by
+timeout or policy, the app opens at ⊞1.0 with the profile named and locked —
+never silently in the other profile. Landing a user in the wrong profile is the
+failure this design most needs to avoid.
 ```
 
 **Degraded is never a dead end.** Each degraded state names the capability that
@@ -147,9 +163,11 @@ supported mode, not a failure.
 ### 2.2 · FLOW A — First run
 
 ```
-0.1 Welcome ─▶ 0.2 Identity ─▶ 0.3 Brain ─▶ 0.4 Reach ─▶ 0.5 Voice ─▶ 1.2 Thread
-                  [Skip]         [Skip]      [Not now]     [Skip]
-                     └──────── every Skip advances; none returns to the start
+0.1 Welcome ─▶ 0.2 Identity ─▶ 0.3 Recovery ─▶ 0.4 Brain ─▶ 0.5 Reach ─▶ 0.6 Voice ─▶ 1.2
+                  [Skip]      NO SKIP        [Skip]      [Not now]     [Skip]
+                     └──── every Skip advances; none returns to the start. The
+                           recovery kit is the one step with no way past it:
+                           without it, losing every device loses everything.
 ```
 
 The governing rule: **onboarding never blocks the first message.** After step 1
@@ -264,6 +282,27 @@ Observe in sync status (5.4.1)
 Biometric-gated at the pairing step. A SAS mismatch is a hard stop with a
 warning state — never a soft retry, because SAS is the only interception
 defence in the protocol.
+
+### 2.8 · FLOW G — Profile switch
+
+```
+Drawer profile header ─▶ ⊞1.0 switcher
+        ▼
+Select the other profile
+        ▼
+⊞9.4 authenticate  ── fail ─▶ stay on current profile, reason shown
+        ▼ success
+TEAR DOWN the current profile
+  close database · destroy model KV cache and conversation context ·
+  clear ambient transcript · clear voiceprint embedding · clear clipboard staging
+        ▼
+Open target profile ─▶ 1.2 Thread, announced assertively
+```
+
+The teardown step is not housekeeping — it is the boundary. Anything carried
+across is a cross-profile leak, and the items listed are the ones that live in
+memory rather than in the database (`docs/TENANCY_DESIGN.md` §8). A switch that
+skips it looks correct and is not.
 
 ---
 
@@ -518,6 +557,11 @@ artefacts of an over-eager rename.
 One IA, three window-size classes, four bodies.
 
 ```
+Profile indicator placement, by class: compact puts it in the drawer header
+(one tap from the thread); medium and expanded keep it permanently visible at
+the top of the sidebar. It is never behind a menu — a user who cannot see which
+profile they are in cannot judge an approval.
+
 Compact  (<600 dp — phones)
   Overlay drawer · chat full-bleed · routes push full-screen · bottom composer
   Artifact → full-screen sheet, entered from a chip in the thread
@@ -610,11 +654,12 @@ use the type-to-confirm variant.
 
 ```
 0 ONBOARDING (first run only, linear)
-  0.1 Welcome · 0.2 Identity · 0.3 Brain · 0.4 Reach · 0.5 Voice
-  0.6 What it can do
+  0.1 Welcome · 0.2 Identity & profiles · 0.3 Recovery kit · 0.4 Brain
+  0.5 Reach · 0.6 Voice · 0.7 What it can do
 
 1 CHAT ─ the home
-  1.1 Conversation list          1.2 Thread ★
+  1.0 Profile switcher           1.1 Conversation list
+  1.2 Thread ★
   1.3 Artifact panel             1.4 Model sheet
   1.5 Attachment sheet           1.6 Conversation actions
   1.7 Image viewer               1.8 Document viewer
@@ -661,6 +706,8 @@ use the type-to-confirm variant.
                          5.6.2 Updates · 5.6.2.1 Update detail
                          5.6.3 Advanced (Dev) · 5.6.3.1 Feature flags
                          5.6.3.2 Dev console · 5.6.3.3 Diagnostics
+  5.7 Profiles           5.7.1 Profile detail · 5.7.2 Organization
+                         5.7.3 Recovery kit
 
 9 GLOBAL OVERLAYS (dismiss returns to the caller)
   9.1 Command palette · 9.2 Blocking error · 9.3 Confirm dialog
@@ -688,29 +735,69 @@ Back: none (first route).
 | Control | Destination |
 |---|---|
 | Continue | `→0.2` |
-| What Newax Aegis can do | `→0.6` |
+| What Newax Aegis can do | `→0.7` |
 | Privacy policy | `→5.1.4.1` |
 
 *A11y* — headline is `heading()`; focus enters on Continue.
 
-#### 0.2 Identity
+#### 0.2 Identity & profiles
 Back: `↩0.1`.
+
+Creates the Person identity (an Ed25519 keypair — not an account) and **both
+profiles together**. See `docs/TENANCY_DESIGN.md` §1.
 
 1. "What should I call you?"
 2. Name field (autofocus).
 3. Language row.
 4. Communication style chips — Formal / Casual / Balanced / Technical.
-5. **Continue** · 6. **Skip**.
+5. **Your two spaces** — an explainer card, not a choice: *Personal* and *Work*
+   are created together, keep separate encrypted storage, and never share data.
+   Work can later be linked to an organization; Personal never can.
+6. **Continue** · 7. **Skip** (skips the persona fields, not the profiles).
 
 | Control | Destination |
 |---|---|
-| Name field | `⚡ ProfileManager → EncryptedMemory` |
+| Name field | `⚡ PersonaSettings → EncryptedMemory` (Personal profile) |
 | Language row | `⊞ searchable language sheet` `⚡` |
 | Style chips | `⚡` |
-| Continue · Skip | `→0.3` |
+| "How are these kept separate?" | `→0.7` |
+| Continue · Skip | `⚡ create Person identity + Work and Personal profiles` `→0.3` |
 
-#### 0.3 Brain
-Back: `↩0.2`.
+*A11y* — the two-spaces card is a `heading()` plus body text, not an image.
+Profile creation announces completion politely; it is not silent.
+
+#### 0.3 Recovery kit
+Back: none — **this step cannot be skipped or reversed past.**
+
+There is no server and no account, so there is no password reset. If every
+enrolled device is lost, the profile keys are gone and the data is
+unrecoverable. This screen is the only thing standing between the user and that
+outcome, so it is the one place in onboarding with no Skip.
+
+1. "Save your recovery kit."
+2. Plain statement of consequence — *without this, losing every device means
+   losing everything. Newax Aegis cannot recover it for you.*
+3. The recovery code, in a copyable monospace block, grouped for transcription.
+4. **Copy** · **Save to file** · **Print**.
+5. **Confirmation challenge** — re-enter a randomly chosen group from the code.
+6. **Continue** (enabled only once the challenge passes).
+
+| Control | Destination |
+|---|---|
+| Copy | `⚡ clipboard` + announce "Copied" |
+| Save to file | `⇱ save picker` |
+| Print | `⇱ system print` |
+| Confirmation field | `⚡ verify` — wrong entry shows which group was asked for, and does not regenerate the code |
+| Continue | `→0.4` |
+| "Why can't you recover it for me?" | `⊞` expands inline — no route |
+
+*Empty/error* — if key generation fails the flow **stops here** rather than
+continuing into a state with unrecoverable profiles.
+*A11y* — the code is readable character-by-character by screen readers (spelled,
+not run together); the challenge field is labelled with which group is wanted.
+
+#### 0.4 Brain
+Back: `↩0.3`.
 
 1. "Give Newax Aegis a brain."
 2. What a model adds, and what basic mode still does without one.
@@ -721,19 +808,19 @@ Back: `↩0.2`.
 | Control | Destination |
 |---|---|
 | Import a model | `⇱ file picker` → `⚡ verify: format · size · magic header · SHA-256` |
-| ↳ verification passes | `→0.4` |
+| ↳ verification passes | `→0.5` |
 | ↳ verification fails | inline fail block naming the failed check |
 | Fail block: Retry | `⚡` |
 | Fail block: Choose another | `⇱ file picker` |
-| Fail block: Continue without | `→0.4` |
-| Continue without one | `⊞9.3` → `→0.4` |
+| Fail block: Continue without | `→0.5` |
+| Continue without one | `⊞9.3` → `→0.5` |
 
 *Empty* — no model present, which is a supported state, not an error.
 *Loading* — verification progress per check.
 *Error* — the specific check that failed, never a generic message.
 
-#### 0.4 Reach
-Back: `↩0.3`.
+#### 0.5 Reach
+Back: `↩0.4`.
 
 1. "Let me see and act on your screen."
 2. Plain-language capability explainer — what Screen Access enables, in terms
@@ -744,12 +831,12 @@ Back: `↩0.3`.
 
 | Control | Destination |
 |---|---|
-| Enable | `⇱ Accessibility settings` → returns → `⚡ re-read state` → `→0.5` |
-| Not now | `→0.5` |
-| "Why are these blocked?" | `→0.6` |
+| Enable | `⇱ Accessibility settings` → returns → `⚡ re-read state` → `→0.6` |
+| Not now | `→0.6` |
+| "Why are these blocked?" | `→0.7` |
 
-#### 0.5 Voice (optional)
-Back: `↩0.4`.
+#### 0.6 Voice (optional)
+Back: `↩0.5`.
 
 1. "Talk to it."
 2. Microphone row.
@@ -760,12 +847,12 @@ Back: `↩0.4`.
 | Control | Destination |
 |---|---|
 | Microphone | `⇱ mic permission` → `⚡ re-read` |
-| Wake word | `→5.1.3.2` (onboarding variant — returns to 0.5) |
-| Voice ID | `→5.1.3.3` (onboarding variant — returns to 0.5) |
+| Wake word | `→5.1.3.2` (onboarding variant — returns to 0.6) |
+| Voice ID | `→5.1.3.3` (onboarding variant — returns to 0.6) |
 | Done · Skip | `→1.2` |
 
-#### 0.6 What Newax Aegis can do
-Back: `↩` caller (0.1 or 0.4).
+#### 0.7 What Newax Aegis can do
+Back: `↩` caller (0.1 or 0.5).
 
 1. Capability groups — chat · screen actions · memory · plans · devices.
 2. An example phrase per group.
@@ -780,21 +867,55 @@ Back: `↩` caller (0.1 or 0.4).
 
 ### 6.3 · Section 1 — Chat
 
+#### 1.0 Profile switcher
+Overlay from the drawer header. Dismiss returns to the caller.
+
+The active profile determines which database, memory, policy, and model context
+are in use (`docs/TENANCY_DESIGN.md` §2). Acting in the wrong one is the primary
+usability failure of the whole design, which is why the switcher is one tap from
+the drawer header rather than buried in Settings — it is a context switch, not a
+setting.
+
+1. Current profile — name, colour, org badge if `LINKED`.
+2. The other profile — name, colour, lock state.
+3. **Manage profiles**.
+
+| Control | Destination |
+|---|---|
+| Other profile row | `⊞9.4` biometric → `⚡ switch` → `↩1.2` in the new profile |
+| Manage profiles | `→5.7` |
+| Close | `↩` caller |
+
+**Switching always re-authenticates.** There is no "recently used, skip auth"
+path — the key is user-auth-bound, so authentication is what makes the profile
+readable at all, not a UI courtesy.
+
+*Loading* — while the target profile's database opens.
+*Error* — authentication failed, or the profile is locked by policy: named
+reason, stay on the current profile.
+*A11y* — the switch is announced **assertively** with the new profile name. A
+silent context change is both an accessibility failure and a safety one: a user
+who does not know which profile they are in cannot judge an approval.
+
 #### 1.1 Conversation list
 Compact: drawer content plus a full route. Expanded: the permanent sidebar.
 Back: `↩1.2`.
 
-1. Brand header — "Newax Aegis".
-2. **New chat** (pencil-in-square icon).
-3. Search field.
-4. Pinned group.
-5. Today / Yesterday / dated groups of conversation rows — title, two-line
-   preview, relative timestamp.
-6. Section links — Memory · Tasks · Capabilities · Settings.
-7. Model status footer — dot + name.
+1. **Profile header — always visible**: active profile name, its colour, and an
+   org badge when `LINKED`. Tapping it opens the switcher.
+2. Brand header — "Newax Aegis".
+3. **New chat** (pencil-in-square icon).
+4. Search field.
+5. Pinned group.
+6. Today / Yesterday / dated groups of conversation rows — title, two-line
+   preview, relative timestamp. **Scoped to the active profile**; there is no
+   cross-profile view, by construction.
+7. Section links — Memory · Tasks · Capabilities · Settings.
+8. Model status footer — dot + name.
 
 | Control | Destination |
 |---|---|
+| Profile header | `⊞1.0` |
 | New chat | `⚡ create thread` `→1.2` |
 | Search field | `→1.11` |
 | Conversation row | `→1.2` (that thread) |
@@ -808,7 +929,9 @@ Back: `↩1.2`.
 *Empty* — "No conversations yet" + New chat.
 *Loading* — six skeleton rows.
 *Error* — history unreadable: named error + Retry `⚡` + `→5.5.1`.
-*A11y* — day groups are `heading()`; the selected row carries
+*A11y* — the profile name is part of the header's accessible name, so a screen
+reader announces the active profile on entering the drawer without extra
+navigation. Day groups are `heading()`; the selected row carries
 `stateDescription = "Selected"`.
 
 #### 1.2 Thread ★ — the main surface
@@ -1004,6 +1127,7 @@ delete, forget — never configuration.
 | **6 · System** | Permissions | "N of M granted" | `→5.6.1` |
 | | Updates | "N pending" | `→5.6.2` |
 | | Advanced (Dev) | collapsed by default | `→5.6.3` |
+| **7 · Profiles** | Profiles | "Personal · Work" + org name if linked | `→5.7` |
 
 **Sequence logic** — who this device is and how it listens (General), then the
 brain (Model & Intelligence), then the guardrails (Safety & Privacy), then how
@@ -1103,11 +1227,18 @@ Each row: display name, short device id, last-synced relative time, and a
 status dot with a text label — `In sync now` (success) / `Last synced 2 h ago`
 (neutral) / `Never synced` (error).
 
+**C · Profiles on each device** — a device holds only the profiles explicitly
+enrolled onto it (`docs/TENANCY_DESIGN.md` §3). Each paired row shows platform,
+**custody tier** (Hardware / Software), and which profiles are present.
+
 | Control | Destination |
 |---|---|
 | Device name | `⊞ edit sheet` `⚡` |
 | Copy device ID | `⚡` |
 | Paired device row | `→5.4.1.2` |
+| Profiles-on-device chip | `⊞` per-profile enrol/remove; removing destroys that profile's key **on that device only** |
+| Custody tier badge | `⊞` explains the tier and which profiles it is sufficient for |
+| Revoke device | `⊞9.3` + `⊞9.4` `⚡` — removes it from the roster and destroys its profile keys |
 | Forget device | `⊞9.3` `⚡` |
 | Pair a new device | `→5.1.2.1` |
 
@@ -1172,6 +1303,12 @@ expiry restarts with a fresh nonce.
 
 SAS is the only interception defence point. Nothing here ever auto-confirms.
 
+**Step 2b · Choose profiles** — after SAS confirmation and before keys move.
+A list of this person's profiles with checkboxes; nothing is preselected.
+Only the chosen profiles' root keys cross the channel. A profile whose minimum
+custody tier exceeds the new device's is shown **disabled with the reason**, not
+hidden — the user should learn why, not wonder.
+
 **Step 3 · Result**
 
 | Outcome | Contents | Controls |
@@ -1232,7 +1369,7 @@ here and does not control the session.
 10 s, so a screen reader is not flooded.
 
 ##### 5.1.3.2 Wake word
-Back: `↩5.1.3` — or `↩0.5` in the onboarding variant, which renders Continue
+Back: `↩5.1.3` — or `↩0.6` in the onboarding variant, which renders Continue
 instead of a back chevron. The single owner of always-on listening.
 
 1. **Master switch** — runs the Vosk wake-word foreground service. On: status
@@ -1263,7 +1400,7 @@ instead of a back chevron. The single owner of always-on listening.
 it works).
 
 ##### 5.1.3.3 Voice authentication
-Back: `↩5.1.3` — or `↩0.5` in the onboarding variant. Owns voice auth: your
+Back: `↩5.1.3` — or `↩0.6` in the onboarding variant. Owns voice auth: your
 voice confirms sensitive actions when device biometric is unavailable or fails.
 Grounded in `VoiceAuthenticator` — cosine similarity against a threshold,
 fail-secure.
@@ -1401,6 +1538,90 @@ The drawer sync badge is a read-only mirror of 5.4.1.
 The dev console remains reachable by shake gesture on Android; the gesture is a
 shortcut to 5.6.3.2, not a separate surface.
 
+#### 5.7 · Profiles
+
+Specified by `docs/TENANCY_DESIGN.md`. Every route here is **scoped to the
+active profile** except 5.7 itself, which lists both.
+
+##### 5.7 Profiles
+Back: `↩5`.
+
+1. **Personal** row — storage used, lock state, device count.
+2. **Work** row — the same, plus governance state: `Not linked` /
+   `Link pending` / the org name.
+3. **This device** — platform and custody tier (Hardware / Software), with a
+   plain explanation of what that means for the profiles held here.
+4. **Recovery kit** — last verified date.
+
+| Control | Destination |
+|---|---|
+| Personal row · Work row | `→5.7.1` (that profile) |
+| Custody tier "What does this mean?" | `⊞` expands inline |
+| Recovery kit | `→5.7.3` |
+
+*A11y* — governance state is text, never a badge colour alone (SC 1.4.1).
+
+##### 5.7.1 Profile detail
+Back: `↩5.7`.
+
+1. Name and colour.
+2. Auto-lock timeout.
+3. Minimum device custody tier — **read-only and shown as org-set** when the org
+   requires it (`docs/TENANCY_DESIGN.md` §6).
+4. Storage breakdown.
+5. Devices holding this profile → 5.1.2.
+6. **Organization** row — Work only; never rendered for Personal.
+7. Export · Wipe this profile.
+
+| Control | Destination |
+|---|---|
+| Name / colour / timeout | `⚡` |
+| Custody tier | `⚡`, or disabled with "Required by <org>" when governed |
+| Devices | `→5.1.2` |
+| Organization | `→5.7.2` |
+| Export | `⚡`+`⇱` per-profile encrypted backup |
+| Wipe this profile | `⊞9.3` **type-to-confirm** + `⊞9.4` → `⚡ destroy key` |
+
+Wipe is cryptographic erasure of one key, and the confirmation says so: it is
+immediate, complete, and cannot be undone with the recovery kit unless the
+profile was exported first.
+
+##### 5.7.2 Organization
+Back: `↩5.7.1`. **Work profile only.** Renders all four governance states.
+
+| State | Contents | Controls |
+|---|---|---|
+| `UNLINKED` | "Not linked to an organization." What linking would mean, in plain terms | **Link with a code** `⊞ input` → `⚡ verify signature` → `LINK_PENDING` |
+| `LINK_PENDING` | Org identity · **the full control surface it would take** (§4.2, itemised) · what unlinking would cost under its retire policy | **Approve** `⊞9.4` `⚡` → `LINKED` · **Decline** `⚡` (token discarded, logged) |
+| `LINKED` | Org identity · every applied restriction with **what changed and who applied it** · retire policy · audit-export obligations | **Leave organization** `⊞9.3` showing the retire cost → `⚡` |
+| `UNLINKING` | Progress, and whether export was taken | — |
+
+**Rules made visible here, not just enforced underneath:**
+- A bundle that would loosen any setting is **rejected**; the rejection appears
+  in this list with its reason. It is not silently dropped.
+- Approve is never the default focus, and `LINK_PENDING` never auto-approves on
+  timeout — it expires to `UNLINKED`.
+- The retire cost (`WIPE` / `RETAIN`, export permitted or not) is shown **before**
+  the user commits to leaving, never after.
+
+*A11y* — arrival at `LINK_PENDING` is an **assertive** live region: something is
+asking to take control of this profile, and it must not be missed.
+
+##### 5.7.3 Recovery kit
+Back: `↩5.7`.
+
+1. Status — generated date, last verified date.
+2. Plain statement of what is lost without it.
+3. **Verify** — re-enter a group to confirm the stored copy is still correct.
+4. **Regenerate** — invalidates the old kit.
+5. Org escrow status — Work only, and only when the org holds escrow.
+
+| Control | Destination |
+|---|---|
+| Verify | `⚡` + inline result |
+| Regenerate | `⊞9.3` + `⊞9.4` → `⚡` → shows the new code (same layout as 0.3) |
+| "Who else can recover this?" | `⊞` expands — org escrow covers **Work only**; nobody can recover Personal |
+
 ---
 
 ### 6.8 · Section 9 — Global overlays
@@ -1426,9 +1647,9 @@ from more than one place, and each shows a caller breadcrumb:
 
 1. **5.4.1 Sync → 5.1.2.1 Pair a device.** Pairing is owned by Devices; Sync
    links to it. Back returns to the caller.
-2. **0.5 Voice → 5.1.3.2 / 5.1.3.3.** The wake-word and voice-enrolment routes
+2. **0.6 Voice → 5.1.3.2 / 5.1.3.3.** The wake-word and voice-enrolment routes
    are reused inside onboarding. In that variant they render **Continue**
-   instead of a back chevron and return to 0.5.
+   instead of a back chevron and return to 0.6.
 
 ---
 
@@ -1570,6 +1791,15 @@ table. An unmarked control is a specification bug, not a design choice.
 
 Every route in §6.1 is reachable from 1.2 in ≤ 3 pushes, has at least one
 inbound edge, and declares a back target (overlays excepted). No orphans.
+Verified at 99 routes.
+
+### 11.2a · Profile scoping
+
+Every route that reads data declares which profile it reads from. A route able
+to show data from a profile other than the active one is a defect, not a
+feature — there is no cross-profile view anywhere in this tree, and adding one
+would defeat the isolation the design exists to provide
+(`docs/TENANCY_DESIGN.md` §2).
 
 ### 11.3 · R13 — no headless capability
 
