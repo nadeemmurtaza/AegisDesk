@@ -321,6 +321,10 @@ modes, hard deny, audit) · App permissions · Automation settings · Learning
 settings · Dev console (shake-to-open) · Crash reporter activity · model status
 badge (drawer).
 
+The target structure for these screens is `docs/UI_DESIGN.md` §6 (the route
+tree) — every screen listed above maps to a numbered route there, and §11.3
+carries the R13 current→new mapping for all four bodies.
+
 ## A18. Desktop apps
 
 - **Windows (`apps/desktop` + `platform-impl/windows`)**: Compose Desktop UI —
