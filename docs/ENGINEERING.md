@@ -145,16 +145,24 @@ when its gate passes — not when the code looks right.
 - **Blocks:** routes 1.1, 1.6, 1.11, 1.12 in `UI_DESIGN.md` §6.
 - **Gate:** migration test (the repo already has `MigrationTest` — extend it).
 
-### Slices T-1 … T-8 — Multi-tenancy ⬜
-- **Goal:** isolated workspaces per device (T1) and organization fleets (T2).
-- **Spec:** `docs/TENANCY_DESIGN.md` — full slice table in §8.
-- **Depends on:** Gate 0 and slice 6. Tenancy layered onto eight process-wide
+### Slices T-1 … T-12 — Tenancy, identity & multi-device ⬜
+- **Goal:** organizations and people; every person gets a Work and a Personal
+  profile; profiles follow the person across Android, iOS, Windows and macOS.
+- **Spec:** `docs/TENANCY_DESIGN.md` — full slice table in §11.
+- **Depends on:** Gate 0 and slice 6. Layering this onto eight process-wide
   singletons and a 1400-line Activity would have to be redone.
-- **Key decision:** isolation by **key**, not by `tenant_id` query filtering.
-  One missing `WHERE` clause is a silent cross-tenant leak; a missing key is
-  unreadable bytes.
-- **Not in scope:** hosted server tenancy (T3) — it would require adding the
-  `INTERNET` permission the product deliberately refuses. Costed in §2.
+- **Key decisions:**
+  - The isolation boundary is the **Profile**, not the tenant — one key and one
+    database each. Isolation by key, never by `tenant_id` filtering: a missing
+    `WHERE` is a silent leak, a missing key is unreadable bytes.
+  - Multi-device is **enrollment, not login** — `shared/sync` already has the
+    Ed25519 identity, QR+SAS pairing, and Noise handshake, so this is key
+    transfer over an authenticated channel, not new crypto and not a server.
+  - An organization governs Work profiles **tighten-only** and is
+    cryptographically unable to see Personal. That is the BYOD guarantee.
+- **Highest risk:** T-2, which migrates every existing user's data.
+- **Not in scope:** hosted server tenancy — it would mean adding the `INTERNET`
+  permission the product deliberately refuses. Costed in §7.
 
 ### Slice 9 — Streaming ⬜
 - **Goal:** wire `ModelProvider.stream()`. It exists and is never called;
