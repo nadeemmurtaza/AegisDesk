@@ -51,7 +51,7 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
-    <application android:name=".NewaxApplication" android:theme="@style/Theme.NewaxNewax" android:label="Newax Newax" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false">
+    <application android:name=".NewaxApplication" android:theme="@style/Theme.NewaxAegis" android:label="Newax Aegis" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false">
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <activity android:name=".MainActivity" android:exported="true">
@@ -64,7 +64,7 @@
         <activity
             android:name=".ui.devconsole.DevConsoleActivity"
             android:exported="false"
-            android:theme="@style/Theme.NewaxNewax"
+            android:theme="@style/Theme.NewaxAegis"
             android:label="Newax Dev Console" />
         <service
             android:name=".accessibility.NewaxAccessibilityService"

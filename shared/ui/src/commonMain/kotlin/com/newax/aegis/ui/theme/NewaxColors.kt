@@ -63,8 +63,22 @@ data class NewaxColors(
     val warningFill: Color,
     /** Failures, hard deny. */
     val error: Color,
+    /** Background of an error card. Pair with [error]. */
+    val errorFill: Color,
     /** Ready, online, in sync. */
     val success: Color,
+    /** Background of a success card. Pair with [success]. */
+    val successFill: Color,
+    /**
+     * Informational emphasis — neutral notices that are neither a warning nor a
+     * failure. The screens used a blue for this and it has no equivalent in the
+     * green/amber/red set, so it stays a distinct token rather than being
+     * collapsed into [accent] (which carries "verified/active", a different
+     * meaning).
+     */
+    val info: Color,
+    /** Background of an info card. Pair with [info]. */
+    val infoFill: Color,
     /**
      * Decorative dividers ONLY. Deliberately below 3:1 — WCAG 2.2 SC 1.4.11
      * exempts purely decorative separators. Anything a user must perceive to
@@ -93,10 +107,16 @@ val NewaxLightColors: NewaxColors = NewaxColors(
     warning = Color(0xFF8A5200),          //  5.96:1
     warningFill = Color(0xFFFEF3C7),      //  5.74:1 vs warning
     error = Color(0xFFB3261E),            //  6.09:1
+    errorFill = Color(0xFFFEE2E2),        //  5.35:1 vs error
     // Darkened from the #15803D in UI_DESIGN §4.1: that value measured 4.47:1
     // on surfaceMuted — passing on bg but failing on the recessed surface it is
     // routinely drawn on. This clears 5.11:1 there and 5.35:1 on bg.
     success = Color(0xFF14762F),          //  5.35:1
+    successFill = Color(0xFFDCFCE7),      //  5.22:1 vs success
+    // Not the #2563EB the screens used: that measures 4.49:1 on
+    // surfaceSelected, a hair under the floor. This clears 5.82:1 there.
+    info = Color(0xFF1D4ED8),             //  6.25:1
+    infoFill = Color(0xFFDBEAFE),         //  5.49:1 vs info
     border = Color(0xFFD8D8D3),           //  1.33:1 — decorative only
     borderStrong = Color(0xFF767671),     //  4.26:1
     isLight = true,
@@ -130,7 +150,11 @@ val NewaxDarkColors: NewaxColors = NewaxColors(
     warning = Color(0xFFF2B233),          //  9.55:1
     warningFill = Color(0xFF3A2A08),
     error = Color(0xFFFF8A80),            //  7.85:1
+    errorFill = Color(0xFF3A1412),        //  7.14:1 vs error
     success = Color(0xFF4ADE80),          // 10.29:1
+    successFill = Color(0xFF0C2A16),      //  8.87:1 vs success
+    info = Color(0xFF7AB7FF),             //  8.58:1
+    infoFill = Color(0xFF0E2440),         //  7.47:1 vs info
     border = Color(0xFF2E2E2E),           // decorative only
     // Not the light theme's #767671: that measured 2.97:1 on surfaceSelected,
     // just under the SC 1.4.11 floor. Worst case is now 3.61:1.

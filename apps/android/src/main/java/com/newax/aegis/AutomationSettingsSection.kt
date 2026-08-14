@@ -34,19 +34,20 @@ import androidx.fragment.app.FragmentActivity
 import com.newax.aegis.engine.AutomationSettings
 import com.newax.aegis.engine.AutomationToggle
 import com.newax.aegis.engine.TotpManager
+import com.newax.aegis.ui.theme.NewaxLightColors
 
-private val BG           = Color(0xFFF7F7F5)
-private val Surface      = Color(0xFFFFFFFF)
-private val SurfaceMuted = Color(0xFFF2F2EF)
-private val SurfaceStr   = Color(0xFFE7E7E2)
-private val Primary      = Color(0xFF1B1B1A)
-private val TextPri      = Color(0xFF1B1B1A)
-private val TextSec      = Color(0xFF686864)
-private val TextTer      = Color(0xFF8D8D87)
-private val Border       = Color(0xFFD8D8D3)
-private val Red          = Color(0xFFDC2626)
-private val Amber        = Color(0xFFD97706)
-private val Green        = Color(0xFF16A34A)
+private val BG           = NewaxLightColors.bg
+private val Surface      = NewaxLightColors.surface
+private val SurfaceMuted = NewaxLightColors.surfaceMuted
+private val SurfaceStr   = NewaxLightColors.surfaceStrong
+private val Primary      = NewaxLightColors.textPrimary
+private val TextPri      = NewaxLightColors.textPrimary
+private val TextSec      = NewaxLightColors.textSecondary
+private val TextTer      = NewaxLightColors.textTertiary
+private val Border       = NewaxLightColors.border
+private val Red          = NewaxLightColors.error
+private val Amber        = NewaxLightColors.warning
+private val Green        = NewaxLightColors.success
 
 // ── State holder for the settings biometric/TOTP flow ────────────────────────
 private enum class SettingsAuthState { IDLE, BIOMETRIC_PENDING, TOTP_PENDING, TOTP_SETUP }

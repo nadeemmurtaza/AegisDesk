@@ -81,6 +81,9 @@ base {
 
 dependencies {
     implementation(project(":shared:core"))
+    // Shared design tokens (docs/UI_DESIGN.md §4) — the one source of truth
+    // for colour, type, spacing, and shape across all four bodies.
+    implementation(project(":shared:ui"))
     implementation(project(":shared:model-api"))
     implementation(project(":shared:sync"))
     implementation(project(":platform-impl:android"))

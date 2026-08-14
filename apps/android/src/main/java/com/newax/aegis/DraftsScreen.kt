@@ -40,17 +40,18 @@ import com.newax.aegis.engine.learning.LearningDraft
 import com.newax.aegis.engine.learning.LearningWorker
 import com.newax.aegis.engine.learning.ScanProgress
 import kotlinx.coroutines.launch
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // ── Design tokens (matches MainActivity palette) ──────────────────────────────
-private val BG_D           = Color(0xFFF7F7F5)
-private val Surface_D      = Color(0xFFFFFFFF)
-private val SurfaceMuted_D = Color(0xFFF2F2EF)
-private val SurfaceStr_D   = Color(0xFFE7E7E2)
-private val Primary_D      = Color(0xFF1B1B1A)
-private val TextPri_D      = Color(0xFF1B1B1A)
-private val TextSec_D      = Color(0xFF686864)
-private val TextTer_D      = Color(0xFF8D8D87)
-private val Border_D       = Color(0xFFD8D8D3)
+private val BG_D           = NewaxLightColors.bg
+private val Surface_D      = NewaxLightColors.surface
+private val SurfaceMuted_D = NewaxLightColors.surfaceMuted
+private val SurfaceStr_D   = NewaxLightColors.surfaceStrong
+private val Primary_D      = NewaxLightColors.textPrimary
+private val TextPri_D      = NewaxLightColors.textPrimary
+private val TextSec_D      = NewaxLightColors.textSecondary
+private val TextTer_D      = NewaxLightColors.textTertiary
+private val Border_D       = NewaxLightColors.border
 
 private fun categoryColor(cat: String): Color = when (cat.lowercase()) {
     "personal"  -> Color(0xFF3B82F6)

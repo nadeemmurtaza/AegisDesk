@@ -34,23 +34,24 @@ import com.newax.aegis.db.entity.RiskLevel
 import com.newax.aegis.db.entity.StagingRecord
 import com.newax.aegis.db.entity.StagingStatus
 import kotlinx.coroutines.delay
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val U_Surface      = Color(0xFFFFFFFF)
-private val U_SurfaceMuted = Color(0xFFF2F2EF)
-private val U_Primary      = Color(0xFF1B1B1A)
-private val U_TextPri      = Color(0xFF1B1B1A)
-private val U_TextSec      = Color(0xFF686864)
-private val U_TextTer      = Color(0xFF8D8D87)
-private val U_Border       = Color(0xFFD8D8D3)
-private val U_Green        = Color(0xFF22C55E)
-private val U_GreenBg      = Color(0xFFDCFCE7)
-private val U_Red          = Color(0xFFDC2626)
-private val U_RedBg        = Color(0xFFFEE2E2)
-private val U_Amber        = Color(0xFFF59E0B)
-private val U_AmberBg      = Color(0xFFFEF3C7)
-private val U_Blue         = Color(0xFF3B82F6)
-private val U_BlueBg       = Color(0xFFDBEAFE)
+private val U_Surface      = NewaxLightColors.surface
+private val U_SurfaceMuted = NewaxLightColors.surfaceMuted
+private val U_Primary      = NewaxLightColors.textPrimary
+private val U_TextPri      = NewaxLightColors.textPrimary
+private val U_TextSec      = NewaxLightColors.textSecondary
+private val U_TextTer      = NewaxLightColors.textTertiary
+private val U_Border       = NewaxLightColors.border
+private val U_Green        = NewaxLightColors.success
+private val U_GreenBg      = NewaxLightColors.successFill
+private val U_Red          = NewaxLightColors.error
+private val U_RedBg        = NewaxLightColors.errorFill
+private val U_Amber        = NewaxLightColors.warning
+private val U_AmberBg      = NewaxLightColors.warningFill
+private val U_Blue         = NewaxLightColors.info
+private val U_BlueBg       = NewaxLightColors.infoFill
 
 private val RISK_ORDER = listOf(RiskLevel.CRITICAL, RiskLevel.HIGH, RiskLevel.MEDIUM, RiskLevel.LOW)
 

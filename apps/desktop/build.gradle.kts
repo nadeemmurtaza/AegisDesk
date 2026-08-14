@@ -27,6 +27,9 @@ dependencies {
     // (the GoalExecutor's Win32 launch context — Phase 5h) must declare core
     // explicitly — same as platform-impl:windows and platform-impl:android.
     implementation(project(":shared:core"))
+    // Shared design tokens (docs/UI_DESIGN.md §4) — the one source of truth
+    // for colour, type, spacing, and shape across all four bodies.
+    implementation(project(":shared:ui"))
 
     // The sync engine's JVM seam (mDNS proximity discovery, TCP transfer
     // channel, the encrypted Quick Share protocol — P2 desktop listener).

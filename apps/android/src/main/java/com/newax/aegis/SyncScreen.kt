@@ -56,17 +56,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.sync.PairedPeer
 import org.json.JSONObject
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val Surface = Color(0xFFFFFFFF)
-private val SurfaceMuted = Color(0xFFF2F2EF)
-private val Primary = Color(0xFF1B1B1A)
-private val TextPri = Color(0xFF1B1B1A)
-private val TextSec = Color(0xFF686864)
-private val TextTer = Color(0xFF8D8D87)
-private val Border = Color(0xFFD8D8D3)
-private val AccentGreen = Color(0xFF22C55E)
-private val AccentRed = Color(0xFFDC2626)
+private val Surface = NewaxLightColors.surface
+private val SurfaceMuted = NewaxLightColors.surfaceMuted
+private val Primary = NewaxLightColors.textPrimary
+private val TextPri = NewaxLightColors.textPrimary
+private val TextSec = NewaxLightColors.textSecondary
+private val TextTer = NewaxLightColors.textTertiary
+private val Border = NewaxLightColors.border
+private val AccentGreen = NewaxLightColors.success
+private val AccentRed = NewaxLightColors.error
 
 /**
  * The sync control surface (docs/SYNC_DESIGN.md §3, §9 — the wiring slice's

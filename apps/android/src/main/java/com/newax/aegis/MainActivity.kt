@@ -73,19 +73,28 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
+import com.newax.aegis.ui.a11y.describedAs
+import com.newax.aegis.ui.a11y.liveRegionPolite
+import com.newax.aegis.ui.a11y.reducedMotionEnabled
+import com.newax.aegis.ui.a11y.statusSemantics
 
-// ── Design Tokens (REFINED_THEME.md) ────────────────────────────────────────
-private val BG           = Color(0xFFF7F7F5)
-private val Surface      = Color(0xFFFFFFFF)
-private val SurfaceMuted = Color(0xFFF2F2EF)
-private val SurfaceSel   = Color(0xFFEFEFEC)
-private val SurfaceStr   = Color(0xFFE7E7E2)
-private val Primary      = Color(0xFF1B1B1A)
-private val PrimaryPr    = Color(0xFF30302E)
-private val TextPri      = Color(0xFF1B1B1A)
-private val TextSec      = Color(0xFF686864)
-private val TextTer      = Color(0xFF8D8D87)
-private val Border       = Color(0xFFD8D8D3)
+// ── Design tokens — aliases onto shared:ui NewaxLightColors (docs/UI_DESIGN.md §4).
+// Light-theme only for now; per-screen migration to NewaxTheme.colors (which
+// carries dark mode) is a later slice. Values live in ONE place: NewaxColors.kt.
+
+private val BG           = NewaxLightColors.bg
+private val Surface      = NewaxLightColors.surface
+private val SurfaceMuted = NewaxLightColors.surfaceMuted
+private val SurfaceSel   = NewaxLightColors.surfaceSelected
+private val SurfaceStr   = NewaxLightColors.surfaceStrong
+private val Primary      = NewaxLightColors.textPrimary
+private val PrimaryPr    = NewaxLightColors.textPrimary
+private val TextPri      = NewaxLightColors.textPrimary
+private val TextSec      = NewaxLightColors.textSecondary
+private val TextTer      = NewaxLightColors.textTertiary
+private val Border       = NewaxLightColors.border
 
 private data class NavEntry(
     val screen: Screen,
@@ -181,18 +190,13 @@ fun NewaxApp(
         uri?.let(vm::importModel)
     }
 
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary         = Primary,
-            background      = BG,
-            surface         = Surface,
-            onPrimary       = Color.White,
-            onBackground    = TextPri,
-            onSurface       = TextPri,
-            surfaceVariant  = SurfaceMuted,
-            outline         = Border
-        )
-    ) {
+    // The shared theme (shared:ui) installs the Material 3 colour scheme from
+    // the same tokens the aliases above read, and provides NewaxTheme.colors /
+    // .typography / .spacing / .shapes to everything below. darkTheme is pinned
+    // to light for now: the screens still read the top-level light aliases, so
+    // flipping this would produce a half-dark UI. Unpinning it is the last step
+    // of the per-screen migration to NewaxTheme.colors.
+    NewaxTheme(darkTheme = false) {
         ModalNavigationDrawer(
             drawerState   = drawerState,
             drawerContent = {
@@ -406,6 +410,9 @@ fun ChatScreen(
 ) {
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    // Read once for the whole chat surface; both the bubble entrance and the
+    // typing indicator honour it (docs/UI_DESIGN.md §3.2, WCAG SC 2.3.3).
+    val reduceMotion = reducedMotionEnabled()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(vm.messages.size) {
@@ -437,9 +444,12 @@ fun ChatScreen(
                 contentPadding      = PaddingValues(top = 12.dp, bottom = 4.dp)
             ) {
                 items(vm.messages, key = { it.id }) { msg ->
+                    // SC 2.3.3: the slide-in is decorative. Under reduced motion
+                    // the bubble appears immediately — same end state, no travel.
                     AnimatedVisibility(
                         visible = true,
-                        enter   = slideInVertically(initialOffsetY = { it / 3 }) + fadeIn(tween(200))
+                        enter   = if (reduceMotion) EnterTransition.None
+                                  else slideInVertically(initialOffsetY = { it / 3 }) + fadeIn(tween(200))
                     ) {
                         ChatBubble(msg)
                     }
@@ -517,7 +527,12 @@ private fun ChatBubble(msg: ChatMessage) {
         Column(horizontalAlignment = if (msg.fromUser) Alignment.End else Alignment.Start) {
             Box(
                 Modifier
-                    .widthIn(max = 300.dp)
+                    // Was widthIn(max = 300.dp). A fixed dp cap does not grow
+                    // with the font scale, so at the 200% required by WCAG 2.2
+                    // SC 1.4.4 the text clipped. A fraction of the available
+                    // width scales with the container instead (§3.1).
+                    .fillMaxWidth(0.86f)
+                    .wrapContentWidth(if (msg.fromUser) Alignment.End else Alignment.Start)
                     .clip(
                         RoundedCornerShape(
                             topStart    = 18.dp,
@@ -550,17 +565,35 @@ private fun ChatBubble(msg: ChatMessage) {
 }
 
 // ── Typing Indicator ──────────────────────────────────────────────────────────
+/**
+ * "The assistant is working" — announced, and motion-optional.
+ *
+ * Two accessibility obligations are met here (docs/UI_DESIGN.md §3):
+ *  - SC 2.3.3: the pulsing dots are an unbounded `infiniteRepeatable`. Under
+ *    reduced motion they are replaced by a static label rather than simply
+ *    removed, so the state stays visible.
+ *  - SC 1.4.1 / 4.1.3: three animating dots convey nothing to a screen reader.
+ *    The row carries a description and is a polite live region, so the state is
+ *    announced without interrupting whatever is being read.
+ */
 @Composable
 private fun TypingIndicator() {
-    val infiniteTransition = rememberInfiniteTransition(label = "typing")
+    val reduceMotion = reducedMotionEnabled()
     Row(
         Modifier
             .clip(RoundedCornerShape(18.dp))
             .background(SurfaceMuted)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .describedAs("Newax Aegis is thinking")
+            .liveRegionPolite(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
+        if (reduceMotion) {
+            Text("Thinking…", fontSize = 13.sp, color = TextSec)
+            return@Row
+        }
+        val infiniteTransition = rememberInfiniteTransition(label = "typing")
         repeat(3) { i ->
             val alpha by infiniteTransition.animateFloat(
                 initialValue = 0.3f,
@@ -912,6 +945,12 @@ private fun MemoryCategoryCard(
                 Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onToggle)
+                    // The chevron below is the only expanded/collapsed cue, and
+                    // an icon swap conveys nothing to a screen reader. State
+                    // belongs on the control, not the glyph (SC 4.1.2) — the
+                    // icon stays contentDescription = null because the row's
+                    // text already names it.
+                    .statusSemantics(if (expanded) "Expanded" else "Collapsed")
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

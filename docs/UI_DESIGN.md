@@ -378,7 +378,11 @@ against that background unless stated otherwise.
 | `warning` | `#8A5200` | 6.0:1 | blocked text, icon, border |
 | `warningFill` | `#FEF3C7` | 5.7:1 vs `warning` | blocked-card background |
 | `error` | `#B3261E` | 6.1:1 | failures, hard deny |
+| `errorFill` | `#FEE2E2` | 5.4:1 vs `error` | error-card background |
 | `success` | `#14762F` | 5.4:1 | ready, online, in sync |
+| `successFill` | `#DCFCE7` | 5.2:1 vs `success` | success-card background |
+| `info` | `#1D4ED8` | 6.3:1 | informational notices |
+| `infoFill` | `#DBEAFE` | 5.5:1 vs `info` | info-card background |
 | `border` | `#D8D8D3` | 1.3:1 | **decorative dividers only** |
 | `borderStrong` | `#767671` | 4.3:1 | composer, inputs, unselected controls |
 
@@ -395,6 +399,14 @@ was dropped — it had exactly one reference, its own declaration.
 `bg` but only **4.47:1** on `surfaceMuted` — passing on the page and failing on
 the recessed surface it is routinely drawn on. Testing every token against
 every text-bearing surface, rather than against `bg` alone, is what caught it.
+
+**Three paired fills and an `info` colour** complete the set. The screens used
+pale card backgrounds (`#DCFCE7`, `#FEE2E2`, `#DBEAFE`) with a matching darker
+foreground, and a blue for informational notices that has no equivalent in the
+green/amber/red trio. `info` stays distinct from `accent`: accent means
+"verified / active", info means "here is something neutral to know". `info` is
+`#1D4ED8`, not the `#2563EB` the screens used — that measured **4.49:1** on
+`surfaceSelected`, a hair under the floor.
 
 **Why these values changed.** The previous palette shipped four measurable
 failures, and one of them was a safety signal:
@@ -434,7 +446,11 @@ semantics. An earlier draft inverted this.
 | `warning` | `#F2B233` | 9.6:1 | blocked |
 | `warningFill` | `#3A2A08` | 7.4:1 vs `warning` | blocked-card background |
 | `error` | `#FF8A80` | 7.9:1 | failures |
+| `errorFill` | `#3A1412` | 7.1:1 vs `error` | error-card background |
 | `success` | `#4ADE80` | 10.3:1 | ready, online |
+| `successFill` | `#0C2A16` | 8.9:1 vs `success` | success-card background |
+| `info` | `#7AB7FF` | 8.6:1 | informational notices |
+| `infoFill` | `#0E2440` | 7.5:1 vs `info` | info-card background |
 | `border` | `#2E2E2E` | — | decorative dividers |
 | `borderStrong` | `#84847F` | 4.8:1 | inputs, unselected controls |
 

@@ -37,19 +37,20 @@ import com.newax.aegis.authority.PolicyAuditRecord
 import com.newax.aegis.authority.PolicyDecision
 import com.newax.aegis.authority.PolicyEngine
 import com.newax.aegis.authority.PolicyMode
+import com.newax.aegis.ui.theme.NewaxLightColors
 
-// ── Design tokens (match CapabilitiesScreen / REFINED_THEME.md) ─────────────
-private val Surface      = Color(0xFFFFFFFF)
-private val SurfaceMuted = Color(0xFFF2F2EF)
-private val TextPri      = Color(0xFF1B1B1A)
-private val TextSec      = Color(0xFF686864)
-private val TextTer      = Color(0xFF8D8D87)
-private val Border       = Color(0xFFD8D8D3)
-private val WarnCol      = Color(0xFFF59E0B)
-private val AutoCol      = Color(0xFF22C55E)
-private val ApprovalCol  = Color(0xFFF59E0B)
-private val StrongCol    = Color(0xFFEF4444)
-private val DenyCol      = Color(0xFF64748B)
+// ── Design tokens — aliases onto shared:ui NewaxLightColors (docs/UI_DESIGN.md §4).────────────
+private val Surface      = NewaxLightColors.surface
+private val SurfaceMuted = NewaxLightColors.surfaceMuted
+private val TextPri      = NewaxLightColors.textPrimary
+private val TextSec      = NewaxLightColors.textSecondary
+private val TextTer      = NewaxLightColors.textTertiary
+private val Border       = NewaxLightColors.border
+private val WarnCol      = NewaxLightColors.warning
+private val AutoCol      = NewaxLightColors.success
+private val ApprovalCol  = NewaxLightColors.warning
+private val StrongCol    = NewaxLightColors.error
+private val DenyCol      = NewaxLightColors.textTertiary
 
 private data class PolicyRow(
     val actionClass: String,

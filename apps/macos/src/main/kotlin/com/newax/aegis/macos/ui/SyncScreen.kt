@@ -50,19 +50,20 @@ import com.newax.aegis.desktopsync.DesktopSync
 import com.newax.aegis.sync.PairedPeer
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // ── Design tokens — same palette as the rest of the Newax apps ──────────────
-private val Background = Color(0xFFF7F7F5)
-private val Surface = Color(0xFFFFFFFF)
-private val SurfaceMuted = Color(0xFFF2F2EF)
-private val Primary = Color(0xFF1B1B1A)
-private val TextPrimary = Color(0xFF1B1B1A)
-private val TextSecondary = Color(0xFF686864)
-private val TextTertiary = Color(0xFF8D8D87)
-private val Border = Color(0xFFD8D8D3)
-private val Green = Color(0xFF22C55E)
-private val Red = Color(0xFFDC2626)
-private val Amber = Color(0xFF92400E)
+private val Background = NewaxLightColors.bg
+private val Surface = NewaxLightColors.surface
+private val SurfaceMuted = NewaxLightColors.surfaceMuted
+private val Primary = NewaxLightColors.textPrimary
+private val TextPrimary = NewaxLightColors.textPrimary
+private val TextSecondary = NewaxLightColors.textSecondary
+private val TextTertiary = NewaxLightColors.textTertiary
+private val Border = NewaxLightColors.border
+private val Green = NewaxLightColors.success
+private val Red = NewaxLightColors.error
+private val Amber = NewaxLightColors.warning
 
 /**
  * The macOS body's sync surface (docs/SYNC_DESIGN.md §2, Track M) — the same

@@ -79,12 +79,16 @@ class ContrastTest {
             assertContrast("$label warning on $surfaceName", c.warning, background, TEXT_FLOOR)
             assertContrast("$label error on $surfaceName", c.error, background, TEXT_FLOOR)
             assertContrast("$label success on $surfaceName", c.success, background, TEXT_FLOOR)
+            assertContrast("$label info on $surfaceName", c.info, background, TEXT_FLOOR)
             // Meaningful boundaries — input edges, unselected controls (SC 1.4.11).
             assertContrast("$label borderStrong on $surfaceName", c.borderStrong, background, UI_FLOOR)
         }
         // Paired fills: each carries its own designated foreground.
         assertContrast("$label onAccentFill on accentFill", c.onAccentFill, c.accentFill, TEXT_FLOOR)
         assertContrast("$label warning on warningFill", c.warning, c.warningFill, TEXT_FLOOR)
+        assertContrast("$label error on errorFill", c.error, c.errorFill, TEXT_FLOOR)
+        assertContrast("$label success on successFill", c.success, c.successFill, TEXT_FLOOR)
+        assertContrast("$label info on infoFill", c.info, c.infoFill, TEXT_FLOOR)
 
         // surfaceStrong is the strongest neutral fill — progress/switch tracks
         // and unselected chips. It is documented as NOT text-bearing, with one

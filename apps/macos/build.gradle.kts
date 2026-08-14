@@ -21,6 +21,9 @@ dependencies {
     // journal at ~/.aegis/sync.db, memory materialization, text-code pairing)
     // — one implementation for both the Windows and macOS desktop bodies.
     implementation(project(":shared:desktop-sync"))
+    // Shared design tokens (docs/UI_DESIGN.md §4) — the one source of truth
+    // for colour, type, spacing, and shape across all four bodies.
+    implementation(project(":shared:ui"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 

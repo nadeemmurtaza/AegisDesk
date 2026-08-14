@@ -36,16 +36,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // Design tokens — mirrored from MainActivity (private to that file)
-private val PsBg           = Color(0xFFF7F7F5)
-private val PsSurface      = Color(0xFFFFFFFF)
-private val PsSurfaceMuted = Color(0xFFF2F2EF)
-private val PsTextPri      = Color(0xFF1B1B1A)
-private val PsTextSec      = Color(0xFF686864)
-private val PsTextTer      = Color(0xFF8D8D87)
-private val PsBorder       = Color(0xFFD8D8D3)
-private val PsPrimary      = Color(0xFF1B1B1A)
+private val PsBg           = NewaxLightColors.bg
+private val PsSurface      = NewaxLightColors.surface
+private val PsSurfaceMuted = NewaxLightColors.surfaceMuted
+private val PsTextPri      = NewaxLightColors.textPrimary
+private val PsTextSec      = NewaxLightColors.textSecondary
+private val PsTextTer      = NewaxLightColors.textTertiary
+private val PsBorder       = NewaxLightColors.border
+private val PsPrimary      = NewaxLightColors.textPrimary
 
 @Composable
 fun PeopleScreen(vm: MainViewModel, padding: PaddingValues) {

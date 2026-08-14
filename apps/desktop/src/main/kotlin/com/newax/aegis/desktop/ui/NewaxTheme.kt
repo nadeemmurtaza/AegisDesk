@@ -5,7 +5,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// ── Design tokens (REFINED_THEME.md) — mirrors Android's CapabilitiesScreen /
+// ── Design tokens — aliases onto shared:ui NewaxLightColors (docs/UI_DESIGN.md §4).
+// Light-theme only for now; per-screen migration to NewaxTheme.colors (which
+// carries dark mode) is a later slice. Values live in ONE place: NewaxColors.kt.
+
 // GoalsScreen palette so both bodies share the same visual language.
 val SurfaceColor = Color(0xFFFFFFFF)
 val SurfaceMutedColor = Color(0xFFF2F2EF)
@@ -34,7 +37,7 @@ private val AppColorScheme = lightColorScheme(
     outline = BorderColor,
 )
 
-/** The desktop app theme — REFINED_THEME.md tokens wired into Material 3. */
+/** The desktop app theme — shared:ui tokens (docs/UI_DESIGN.md §4) wired into Material 3. */
 @Composable
 fun NewaxTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = AppColorScheme, content = content)
