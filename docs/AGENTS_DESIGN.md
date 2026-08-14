@@ -36,6 +36,38 @@ connectors (the chat's existing convention) and **each step routes
 independently**: step 1 "plan…" → Planning Agent, step 2 "write the code…" →
 Coding Agent.
 
+### Profile-aware routing
+
+Routing resolves the **active profile before it scores anything**
+(`docs/TENANCY_DESIGN.md`). The profile decides which agents exist, which
+credentials and connectors they may reach, and which persona they speak in — a
+Work request never reaches a Personal agent, because the Personal registry is in
+a database the Work profile cannot read.
+
+```
+User request ─▶ Router ─▶ resolve ACTIVE PROFILE ─▶ score that profile's
+                            agents only ─▶ dominant + supporters (as above)
+```
+
+Two invariants that multi-agent routing must not break:
+
+- **The router routes; it never decides permission.** If choosing an agent could
+  change what is permitted, then influencing the routing — which the
+  untrusted-content flag above already tells us an attacker may be able to do —
+  becomes a privilege escalation. Policy is resolved from the typed action and
+  the active profile, never from which agent proposed it.
+- **No agent holds execution authority.** Every agent is a planner emitting
+  typed `ProposedAction`s into the one spine. Otherwise A, denied X, asks B to
+  do X for it. `SkillGuard` PBAC is therefore enforced **at the spine**, not
+  per-agent.
+
+Agents with the same role in both profiles (a finance agent in each) are two
+independent registrations sharing no state, credentials, or learned procedures —
+and should not share a display name, or users will conflate them at the moment
+precision matters.
+
+Computer-use routing carries extra obligations: see `docs/COMPUTER_USE.md`.
+
 ## Orchestration (agents work together)
 
 `AgentOrchestrator`:

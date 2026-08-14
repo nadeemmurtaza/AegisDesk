@@ -169,6 +169,22 @@ when its gate passes — not when the code looks right.
 - **Not in scope:** hosted server tenancy — it would mean adding the `INTERNET`
   permission the product deliberately refuses. Costed in §7.
 
+### Slices C-1 … C-9 — Computer use & GUI automation ⬜
+- **Goal:** drive real UIs on the user's behalf — spreadsheets, CRM, expense
+  reports, checkout flows — safely.
+- **Spec:** `docs/COMPUTER_USE.md`.
+- **Depends on:** Gate 0, slice 6, and tenancy T-1…T-5.
+- **Why it gets its own document:** the mechanics largely exist already
+  (`ExecutionRouter`, `ExecutionGuard`, Windows `SendInput`, accessibility
+  automation). What is missing is consequence modelling, pre-flight
+  verification, and screen-content trust.
+- **The defining risk:** a computer-use agent reads the screen to decide what to
+  do, so every pixel of it is adversary-controlled input. Screen content is
+  **data, never instruction** — it may fill a parameter, never select an action
+  or retarget one.
+- **Highest-value slice:** C-2, the untrusted-screen boundary, with an injection
+  corpus built alongside the capability rather than after it.
+
 ### Slice 9 — Streaming ⬜
 - **Goal:** wire `ModelProvider.stream()`. It exists and is never called;
   `MainViewModel` uses `complete()`, so replies arrive whole with no stop button.
