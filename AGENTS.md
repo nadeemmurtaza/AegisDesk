@@ -42,7 +42,7 @@ If any is unknown: **ask, or state the assumption in one line and take the conse
 | Kotlin | **2.4.10** | root `build.gradle.kts`; KSP 2.3.11 is standalone (no longer `<kotlin>-<ksp>` coupled) |
 | KSP | **2.3.11** | standalone versioning since Kotlin 2.x; no lockstep format anymore |
 | AGP | **9.3.1** | couples to Gradle 9.7.0 + JDK 17; AGP 9 has built-in Kotlin (`kotlin { compilerOptions { jvmTarget } }`, not `kotlinOptions`) |
-| compileSdk / targetSdk / minSdk | **36 / 36 / 26** | Android app; every API used must exist at 26 or be guarded |
+| compileSdk / targetSdk / minSdk | **37 / 37 / 26** | Android app + every module with an `android {}` block (7 total — keep them identical); every API used must exist at 26 or be guarded. 37 is the floor required by androidx `core[-ktx]:1.19.0` and `lifecycle-*-compose:2.11.0` — below it AGP's AAR-metadata check fails the build |
 | Compose | **BOM 2026.06.01** (Android); windows/macos apps: **Compose Multiplatform 1.11.1** | Compose compiler comes from the Kotlin plugin (Kotlin 2.0+); CMP 1.11.1 is the lockstep pairing for Kotlin 2.4.10 — keep them coupled |
 | Room | **2.8.4 (stable KMP)** | `shared:database`; stable since 2.8.x — the 2.7.0-alpha13 pre-release line is gone |
 | sqlite driver | **androidx.sqlite:sqlite-bundled 2.7.0** (desktop); **sqlite-framework 2.7.0 / NativeSQLiteDriver** (appleMain, Track M2); SQLCipher 4.17.0 (androidMain) | stable line; per-target KSP configs (`kspAndroid`, `kspDesktop`, `kspIosNative`, …) — the `ksp()` KMP shorthand is deprecated |
