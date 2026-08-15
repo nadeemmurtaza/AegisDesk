@@ -7,7 +7,6 @@ import com.newax.aegis.model.ModelDescriptor
 import com.newax.aegis.model.ModelFormat
 import com.newax.aegis.model.ModelProvider
 import com.newax.aegis.model.ModelRequest
-import com.newax.aegis.model.ModelResponse
 import com.newax.aegis.model.ModelState
 import java.io.File
 import kotlinx.coroutines.flow.Flow
@@ -65,11 +64,12 @@ class LiteRtModelProvider internal constructor(
         }
     }
 
-    override suspend fun complete(request: ModelRequest): ModelResponse {
-        require(request.text.isNotBlank()) { "ModelRequest.text must not be blank" }
-        val reply = engine.complete(request.text, request.imageBytes?.let(decodeImage))
-        return ModelResponse(reply)
-    }
+    // No `complete` override (T2.5). The interface default collects [stream], and
+    // this provider's stream is a single emission of exactly what `complete` used
+    // to return — so routing both through one path is byte-identical here and
+    // makes the contract's claim ("completion IS the stream collected") true on
+    // Android rather than only on the fallback. An override that duplicated the
+    // engine call would be a second source of truth for the same answer.
 
     override fun stream(request: ModelRequest): Flow<String> {
         require(request.text.isNotBlank()) { "ModelRequest.text must not be blank" }

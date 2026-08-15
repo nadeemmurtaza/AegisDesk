@@ -46,8 +46,15 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Compile shared:core for every target (expect/actual gate)
-        run: ./gradlew :shared:core:compileKotlinJvm :shared:core:assemble --stacktrace
+      # jvmTest is not optional here. shared:core holds the authority spine —
+      # PolicyEngine, AuthorityManager, the auth ladder — and ENGINEERING.md §B7
+      # calls its property tests "the highest-value test in this project". Until
+      # this line existed the module was compile-checked only, so 60 tests
+      # (PolicyEnginePropertyTest, AuthoritySpinePropertyTest, ActionGateTest,
+      # AuthenticationTest, StartupReportTest, ModelsRiskTest) compiled on every
+      # PR and ran on none of them. A test that never executes is documentation.
+      - name: Compile shared:core per target + run the authority-spine tests
+        run: ./gradlew :shared:core:compileKotlinJvm :shared:core:assemble :shared:core:jvmTest --stacktrace
 
       # platform-api is the capability contract (platform-free commonMain). jvmTest runs
       # the commonTest contract tests on the JVM target; assemble compiles the
@@ -67,6 +74,13 @@ jobs:
       # arithmetic here, not by review. assemble compiles the androidTarget.
       - name: Compile shared:ui per target + run token contrast tests
         run: ./gradlew :shared:ui:compileKotlinJvm :shared:ui:assemble :shared:ui:jvmTest --stacktrace
+
+      # The ModelProvider contract (complete() is the collected stream(), T2.5)
+      # and the sync engine's crypto, codecs and CRDT merge. 125 tests that were
+      # likewise compiled but never run — including SyncAvailabilityTest, which
+      # pins the degradation path whose absence shipped a crash on launch.
+      - name: Compile shared:model-api + shared:sync per target and run their tests
+        run: ./gradlew :shared:model-api:assemble :shared:model-api:jvmTest :shared:sync:assemble :shared:sync:jvmTest --stacktrace
 
       - name: "Build Android app — invariant: Android stays green"
         run: ./gradlew :apps:android:assembleDebug :apps:android:testDebugUnitTest --stacktrace

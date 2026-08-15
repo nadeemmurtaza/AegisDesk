@@ -63,7 +63,8 @@ import kotlin.concurrent.Volatile
         StagingRecord::class,
         LearningSignal::class,
         ConversationEntity::class,
-        MessageEntity::class
+        MessageEntity::class,
+        MessageBlockEntity::class
     ],
     version = 20,
     exportSchema = true
@@ -634,6 +635,22 @@ abstract class NewaxDatabase : RoomDatabase() {
                     )
                 """)
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_messages_conversationId_timestampMs ON messages(conversationId, timestampMs)")
+
+                // Stacked content blocks (docs/UI_DESIGN.md §7). A plain-text
+                // message stores no rows here — messages.text is the whole
+                // message and "no blocks" reads as one implicit text block.
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS message_blocks (
+                        id TEXT NOT NULL,
+                        messageId TEXT NOT NULL,
+                        position INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        content TEXT NOT NULL DEFAULT '',
+                        metadata TEXT NOT NULL DEFAULT '',
+                        PRIMARY KEY (id)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_message_blocks_messageId_position ON message_blocks(messageId, position)")
             }
         }
 

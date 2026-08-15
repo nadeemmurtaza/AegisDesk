@@ -18,7 +18,8 @@ import kotlinx.coroutines.withContext
  * 1. Create: `KherudGgufEngine(file)` — no native resources allocated.
  * 2. Load: calls `LlamaModel(ModelParameters)` — JNI native library loads and
  *    the model file is mapped into memory. Heavy (RAM + time).
- * 3. Infer: `complete()` / `stream()` — synchronous JNI calls into llama.cpp.
+ * 3. Infer: `stream()` — a synchronous JNI call into llama.cpp, driven as a Flow.
+ *    It is the only inference entry point; `ModelProvider.complete` collects it.
  * 4. Close: `LlamaModel.close()` — releases native memory and unloads the library.
  *
  * ## Platform support
@@ -27,10 +28,9 @@ import kotlinx.coroutines.withContext
  * all three desktop OSes.
  *
  * ## Thread safety
- * LlamaModel is NOT thread-safe for concurrent inference. [complete] is
- * suspend-dispatched to [Dispatchers.IO] and the generationMutex (implicit — the
- * provider-level caller serialises via the state machine) ensures single access.
- * [stream] emits on the collector's context via [Dispatchers.IO].
+ * LlamaModel is NOT thread-safe for concurrent inference. [stream] runs its
+ * generation loop on [Dispatchers.IO] via `flowOn`, and single access is ensured
+ * by the provider-level caller serialising through the state machine.
  */
 class KherudGgufEngine(
     private val modelFile: File,
@@ -45,20 +45,6 @@ class KherudGgufEngine(
                 .setModel(modelFile.absolutePath)
                 .setGpuLayers(0) // CPU-only by default; override via setGpuLayers(n)
             model = LlamaModel(params)
-        }
-    }
-
-    override suspend fun complete(prompt: String): String {
-        val m = requireModel()
-        return withContext(Dispatchers.IO) {
-            val params = InferenceParameters(prompt)
-                .setNPredict(512)
-                .setTemperature(0.7f)
-            val sb = StringBuilder()
-            for (output: LlamaOutput in m.generate(params)) {
-                sb.append(output.toString())
-            }
-            sb.toString().trim()
         }
     }
 

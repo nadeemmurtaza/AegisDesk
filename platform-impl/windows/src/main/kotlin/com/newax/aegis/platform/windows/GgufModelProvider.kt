@@ -4,7 +4,6 @@ import com.newax.aegis.model.ModelDescriptor
 import com.newax.aegis.model.ModelFormat
 import com.newax.aegis.model.ModelProvider
 import com.newax.aegis.model.ModelRequest
-import com.newax.aegis.model.ModelResponse
 import com.newax.aegis.model.ModelState
 import java.io.File
 import kotlinx.coroutines.flow.Flow
@@ -56,11 +55,20 @@ class GgufModelProvider internal constructor(
         }
     }
 
-    override suspend fun complete(request: ModelRequest): ModelResponse {
-        require(request.text.isNotBlank()) { "ModelRequest.text must not be blank" }
-        val reply = engine.complete(request.text)
-        return ModelResponse(reply)
-    }
+    // No `complete` override (T2.5). The interface default collects [stream], so
+    // completion and streaming are one path here and cannot answer differently.
+    //
+    // This also fixes a real defect the override carried: `GgufEngine.complete`
+    // hardcodes 512 tokens and temperature 0.7, so every caller's
+    // [ModelRequest.maxTokens] and [ModelRequest.temperature] were silently
+    // discarded on the completion path while [stream] honoured them. Routing
+    // through the stream means the request's sampler settings are now applied.
+    //
+    // One deliberate behaviour change: the old override trimmed the reply. The
+    // collected stream does not, and must not — a streaming UI renders chunks as
+    // they arrive and cannot retroactively trim what it already drew, so a
+    // trimming `complete()` would disagree with the text the user watched being
+    // typed. Trim at the render boundary if it matters, not at one of two paths.
 
     override fun stream(request: ModelRequest): Flow<String> {
         require(request.text.isNotBlank()) { "ModelRequest.text must not be blank" }
@@ -92,8 +100,10 @@ interface GgufEngine {
     /** Loads the native model into memory so the engine is ready to infer. */
     suspend fun load()
 
-    /** Runs one blocking full-sequence inference. Returns the complete text. */
-    suspend fun complete(prompt: String): String
+    // No `complete` on this seam (T2.5). There is one inference entry point —
+    // [stream] — and `ModelProvider.complete` is that stream collected. A second
+    // full-sequence method here is what let the two drift: the old one pinned
+    // 512 tokens and temperature 0.7 while [stream] honoured the request.
 
     /** Token-level streaming. Each element emitted by the returned [Flow] is a
      *  single output token from the llama.cpp generation loop. */

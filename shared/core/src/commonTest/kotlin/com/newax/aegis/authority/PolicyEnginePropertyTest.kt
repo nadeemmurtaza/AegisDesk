@@ -13,10 +13,19 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * Property tests over the policy engine (Track 2.3). ENGINEERING.md §B7 is not
- * present in this snapshot, so the four invariants are taken from the
- * ARCHITECTURE.md decision table (rule 3 corollary + T2.2 concept registry),
- * which is the authority that exists here:
+ * Property tests over the policy engine's decision table (Track 2.3).
+ *
+ * **Scope.** These are the engine's *own* invariants, derived from the
+ * ARCHITECTURE.md decision table (rule 3 corollary + the T2.2 concept registry).
+ * The four invariants `ENGINEERING.md` §B7 names are a different, broader list
+ * about the spine end to end — two of them are statements about
+ * [AuthorityManager], not about this class — and they live in
+ * [AuthoritySpinePropertyTest]. Neither file subsumes the other; read them as a
+ * pair.
+ *
+ * (An earlier revision of this header claimed §B7 "is not present in this
+ * snapshot". It is — `docs/ENGINEERING.md`, §B7, "Testing strategy". The
+ * invariants below were never the §B7 four.)
  *
  *  - **I1 — deny is absolute.** A user deny for the action class wins over every
  *    mode and origin: the decision is always DENY.
@@ -43,50 +52,26 @@ import kotlin.test.assertTrue
 class PolicyEnginePropertyTest {
 
     /** Every ProposedAction variant with representative arguments. */
-    private fun allActions(): List<ProposedAction> = listOf(
-        ProposedAction.Tap("ok"),
-        ProposedAction.Type("hello"),
-        ProposedAction.Send("hi"),
-        ProposedAction.OpenApp("WhatsApp"),
-        ProposedAction.Scroll(true),
-        ProposedAction.Scroll(false),
-        ProposedAction.SendImage("a photo"),
-        ProposedAction.UpdateMemory("personal", "fact"),
-        ProposedAction.ReplyNotification("key", "sure"),
-        ProposedAction.QueryCalendar("week"),
-        ProposedAction.CreateEvent("Lunch", "13:00"),
-        ProposedAction.TapPixels(1f, 2f),
-        ProposedAction.DeleteFile("/x"),
-        ProposedAction.DeleteContact("c1"),
-        ProposedAction.RunScript("print(1)"),
-        ProposedAction.UpdateGraph("a", "knows", "b"),
-        ProposedAction.UpdateNode("n1", "key", "value"),
-        ProposedAction.LogCommunication("Ayesha", "called"),
-        ProposedAction.UpdateProject("p1", "done", "notes"),
-        ProposedAction.PrefixSearch("ay"),
-        ProposedAction.SearchAll("query"),
-        ProposedAction.ForgetFact("personal", "f"),
-        ProposedAction.DeleteProject("p1"),
-        ProposedAction.PostSocialMedia("com.pkg", "caption", "img", "alt"),
-        ProposedAction.AuditSecurity,
-        ProposedAction.TakeScreenshot,
-        ProposedAction.ToggleConnectivity,
-        ProposedAction.Home,
-        ProposedAction.Recents,
-        ProposedAction.Back,
-        ProposedAction.ShowDrafts,
-        ProposedAction.ApproveDraft("d1"),
-        ProposedAction.RejectDraft("d1"),
-        ProposedAction.ApproveAllDrafts,
-        ProposedAction.RejectAllDrafts,
-        ProposedAction.StartLearning,
-        ProposedAction.StopLearning,
-        ProposedAction.ScanNow,
-        ProposedAction.AnalyzeContacts(),
-        ProposedAction.ShowPersonProfile("Ayesha"),
-        ProposedAction.MergeContacts("a", "b"),
-        ProposedAction.BuildPersonProfile("Ayesha"),
-    )
+    private fun allActions(): List<ProposedAction> = ProposedActionCorpus.all()
+
+    /**
+     * The corpus is only "exhaustive" while it keeps up with the sealed
+     * interface, and nothing in the language enforces that — Kotlin/Native has
+     * no reflective enumeration of a sealed hierarchy's implementations. Pinning
+     * the count is the enforcement: adding a `ProposedAction` variant without
+     * adding it to [ProposedActionCorpus] fails here, with a message saying so,
+     * instead of silently shrinking every exhaustive test in this package.
+     */
+    @Test
+    fun `the corpus covers every ProposedAction variant`() {
+        assertEquals(
+            EXPECTED_VARIANT_COUNT,
+            ProposedActionCorpus.distinctClassNames().size,
+            "ProposedAction gained or lost a variant. Add it to ProposedActionCorpus " +
+                "(and give it a risk classification in riskOf) before updating this count — " +
+                "every exhaustive test in this package iterates that list.",
+        )
+    }
 
     private fun engineWith(toggleEnabled: Boolean): PolicyEngine = PolicyEngine(
         toggleKeyForAction = { "t" },
@@ -221,5 +206,10 @@ class PolicyEnginePropertyTest {
                 "confirmationWarning mismatch for ${classNameOf(action)}",
             )
         }
+    }
+
+    private companion object {
+        /** Sealed subtypes of `ProposedAction` in `assistant/Models.kt`. */
+        const val EXPECTED_VARIANT_COUNT = 41
     }
 }

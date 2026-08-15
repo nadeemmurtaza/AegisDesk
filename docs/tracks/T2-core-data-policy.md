@@ -122,6 +122,25 @@ nothing would catch it.
 
 **Verify:** `./gradlew :shared:core:assemble :apps:android:assembleDebug`
 
+### Status — mostly landed, one step outstanding
+
+Steps 1–3 are done (`d390f67`, corrected in the follow-up): the concept registry
+is in `ARCHITECTURE.md`, `MACHINE_AUTO_EXECUTE_CEILING` and
+`PolicyEngine.defaultModeFor` are each single-sourced, and `db.entity.RiskLevel`
+derives from the canonical enum.
+
+Step 4 is **correctly not done** — `enum class Risk` is still at
+`MainActivity.kt:619`, because that file is Track 3's. It is now handed over in
+Track 3's brief as slice T3.0. Step 5 (the banned-symbol guard) cannot be added
+until step 4 lands, or it fails on the code it is meant to prevent.
+
+**A documentation lesson worth more than the slice.** The first pass wrote "that
+enum is **retired**" into `ARCHITECTURE.md` while the enum was still in the tree
+and still wrong about three action classes. Deferring work to another track is
+correct; recording deferred work as finished is not. **Write the state of the
+code, not the state of your intent** — the registry is what the next agent
+trusts instead of reading `MainActivity.kt`.
+
 ---
 
 ## Slice T2.3 — Property tests over the policy engine
@@ -146,6 +165,39 @@ invariants hold.
 **Done when:** all four run in CI. Do not chase coverage percentages — cover the
 spine exhaustively and leave glue alone.
 
+### Status — landed, after two corrections
+
+`PolicyEnginePropertyTest` (the engine's decision table) and
+`AuthoritySpinePropertyTest` (the four §B7 invariants, including the two that are
+statements about `AuthorityManager` rather than about `PolicyEngine`) are both
+exhaustive over every action × origin × mode × toggle — enumeration rather than
+sampling, because the domain is finite. No generator library was added; R5 says
+prefer what is present, and jqwik would have bought nothing over a total
+enumeration.
+
+Two failures on the way in, both worth remembering:
+
+1. **The first pass wrote "ENGINEERING.md §B7 is not present in this snapshot"
+   and substituted four invariants of its own.** §B7 is at `docs/ENGINEERING.md`
+   line 534 and states its four plainly. Two of them (approval precedes
+   execution; a rejected action never executes) were simply not covered, and one
+   (no downgrade to `AUTO`) was covered only with a fresh engine per case, which
+   cannot observe a *sequence*. **If a document you were pointed at seems to be
+   missing, grep for it before writing that it does not exist.**
+2. **"Done when: all four run in CI" was not checked against CI.** No workflow
+   ran `:shared:core:jvmTest` — `invariants.yml` compiled the module and stopped
+   — so 60 tests compiled on every PR and ran on none. A green check next to a
+   test that never executed is worse than a red one. **Before claiming a test is
+   a gate, find the workflow line that runs it.**
+
+§B7's first invariant also turned out to be **unenforceable as literally
+written**: a user override may lower a CRITICAL action's gate to `AUTO`, because
+the rule-3 corollary makes the mapping user-controllable. What is enforced is the
+honest form — no *machine-side* input sequence downgrades anything, and a user
+downgrade is never silent because the audit record carries the weakened mode.
+Whether the engine should instead clamp overrides at CRITICAL is an open policy
+question recorded in the test, not a defect papered over.
+
 ---
 
 ## Slice T2.4 — Conversation persistence (slice 8)
@@ -168,6 +220,24 @@ list over data that does not exist.
 
 **Verify:** `:shared:database:assemble` + the new migration test.
 
+### Status — landed, after the exact mistake step 2 warned about
+
+Schema v20 is real: `conversations`, `messages`, `message_blocks`,
+`MIGRATION_19_20` on all three builders, `20.json` exported, and two instrumented
+round-trip tests.
+
+`message_blocks` was **not** in the first pass. It stored `messages.text: String`
+and nothing else — step 2 of this slice says, in as many words, "messages carry
+stacked content blocks, not just text, and designing for plain text now means a
+second migration later", and the first message carrying a code block or an
+approval card would have forced exactly that migration. The fix amended v20 in
+place rather than adding v21, which was only possible because nothing had shipped
+or consumed it yet; a week later it would have cost the second migration for
+real.
+
+**Read the document the slice points you at, before designing the thing it is
+about.** `docs/UI_DESIGN.md` §7 lists ten block kinds in a table.
+
 ---
 
 ## Slice T2.5 — Wire streaming (slice 9)
@@ -179,6 +249,30 @@ whole and there is no stop button to design around.
 Your half: make `stream()` real in the providers and cancellable. Track 3 renders
 it. Coordinate the interface in your PR body — Rule 6 says a contract change
 names its dependents.
+
+### Status — landed on the second attempt
+
+`ModelProvider.complete()` is an interface default that collects `stream()`, and
+**no provider overrides it**, so `stream()` really is on the production path for
+every inference on every body.
+
+The first pass added the default and wrote "`stream()` is production-called on
+every inference" into the contract — while `LiteRtModelProvider` and
+`GgufModelProvider`, the only two providers that run a model, both still
+overrode `complete()` with their own engine call. The claim was true only of
+`FallbackModelProvider`, the no-model stub. Removing the two overrides also
+fixed a live defect: the GGUF override called an engine method pinned to 512
+tokens and temperature 0.7, silently discarding every caller's
+`ModelRequest.maxTokens` and `temperature`, which `stream()` had always honoured.
+
+**A default that every real implementation overrides is not a default.** When you
+write "X is now called in production", name the call site and check that nothing
+shadows it.
+
+`cancel()` remains a documented no-op on both providers — neither the LiteRT
+`sendMessage()` nor the kherud `generate()` call is interruptible — so the "and
+cancellable" half of this slice is **still open**, and the stop button Track 3
+draws will need a real cancellation path underneath it.
 
 ---
 

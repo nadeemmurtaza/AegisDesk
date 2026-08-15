@@ -6,6 +6,8 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.newax.aegis.db.entity.ConversationEntity
+import com.newax.aegis.db.entity.MessageBlockEntity
+import com.newax.aegis.db.entity.MessageBlockType
 import com.newax.aegis.db.entity.MessageEntity
 import com.newax.aegis.db.entity.MessageRole
 import com.newax.aegis.db.entity.SyncJournalEntity
@@ -404,6 +406,60 @@ class MigrationTest {
                 assert(dao.conversationById("c1") == null)
                 assert(dao.messageCount("c1") == 0L)
                 assert(dao.messageCount("c2") == 0L)
+            }
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * Stacked content blocks (docs/UI_DESIGN.md §7) round-trip: render order,
+     * kind filtering, the plain-text message that stores no blocks at all, and
+     * the transactional delete leaving no orphans behind.
+     */
+    @Test
+    @Throws(IOException::class)
+    fun messageBlocksRoundTrip() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, NewaxDatabase::class.java).build()
+        try {
+            val dao = db.conversationDao()
+            runBlocking {
+                dao.upsertConversation(ConversationEntity(id = "c1", title = "Chat", createdAtMs = 1, updatedAtMs = 1))
+                dao.upsertMessage(MessageEntity(id = "m1", conversationId = "c1", fromUser = MessageRole.USER, text = "show me the code", timestampMs = 1))
+                dao.upsertMessage(MessageEntity(id = "m2", conversationId = "c1", fromUser = MessageRole.ASSISTANT, text = "Here it is. print(1)", timestampMs = 2))
+
+                // m1 is plain text and deliberately stores no blocks.
+                assert(dao.blocksFor("m1").isEmpty())
+
+                // m2 stacks three blocks, inserted out of order to prove that
+                // `position` and not insertion order drives rendering.
+                dao.upsertBlocks(
+                    listOf(
+                        MessageBlockEntity(id = "b2", messageId = "m2", position = 1, type = MessageBlockType.CODE, content = "print(1)", metadata = """{"language":"python"}"""),
+                        MessageBlockEntity(id = "b0", messageId = "m2", position = 0, type = MessageBlockType.THOUGHT, content = "they want the snippet"),
+                        MessageBlockEntity(id = "b1", messageId = "m2", position = 2, type = MessageBlockType.TEXT, content = "Here it is."),
+                    )
+                )
+
+                val blocks = dao.blocksFor("m2")
+                assert(blocks.map { it.id } == listOf("b0", "b2", "b1"))
+                assert(blocks.map { it.position } == listOf(0, 1, 2))
+                assert(blocks[1].metadata == """{"language":"python"}""")
+
+                // Kind filtering across the conversation — the artifact panel's query.
+                assert(dao.blocksOfType("c1", MessageBlockType.CODE).map { it.id } == listOf("b2"))
+                assert(dao.blocksOfType("c1", MessageBlockType.IMAGE).isEmpty())
+
+                // An unknown kind round-trips rather than being dropped, so a
+                // message written by a newer build survives an older reader.
+                dao.upsertBlocks(listOf(MessageBlockEntity(id = "b9", messageId = "m2", position = 3, type = "kind_from_the_future")))
+                assert(dao.blocksFor("m2").last().type == "kind_from_the_future")
+
+                // Deleting the conversation leaves no orphaned blocks.
+                dao.deleteConversation("c1")
+                assert(dao.messageCount("c1") == 0L)
+                assert(dao.blocksFor("m2").isEmpty())
             }
         } finally {
             db.close()

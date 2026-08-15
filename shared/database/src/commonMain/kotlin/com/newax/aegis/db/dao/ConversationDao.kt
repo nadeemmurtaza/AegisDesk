@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.newax.aegis.db.entity.ConversationEntity
+import com.newax.aegis.db.entity.MessageBlockEntity
 import com.newax.aegis.db.entity.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -59,13 +60,66 @@ interface ConversationDao {
     @Query("SELECT COUNT(*) FROM messages WHERE conversationId = :conversationId")
     suspend fun messageCount(conversationId: String): Long
 
-    // ── delete (one transaction — no orphan messages) ─────────────────────────
+    // ── content blocks (docs/UI_DESIGN.md §7) ─────────────────────────────────
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertBlocks(blocks: List<MessageBlockEntity>)
+
+    /**
+     * A message's blocks in render order. An empty list is not an error — a
+     * plain-text message stores no blocks and [MessageEntity.text] is the whole
+     * message. Readers must treat "no blocks" as one implicit text block rather
+     * than as an empty message.
+     */
+    @Query("SELECT * FROM message_blocks WHERE messageId = :messageId ORDER BY position ASC")
+    suspend fun blocksFor(messageId: String): List<MessageBlockEntity>
+
+    /** Every block in a conversation, so a screen can load a transcript in two queries. */
+    @Query(
+        """
+        SELECT b.* FROM message_blocks b
+        INNER JOIN messages m ON m.id = b.messageId
+        WHERE m.conversationId = :conversationId
+        ORDER BY m.timestampMs ASC, b.position ASC
+        """
+    )
+    fun observeBlocks(conversationId: String): Flow<List<MessageBlockEntity>>
+
+    /**
+     * Blocks of one kind across a conversation — what the artifact panel (§7.1)
+     * and the step list (§7.2) need, and the reason blocks are rows rather than
+     * a JSON column on `messages`.
+     */
+    @Query(
+        """
+        SELECT b.* FROM message_blocks b
+        INNER JOIN messages m ON m.id = b.messageId
+        WHERE m.conversationId = :conversationId AND b.type = :type
+        ORDER BY m.timestampMs ASC, b.position ASC
+        """
+    )
+    suspend fun blocksOfType(conversationId: String, type: String): List<MessageBlockEntity>
+
+    @Query("DELETE FROM message_blocks WHERE messageId = :messageId")
+    suspend fun deleteBlocks(messageId: String): Int
+
+    // ── delete (one transaction — no orphan messages or blocks) ───────────────
 
     @Transaction
     suspend fun deleteConversation(conversationId: String) {
+        deleteBlocksIn(conversationId)
         deleteMessages(conversationId)
         deleteConversationRow(conversationId)
     }
+
+    /**
+     * Deletes blocks by joining through `messages`, so it must run **before**
+     * [deleteMessages] — after it, the join matches nothing and every block in
+     * the conversation is orphaned. [deleteConversation] is the ordered path;
+     * this is not a general-purpose entry point.
+     */
+    @Query("DELETE FROM message_blocks WHERE messageId IN (SELECT id FROM messages WHERE conversationId = :conversationId)")
+    suspend fun deleteBlocksIn(conversationId: String): Int
 
     @Query("DELETE FROM messages WHERE conversationId = :conversationId")
     suspend fun deleteMessages(conversationId: String): Int
