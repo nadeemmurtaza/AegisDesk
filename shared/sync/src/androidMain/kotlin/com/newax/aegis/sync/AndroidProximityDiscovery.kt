@@ -87,8 +87,14 @@ class AndroidProximityDiscovery(
 
     override fun nearby(): List<ProximityEndpoint> = ble.nearby()
 
-    /** Current BLE discovery error, if any. */
-    val discoveryError: String?
+    /**
+     * Current BLE discovery error, if any.
+     *
+     * Was `discoveryError` until [ProximityDiscovery] gained an `error` member —
+     * two names for one concept, which is exactly what the interface now
+     * prevents.
+     */
+    override val error: String?
         get() = ble.error
 
     // ── receive mode ─────────────────────────────────────────────────────────

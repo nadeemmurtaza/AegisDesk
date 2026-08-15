@@ -39,10 +39,10 @@ verification log in `ENGINEERING.md` Gate 0.
 | `KMP compile gates + Android green` | ✅ **green** |
 | `apple-compile` | ✅ **green** |
 | `Windows adapter tests` | ✅ green |
-| `instrumented-tests` | ❌ see below |
+| `instrumented-tests` | ✅ **green** — 22/22, first full run ever |
 
-Those are the **first green runs of `build`, `KMP compile gates` and
-`apple-compile` in the project's recorded history.**
+**Every check is green.** `build`, `KMP compile gates`, `apple-compile` and
+`instrumented-tests` had never passed once before this branch.
 
 ### The one red check was a crash on launch — now fixed
 
@@ -118,9 +118,24 @@ the family aligns.
 **Fixed** with `kotlinx-serialization-bom:1.8.1` in `apps/android`, which fixes
 both halves where a single-module constraint would not.
 
-**Still open, and Track 2's:** whether the 18 migrations actually pass. Three
-distinct faults have now been cleared in front of that question and it is still
-unanswered. Make no schema claims until `MigrationTest` reports.
+### Answered: the 18 migrations pass
+
+`MigrationTest` completed its first full run in the project's history on
+`66aad40`:
+
+```
+Starting 22 tests on test(AVD) - 10
+Finished 22 tests on test(AVD) - 10
+BUILD SUCCESSFUL
+```
+
+22 started, 22 finished, zero failures — and `MigrationTest` declares exactly 22
+`@Test` cases, so this was not a vacuous pass. That covers all 18
+`migrateNToN+1` steps, both full paths (`1→13`, `1→19`), the sync DAO
+round-trip, and current-schema validation.
+
+**All six checks are green at once for the first time.** Three faults stood in
+front of that question and none of them was a schema problem.
 
 **The pattern worth noting:** each fix reveals the next fault, because
 `Application.onCreate` does a great deal of eager work and the first throw masks
@@ -132,22 +147,32 @@ Gradle tail each time.
 **CI builds `:apps:android` and nothing else.** `:apps:desktop`, `:apps:macos`
 and `:apps:ios` appear in no workflow. That is how the next item went unnoticed.
 
-**`:apps:desktop` does not compile.** Verified at `HEAD` with no local changes.
-Four independent faults:
+**`:apps:desktop` did not compile** — verified at `HEAD` with no local changes,
+and now fixed. Six faults, all API drift that no build ever caught:
 
 | File | Fault |
 |---|---|
-| `Main.kt` | `Episode` and friends unresolved — `shared:database` was never declared **(fixed)** |
-| `ProximityCli.kt:49` | `discovery.error` — `ProximityDiscovery` exposes no such member |
-| `planner/DesktopGoalPlanner.kt:284` | `Unresolved reference 'id'` |
-| `ui/GoalsScreen.kt:539` | function invokes `@Composable` without being annotated |
-| `ui/state/GoalsScreenState.kt` | cascades from `DesktopGoalPlanner` |
+| `build.gradle.kts` | `Episode` unresolved — `shared:database` never declared |
+| `ProximityCli.kt:49` | `discovery.error` — promoted to the `ProximityDiscovery` interface with a null default |
+| `planner/DesktopGoalPlanner.kt:284` | `it.id` on a `TaskGraph`, which is keyed by `goalId` everywhere else |
+| `ui/GoalsScreen.kt:539` | `RunLogCard` built a Compose tree without `@Composable` |
+| `ui/state/GoalsScreenState.kt` | imported `DesktopGoalPlanner` from the wrong package |
+| `PolicyExporterTest.kt:31` | `RiskLevel.HIGH_IMPACT_SYSTEM` — a `PrivilegeLevel` value on a `RiskLevel` field |
 
-Only the first is fixed here — it was a missing dependency declaration with an
-unambiguous fix, and the build file's own comment already described the same
-pattern for `shared:core`. **The other three are API drift in Track 4's body and
-need that track's context**; guessing at them from outside, with no way to run
-the desktop app, would be worse than routing them.
+That last one is slice T2.2's premise in miniature: three risk vocabularies, and
+a test that mixed two of them.
+
+Its 113 tests then ran for the first time. **Eight failed, and one was a real
+bug:** `DesktopPolicyHolder.init` created the audit store but never called its
+`load()`, so every policy decision was written to disk and never read back — the
+desktop policy audit silently started empty on every launch. An audit trail that
+forgets across restarts is not an audit trail.
+
+The other seven were tests that had never run: they asserted quote-always CSV
+with no trailing terminator, against an RFC-4180 renderer that quotes minimally
+and uses CRLF — and recovered records by splitting on newlines, which cannot
+work when a field legally contains one. Rewritten to assert exact output, which
+is stricter than the `contains` checks they replaced.
 
 **Track 1:** once Track 4 has it compiling, add the desktop and macOS targets to
 a workflow. An unbuilt module is an unverified module, and this one rotted all

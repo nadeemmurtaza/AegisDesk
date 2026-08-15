@@ -61,90 +61,33 @@ verification without a Mac. Only linking a final framework needs one.
 
 ---
 
-## Slice T2.1 — Find out what `MigrationTest` actually reports ← start here
+## Slice T2.1 — ~~The `instrumented-tests` failure~~ ✅ RESOLVED
 
-**Read this history before starting; two earlier diagnoses were wrong.**
+**Nothing to do. Kept as a record, because the route here was instructive.**
 
-1. First recorded as a probable **migration/schema defect**, guessed from the
-   Gradle stack trace. Wrong.
-2. The emulator log then showed the real cause — a **crash on launch**:
+`MigrationTest` completed its first full run in the project's history on
+`66aad40`: **22 started, 22 finished, zero failures.** All 18 `migrateNToN+1`
+steps pass, plus both full paths (`1→13`, `1→19`), the sync DAO round-trip and
+current-schema validation. The schema is sound.
 
-```
-Starting 0 tests on test(AVD) - 10
-IllegalStateException: This platform lacks Ed25519/X25519 JCA providers
-  at SyncRuntime.init(SyncRuntime.kt:183)
-  at NewaxApplication.onCreate(NewaxApplication.kt:61)
-```
+### Three wrong answers came first
 
-`minSdk = 26`, `JavaCrypto` requires API 31, and identity generation ran eagerly
-at startup — so the app could not launch on Android 8 through 11, and
-`MigrationTest` never got to run.
+| Diagnosis | Verdict |
+|---|---|
+| "A migration/schema mismatch" | **Wrong** — guessed from the Gradle stack-trace tail |
+| Eager Ed25519 call in `Application.onCreate` | Real: crashed every device below Android 12 |
+| SQLCipher native library never loaded | Real: crashed *every* device, every ABI |
+| `serialization-json:1.8.1` vs core `{strictly 1.7.3}` | Real: could not parse the schema JSON |
 
-3. With that fixed, the emulator reached the **next** crash on launch:
+None was a schema problem. Two were shipped crashes that existed *because* CI
+could never run the app — the suite that would have caught them was structurally
+unable to report.
 
-```
-UnsatisfiedLinkError: No implementation found for
-  net.zetetic.database.sqlcipher.SQLiteConnection.nativeOpen(...)
-```
-
-`net.zetetic:sqlcipher-android` 4.x ships `libsqlcipher.so` for all four ABIs but
-has **no static initializer that loads it** — unlike the retired
-`net.sqlcipher:android-database-sqlcipher`. Not one class in the 4.17.0 artifact
-calls `System.loadLibrary`, and neither did this repo. **This broke every device
-and every ABI**: the app could never open its database. Fixed in
-`getNewaxDatabase`. (Checked properly: the `.so` *is* in the APK for x86_64, so
-it was never an ABI gap.)
-
-**Both crashes are fixed.** Sync degrades instead of dying:
-`shared/sync/SyncAvailability.kt` classifies the failure, `SyncRuntime`'s
-identity resolution never throws, every entry point is guarded by
-`SyncRuntime.isAvailable`, and the Sync screen states the limit rather than
-showing controls that would throw. `JavaCrypto`'s refusal to use weaker curves
-is untouched — it was always correct.
-
-### Your actual job
-
-**Nobody knows whether the 18 migrations pass.** `MigrationTest` finally *ran*
-after both startup crashes were fixed — and failed on a third, unrelated fault:
-`kotlinx-serialization-json:1.8.1` against core pinned to `{strictly 1.7.3}`,
-so it could not parse the schema JSON at all (`AbstractMethodError` in
-`FieldBundle$$serializer`). Caused by AGP consistent resolution propagating the
-app runtime's core version to androidTest while leaving json unpinned; fixed
-with `kotlinx-serialization-bom:1.8.1`.
-
-Three distinct faults have now been cleared in front of the actual question, and
-it is still unanswered. Make no claim about the schema until it reports.
-
-**Steps:**
-
-1. Re-run `instrumented-tests` and read the result — for the first time ever.
-2. If it fails, *now* the migration hunt is justified. `runMigrationsAndValidate(..., validateDroppedTables = true, ...)`
-   compares the post-migration schema against the exported JSON for that version;
-   a mismatch is usually a column default, an index, or a dropped table.
-   Fix the **migration**, not the exported JSON — the JSON records what that
-   version was, and rewriting it to match a broken migration hides the bug.
-3. Ask Track 1 to add an **API-31 emulator alongside API 29**, not instead of it.
-   The low level is the one that found the crash, and it is the only check on the
-   `minSdk = 26` claim.
-
-**Already ruled out — do not repeat:**
-
-- ✅ All 19 schema JSONs exist
-- ✅ Schemas are wired into the test APK assets (`apps/android/build.gradle.kts:63`)
-- ✅ `androidTest` deps present, including `room-testing:2.8.4`
-- ✅ Both startup crashes (fixed; neither was a schema problem)
-- ✅ Native-library ABI coverage — x86_64 carries every `.so` arm64 does
-- ✅ The serialization split that stopped schema JSON parsing (fixed)
-
-**The lesson worth carrying:** both wrong diagnoses came from reading the Gradle
-stack trace instead of the test output. `Starting 0 tests` was in the log the
-whole time. Read the runner's own output first.
-
-**Ownership note:** the fix touched `SyncRuntime.kt` and `NewaxApplication.kt` —
-`apps/android` but not UI — and `shared/sync`, which **has no owner in the
-ownership map**. An ordinary gap; agree the boundary before editing further.
-
-**Do not** delete or skip `MigrationTest` to get green.
+**The lesson, and the reason this section survives:** both wrong diagnoses came
+from reading the Gradle stack trace instead of the runner output. `Starting 0
+tests` was in the log the entire time, above two hundred lines of Gradle
+internals. **Read the runner's own output first.** And when a check turns green,
+check the test *count* — a suite that runs zero tests also passes.
 
 ---
 

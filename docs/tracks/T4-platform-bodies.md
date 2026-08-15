@@ -76,40 +76,38 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties          # gitignored
 
 ---
 
-## Slice T4.0 — `:apps:desktop` does not compile ← start here
+## Slice T4.0 — ~~`:apps:desktop` does not compile~~ ✅ RESOLVED
 
-Before parity, before layout: **the Windows body is broken at `HEAD`.** Verified
-with no local changes. It was invisible because **no CI workflow builds
-`:apps:desktop`** — only `:apps:android` is built anywhere.
+**Nothing to do. Kept as a record of what unbuilt code costs.**
 
-```bash
-./gradlew :apps:desktop:compileKotlin
-```
+The Windows body did not compile at `HEAD`, and its 113 tests had never run,
+because **no CI workflow builds `:apps:desktop`**. Six faults, all ordinary API
+drift:
 
-| File | Fault | State |
-|---|---|---|
-| `build.gradle.kts` | `Episode` unresolved — `shared:database` never declared | ✅ fixed |
-| `ProximityCli.kt:49` | `discovery.error` — `ProximityDiscovery` has no such member (it declares only `startAdvertising`, `startScanning`, `stop`, `nearby`) | ⬜ yours |
-| `planner/DesktopGoalPlanner.kt:284` | `Unresolved reference 'id'` on the snapshot graph type | ⬜ yours |
-| `ui/GoalsScreen.kt:539` | function invokes `@Composable` without the annotation | ⬜ yours |
-| `ui/state/GoalsScreenState.kt` | cascades from `DesktopGoalPlanner` | ⬜ yours |
+| File | Fault |
+|---|---|
+| `build.gradle.kts` | `Episode` unresolved — `shared:database` never declared, though the file's own comment already described that exact pattern for `shared:core` |
+| `ProximityCli.kt:49` | `discovery.error` — promoted to the `ProximityDiscovery` interface with a `null` default, which also collapsed Android's separately-named `discoveryError` into one name |
+| `planner/DesktopGoalPlanner.kt:284` | `it.id` on a `TaskGraph`, which is keyed by `goalId` everywhere else |
+| `ui/GoalsScreen.kt:539` | `RunLogCard` built a Compose tree without `@Composable` |
+| `ui/state/GoalsScreenState.kt` | imported `DesktopGoalPlanner` from the wrong package |
+| `PolicyExporterTest.kt:31` | `RiskLevel.HIGH_IMPACT_SYSTEM` — a `PrivilegeLevel` value on a `RiskLevel` field |
 
-The first was a missing dependency declaration with an unambiguous fix — the
-build file's own comment already described the same pattern for `shared:core`,
-where a type leaks through an `implementation`-only dependency. The rest is API
-drift against `shared/sync` and the planner model, and needs your context.
+Then the tests ran, and eight failed. **One was a real bug:**
+`DesktopPolicyHolder.init` constructed the audit store but never called its
+`load()`. Every policy decision was written to disk and never read back, so the
+desktop policy audit silently started empty on every launch. An audit trail that
+forgets across restarts is not an audit trail.
 
-**On `ProximityCli.kt:49` specifically:** decide whether `ProximityDiscovery`
-should expose an error channel at all. Deleting the line is the smaller change
-but silently drops a "discovery degraded" diagnostic; adding `error` to the
-interface is a `shared/sync` change that affects Android too, so **request it**
-rather than making it.
+The other seven were tests that had never executed: they asserted quote-always
+CSV with no trailing terminator against an RFC-4180 renderer that quotes
+minimally and terminates with CRLF — and they recovered records by splitting on
+newlines, which cannot work when a field legally contains one. Rewritten to
+assert exact output, which is stricter than the `contains` checks they replaced.
 
-**Ask Track 1 to add desktop and macOS to a workflow** the moment it compiles.
-`:apps:macos:compileKotlin` passes today — protect that too, or it rots next.
-
-**Done when:** `./gradlew :apps:desktop:compileKotlin :apps:desktop:test` passes
-and a workflow runs it.
+**Your first job is now T4.1.** But ask Track 1 to add `:apps:desktop` and
+`:apps:macos` to a workflow before you build on top of this — everything above
+happened because nothing checked.
 
 ---
 

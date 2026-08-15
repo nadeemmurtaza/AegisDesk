@@ -22,7 +22,7 @@ internal object CsvFiles {
 
     /** Renders [header] plus [rows] as CSV. Input row order is preserved. */
     fun render(header: List<String>, rows: List<List<String>>): String = buildString {
-        append(header.joinToString(",")).append("\r\n")
+        append(header.joinToString(",") { csvField(it) }).append("\r\n")
         rows.forEach { row ->
             row.joinTo(this, ",") { csvField(it) }.append("\r\n")
         }

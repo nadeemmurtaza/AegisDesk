@@ -41,7 +41,7 @@ class BleProximityDiscovery(private val context: Context) : ProximityDiscovery {
     private var ownDeviceId: String? = null
 
     @Volatile
-    var error: String? = null
+    override var error: String? = null
         private set
 
     override fun startAdvertising(profile: ProximityProfile) {

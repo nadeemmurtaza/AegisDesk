@@ -1,10 +1,10 @@
 package com.newax.aegis.desktop.ui.state
 
-import com.newax.aegis.desktop.DesktopGoalPlanner
 import com.newax.aegis.desktop.ExecutionAudit
 import com.newax.aegis.desktop.ExecutionAuditEntry
 import com.newax.aegis.desktop.GoalsStore
 import com.newax.aegis.desktop.TaskFailureKind
+import com.newax.aegis.desktop.planner.DesktopGoalPlanner
 import com.newax.aegis.desktop.planner.DesktopPlan
 import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState

@@ -145,7 +145,7 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                     // Receive-mode failures (e.g. WiFi-Direct unavailable) arrive
                     // on the main thread after startReceiving returns — re-read.
                     discovery.receiveError?.let { error = it }
-                    discovery.discoveryError?.let { error = it }
+                    discovery.error?.let { error = it }
                 }
             }
         })
