@@ -74,13 +74,26 @@ class GgufModelProviderTest {
     }
 
     @Test
-    fun `complete delegates prompt to engine`() = runBlocking {
-        engine.reply = "Once upon a time"
+    fun `complete is the stream collected, so both paths answer identically`() = runBlocking {
+        engine.streamTokens = listOf("Once", " upon", " a", " time")
         val p = provider()
         p.load()
         val response = p.complete(ModelRequest(text = "tell me a story"))
         assertEquals("Once upon a time", response.text)
-        assertEquals("tell me a story", engine.lastPrompt)
+        assertEquals("tell me a story", engine.lastStreamPrompt)
+        // The point of T2.5: there is no second inference path to drift from.
+        assertEquals(response.text, p.stream(ModelRequest(text = "tell me a story")).toList().joinToString(""))
+    }
+
+    @Test
+    fun `completion honours the request sampler settings instead of hardcoding them`() = runBlocking {
+        // The retired `complete` override called an engine method that pinned 512
+        // tokens and temperature 0.7, silently discarding the caller's values.
+        val p = provider()
+        p.load()
+        p.complete(ModelRequest(text = "hi", maxTokens = 32, temperature = 0.1f))
+        assertEquals(32, engine.lastMaxTokens)
+        assertEquals(0.1f, engine.lastTemperature)
     }
 
     @Test
@@ -115,10 +128,10 @@ class GgufModelProviderTest {
     private class FakeGgufEngine : GgufEngine {
         var loaded = false
         var loadError: Throwable? = null
-        var lastPrompt: String? = null
         var lastStreamPrompt: String? = null
+        var lastMaxTokens: Int? = null
+        var lastTemperature: Float? = null
         var closeCalls = 0
-        var reply = "fake reply"
         var streamTokens: List<String> = listOf("fake")
 
         override suspend fun load() {
@@ -126,13 +139,10 @@ class GgufModelProviderTest {
             loaded = true
         }
 
-        override suspend fun complete(prompt: String): String {
-            lastPrompt = prompt
-            return reply
-        }
-
         override fun stream(prompt: String, maxTokens: Int, temperature: Float): Flow<String> {
             lastStreamPrompt = prompt
+            lastMaxTokens = maxTokens
+            lastTemperature = temperature
             return flow { streamTokens.forEach { emit(it) } }
         }
 

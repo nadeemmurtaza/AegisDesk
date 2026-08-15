@@ -40,6 +40,11 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                // AuthorityManager publishes its decisions as a SharedFlow with
+                // replay = 0, so the ENGINEERING.md §B7 invariants about which
+                // events an approval path may emit are only observable from a
+                // live collector. Same pin as shared/model-api's commonTest.
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
         }
     }

@@ -97,6 +97,18 @@ class LiteRtModelProviderTest {
     }
 
     @Test
+    fun `complete is the stream collected, so both paths answer identically`() = runBlocking {
+        // T2.5: this provider deliberately has no `complete` override, so the
+        // contract's claim holds here and not only on the fallback.
+        engine.reply = "one shot reply"
+        val p = provider()
+        p.load()
+        val completed = p.complete(ModelRequest(text = "hi")).text
+        val streamed = p.stream(ModelRequest(text = "hi")).toList().joinToString("")
+        assertEquals(streamed, completed)
+    }
+
+    @Test
     fun `blank text is rejected`() {
         runBlocking {
             val p = provider()

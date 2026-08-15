@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 20,
-    "identityHash": "00000000000000000000000000000000",
+    "identityHash": "0a594c94f64a1e67e7d04c13c9469e47",
     "entities": [
       {
         "tableName": "persons",
@@ -4420,11 +4420,73 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_conversationId_timestampMs` ON `${TABLE_NAME}` (`conversationId`, `timestampMs`)"
           }
         ]
+      },
+      {
+        "tableName": "message_blocks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `messageId` TEXT NOT NULL, `position` INTEGER NOT NULL, `type` TEXT NOT NULL, `content` TEXT NOT NULL DEFAULT '', `metadata` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageId",
+            "columnName": "messageId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "metadata",
+            "columnName": "metadata",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_message_blocks_messageId_position",
+            "unique": false,
+            "columnNames": [
+              "messageId",
+              "position"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_message_blocks_messageId_position` ON `${TABLE_NAME}` (`messageId`, `position`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '00000000000000000000000000000000')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0a594c94f64a1e67e7d04c13c9469e47')"
     ]
   }
 }
