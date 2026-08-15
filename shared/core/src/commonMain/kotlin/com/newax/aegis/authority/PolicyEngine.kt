@@ -3,6 +3,7 @@ package com.newax.aegis.authority
 import com.newax.aegis.currentTimeMillis
 
 import com.newax.aegis.assistant.ActionOrigin
+import com.newax.aegis.assistant.MACHINE_AUTO_EXECUTE_CEILING
 import com.newax.aegis.assistant.ProposedAction
 import com.newax.aegis.assistant.RiskLevel
 import com.newax.aegis.assistant.riskLevel
@@ -12,6 +13,11 @@ import com.newax.aegis.engine.AutomationSettings
  * Policy modes — how much the user has authorized Newax to do on its own.
  * The mode is the *policy* answer ("should Newax do this automatically"),
  * orthogonal to the *permission* answer ("can the OS/account do this").
+ * This is the **gate** side of the safety vocabulary (ARCHITECTURE.md concept
+ * registry, T2.2): RiskLevel describes the action, PolicyMode describes the
+ * required gate — the only two types for the safety concept. The default
+ * RiskLevel→PolicyMode mapping lives in PolicyEngine.defaultModeFor; the
+ * user-controllable part comes from PolicyStore overrides.
  * ARCHITECTURE.md corollary: PrivilegeLevel maps to these modes
  * (READ_ONLY→AUTO, STANDARD→CONFIGURABLE, HIGH_IMPACT_SYSTEM→APPROVAL,
  * CRITICAL→STRONG_CONFIRMATION) and the mapping is user-controllable.
@@ -144,9 +150,6 @@ class PolicyEngine(
     private val auditSink: (PolicyAuditRecord) -> Unit = {},
 ) {
 
-    /** Actions at/above this risk never auto-execute when the origin is a machine (background text or an agent). */
-    private val machineCeiling = RiskLevel.HIGH
-
     fun evaluate(action: ProposedAction, origin: ActionOrigin): PolicyEvaluation {
         val actionClass = action::class.simpleName ?: "UnknownAction"
         val risk = action.riskLevel
@@ -172,7 +175,10 @@ class PolicyEngine(
 
     private fun decide(action: ProposedAction, origin: ActionOrigin, mode: PolicyMode): Pair<PolicyDecision, String> {
         val risk = action.riskLevel
-        val machineBlocked = origin != ActionOrigin.USER && risk >= machineCeiling
+        // The single machine ceiling (ARCHITECTURE.md concept registry, T2.2):
+        // assistant.MACHINE_AUTO_EXECUTE_CEILING — never redeclared here, so
+        // mayAutoExecute and this engine cannot drift apart.
+        val machineBlocked = origin != ActionOrigin.USER && risk >= MACHINE_AUTO_EXECUTE_CEILING
         return when (mode) {
             PolicyMode.AUTO -> if (machineBlocked) {
                 PolicyDecision.REQUIRE_APPROVAL to
@@ -223,7 +229,13 @@ class PolicyEngine(
     fun setDenied(actionClass: String, denied: Boolean) = store.setDenied(actionClass, denied)
 
     companion object {
-        /** Default mapping — the ARCHITECTURE.md corollary, keyed by risk level. */
+        /**
+         * The single default RiskLevel→PolicyMode mapping (ARCHITECTURE.md concept
+         * registry, T2.2): LOW→AUTO, MEDIUM→CONFIGURABLE, HIGH→APPROVAL,
+         * CRITICAL→STRONG_CONFIRMATION. No caller reimplements this table — read
+         * the gate from here (or from [PolicyEngine.effectiveMode] when user
+         * overrides apply). Keyed by risk level per the ARCHITECTURE.md corollary.
+         */
         fun defaultModeFor(risk: RiskLevel): PolicyMode = when (risk) {
             RiskLevel.LOW -> PolicyMode.AUTO
             RiskLevel.MEDIUM -> PolicyMode.CONFIGURABLE

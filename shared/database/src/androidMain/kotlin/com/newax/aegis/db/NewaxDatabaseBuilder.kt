@@ -75,7 +75,8 @@ fun getNewaxDatabase(context: Context, passphrase: ByteArray): NewaxDatabase {
             NewaxDatabase.MIGRATION_15_16,
             NewaxDatabase.MIGRATION_16_17,
             NewaxDatabase.MIGRATION_17_18,
-            NewaxDatabase.MIGRATION_18_19
+            NewaxDatabase.MIGRATION_18_19,
+            NewaxDatabase.MIGRATION_19_20
         )
         .build()
         .also {

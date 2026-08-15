@@ -22,10 +22,9 @@ class FallbackModelProvider(
 
     override val state: StateFlow<ModelState> = MutableStateFlow(ModelState.NOT_INSTALLED)
 
-    override suspend fun complete(request: ModelRequest): ModelResponse {
-        require(request.text.isNotBlank()) { "ModelRequest.text must not be blank" }
-        return ModelResponse(FALLBACK_TEXT)
-    }
+    // No `complete` override: the interface default (T2.5) collects [stream],
+    // so completion and streaming here are the same single path and cannot
+    // drift. The blank-text rejection comes from [stream]'s require below.
 
     override fun stream(request: ModelRequest): Flow<String> {
         require(request.text.isNotBlank()) { "ModelRequest.text must not be blank" }

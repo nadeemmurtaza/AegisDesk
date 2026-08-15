@@ -71,6 +71,16 @@ sealed interface ProposedAction {
 
 data class AssistantReply(val text: String, val proposedAction: ProposedAction? = null)
 
+/**
+ * How dangerous the proposed action is — the **action** side of the safety
+ * vocabulary (ARCHITECTURE.md concept registry, T2.2). Enum declaration order
+ * IS severity, so `>=`/`<` comparisons mean severity (used by the machine
+ * auto-execute ceiling). This is the only action-risk type in the codebase;
+ * `PolicyMode` (the required gate) is a separate type and `PrivilegeLevel`
+ * (the permission axis) is not a risk value at all. Classification for an
+ * action comes from [riskOf] / [ProposedAction.riskLevel] — never from a
+ * locally redefined mapping.
+ */
 enum class RiskLevel { LOW, MEDIUM, HIGH, CRITICAL }
 
 fun riskOf(action: ProposedAction): RiskLevel = when (action) {
@@ -112,8 +122,13 @@ enum class ActionOrigin { USER, BACKGROUND, AGENT }
  * machine (background text or an autonomous agent), regardless of how the automation
  * toggles are set. The toggles record what the user is willing to have done on *their*
  * instruction, not on a scanner's or an agent's.
+ *
+ * The single definition of the ceiling (ARCHITECTURE.md concept registry, T2.2):
+ * `PolicyEngine` reads this same constant instead of redeclaring `RiskLevel.HIGH`,
+ * so the two cannot drift apart. `internal` — visible to the rest of shared:core
+ * (including its tests), not part of the public API.
  */
-private val MACHINE_AUTO_EXECUTE_CEILING = RiskLevel.HIGH
+internal val MACHINE_AUTO_EXECUTE_CEILING = RiskLevel.HIGH
 
 fun mayAutoExecute(action: ProposedAction, origin: ActionOrigin, toggleEnabled: Boolean): Boolean {
     if (!toggleEnabled) return false

@@ -47,6 +47,30 @@ class ModelProviderContractTest {
     }
 
     @Test
+    fun completeIsTheStreamCollected() = runTest {
+        // T2.5 — the single inference path: complete() is the collected stream().
+        // The fallback now relies on the interface default, so this pins the
+        // wiring: the reply must equal exactly what stream() emits.
+        val provider = FallbackModelProvider()
+        val request = ModelRequest("hi")
+        assertEquals(
+            provider.stream(request).toList().joinToString(""),
+            provider.complete(request).text,
+        )
+        assertEquals(FallbackModelProvider.FALLBACK_TEXT, provider.complete(request).text)
+    }
+
+    @Test
+    fun aProviderThatOverridesOnlyStreamGetsCompleteForFree() = runTest {
+        // A provider implementing only stream() (and nothing else) must still
+        // answer complete() correctly — the default is the production caller of
+        // stream(), so a new provider cannot accidentally leave complete() dead.
+        val response = StreamOnlyProvider().complete(ModelRequest("hello"))
+        assertEquals("hello!", response.text)
+        assertFalse(response.truncated)
+    }
+
+    @Test
     fun fallbackCancelAndCloseAreSafeRepeatedly() {
         val provider = FallbackModelProvider()
         provider.cancel()
@@ -141,5 +165,23 @@ class ModelProviderContractTest {
             internalState.value = newState
             observed = newState
         }
+    }
+
+    /** Proves the interface default: overrides stream() only, inherits complete(). */
+    private class StreamOnlyProvider : ModelProvider {
+        override val descriptor = ModelDescriptor(
+            modelName = "Stream only",
+            format = ModelFormat.UNKNOWN,
+            sizeBytes = 0,
+            sha256 = "",
+        )
+
+        override val state: StateFlow<ModelState> = MutableStateFlow(ModelState.NOT_INSTALLED)
+
+        override fun stream(request: ModelRequest): Flow<String> = flowOf(request.text, "!")
+
+        override fun cancel() = Unit
+
+        override fun close() = Unit
     }
 }

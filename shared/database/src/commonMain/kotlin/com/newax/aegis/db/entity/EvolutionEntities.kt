@@ -96,7 +96,7 @@ data class StagingRecord(
     val changeType: String = ChangeType.MUTATION,
     /** [EvolutionProtocol] name — which learning loop produced it. */
     val protocol: String = EvolutionProtocol.DETERMINISTIC,
-    /** [RiskLevel] name — drives the urgency grouping in the Updates tab. */
+    /** [RiskLevel] (canonical `assistant.RiskLevel`) name — drives the urgency grouping in the Updates tab. */
     val riskLevel: String = RiskLevel.MEDIUM,
     /** The pre-mutation state (last error, current guidance) for the diff screen. */
     val diffBefore: String = "",
@@ -164,11 +164,19 @@ object StagingStatus {
     const val DEPLOYED = "DEPLOYED"
 }
 
+/**
+ * Persistence codec for the `staging_records.riskLevel` column (ARCHITECTURE.md
+ * concept registry, T2.2): the stored strings ARE
+ * [com.newax.aegis.assistant.RiskLevel] names, and these constants derive from
+ * the canonical enum so the column can never drift from the single risk
+ * vocabulary. Stored values are unchanged (identical strings — no migration).
+ * Delete this object once app code writes `.name` at the DAO boundary.
+ */
 object RiskLevel {
-    const val CRITICAL = "CRITICAL" // crash/broken tool fixes — top of the Updates tab
-    const val HIGH = "HIGH"
-    const val MEDIUM = "MEDIUM"
-    const val LOW = "LOW"           // stylistic/performance proposals — bottom
+    val CRITICAL: String get() = com.newax.aegis.assistant.RiskLevel.CRITICAL.name // crash/broken tool fixes — top of the Updates tab
+    val HIGH: String get() = com.newax.aegis.assistant.RiskLevel.HIGH.name
+    val MEDIUM: String get() = com.newax.aegis.assistant.RiskLevel.MEDIUM.name
+    val LOW: String get() = com.newax.aegis.assistant.RiskLevel.LOW.name           // stylistic/performance proposals — bottom
 }
 
 object ChangeType {

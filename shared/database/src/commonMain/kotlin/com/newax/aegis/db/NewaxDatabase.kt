@@ -61,9 +61,11 @@ import kotlin.concurrent.Volatile
         AgentHealthEntity::class,
         SkillEvolution::class,
         StagingRecord::class,
-        LearningSignal::class
+        LearningSignal::class,
+        ConversationEntity::class,
+        MessageEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = true
 )
 @ConstructedBy(NewaxDatabaseConstructor::class)
@@ -89,6 +91,7 @@ abstract class NewaxDatabase : RoomDatabase() {
     abstract fun skillManagerDao(): SkillManagerDao
     abstract fun agentRuntimeDao(): AgentRuntimeDao
     abstract fun evolutionDao(): EvolutionDao
+    abstract fun conversationDao(): ConversationDao
 
     companion object {
         @Volatile private var INSTANCE: NewaxDatabase? = null
@@ -594,6 +597,43 @@ abstract class NewaxDatabase : RoomDatabase() {
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_learning_signals_consumed ON learning_signals(consumed)")
 
                 connection.execSQL("ALTER TABLE skills ADD COLUMN learningSpec TEXT NOT NULL DEFAULT '{}'")
+            }
+        }
+
+        /**
+         * v20 — conversation persistence (Track 2.4, claimed before writing):
+         * `conversations` (chat-list rows) + `messages` (per-turn rows).
+         * Device-local like agents/skills/sessions — chat-history sync is a
+         * later slice (the v13 sync columns can be added with ALTER TABLE, no
+         * table rebuild). Room property names verbatim (no snake_case);
+         * @ColumnInfo(defaultValue) columns carry DEFAULT, plain Kotlin
+         * defaults do not — this SQL mirrors the entity definitions exactly.
+         */
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS conversations (
+                        id TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        createdAtMs INTEGER NOT NULL DEFAULT 0,
+                        updatedAtMs INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (id)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_updatedAtMs ON conversations(updatedAtMs)")
+
+                connection.execSQL("""
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id TEXT NOT NULL,
+                        conversationId TEXT NOT NULL,
+                        fromUser INTEGER NOT NULL,
+                        text TEXT NOT NULL,
+                        timestampMs INTEGER NOT NULL DEFAULT 0,
+                        truncated INTEGER NOT NULL,
+                        PRIMARY KEY (id)
+                    )
+                """)
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_messages_conversationId_timestampMs ON messages(conversationId, timestampMs)")
             }
         }
 

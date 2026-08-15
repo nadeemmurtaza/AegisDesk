@@ -28,6 +28,10 @@ class PolicyExporterTest {
         actionClass = actionClass,
         actionSummary = actionSummary,
         origin = ActionOrigin.AGENT,
+        // T2.2 — the canonical risk vocabulary: RiskLevel.HIGH_IMPACT_SYSTEM was a
+        // PrivilegeLevel value misused as a RiskLevel (a compile error that never
+        // surfaced because nothing built this test module). HIGH maps to APPROVAL
+        // per the corollary, matching the mode below.
         risk = RiskLevel.HIGH,
         mode = PolicyMode.APPROVAL,
         decision = decision,

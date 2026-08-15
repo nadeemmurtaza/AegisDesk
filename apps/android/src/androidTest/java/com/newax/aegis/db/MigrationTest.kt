@@ -5,6 +5,9 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.newax.aegis.db.entity.ConversationEntity
+import com.newax.aegis.db.entity.MessageEntity
+import com.newax.aegis.db.entity.MessageRole
 import com.newax.aegis.db.entity.SyncJournalEntity
 import com.newax.aegis.db.entity.SyncVectorEntity
 import kotlinx.coroutines.runBlocking
@@ -222,6 +225,41 @@ class MigrationTest {
         helper.runMigrationsAndValidate(TEST_DB, 19, true, NewaxDatabase.MIGRATION_18_19)
     }
 
+    /**
+     * v20 adds the conversation tables. Seeds a v19 row first so the migration
+     * is exercised on non-empty data, then verifies existing data survives and
+     * the new tables accept the DAO's row shape (verbatim property names).
+     */
+    @Test
+    @Throws(IOException::class)
+    fun migrate19To20() {
+        helper.createDatabase(TEST_DB, 19).apply {
+            execSQL("INSERT INTO skills (skillId, name, description, category, version, source, packageDir) VALUES ('s1', 'skill one', 'd', 'c', '1', 'bundled', '/x')")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 20, true, NewaxDatabase.MIGRATION_19_20)
+
+        // Existing v19 data survives untouched.
+        val skill = db.query("SELECT name FROM skills WHERE skillId = 's1'")
+        assert(skill.moveToFirst())
+        assert(skill.getString(0) == "skill one")
+        skill.close()
+
+        // The new tables accept the DAO's row shape.
+        db.execSQL("INSERT INTO conversations (id, title, createdAtMs, updatedAtMs) VALUES ('c1', 'First chat', 1, 1)")
+        db.execSQL("INSERT INTO messages (id, conversationId, fromUser, text, timestampMs, truncated) VALUES ('m1', 'c1', 1, 'hi', 1, 0)")
+        val conv = db.query("SELECT title FROM conversations WHERE id = 'c1'")
+        assert(conv.moveToFirst())
+        assert(conv.getString(0) == "First chat")
+        conv.close()
+        val msg = db.query("SELECT text, fromUser, truncated FROM messages WHERE conversationId = 'c1'")
+        assert(msg.moveToFirst())
+        assert(msg.getString(0) == "hi")
+        assert(msg.getLong(1) == 1L)
+        assert(msg.getLong(2) == 0L)
+        msg.close()
+    }
+
     @Test
     @Throws(IOException::class)
     fun migrateFullPath_1To13() {
@@ -245,10 +283,10 @@ class MigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun migrateFullPath_1To19() {
+    fun migrateFullPath_1To20() {
         helper.createDatabase(TEST_DB, 1).apply { close() }
         helper.runMigrationsAndValidate(
-            TEST_DB, 19, true,
+            TEST_DB, 20, true,
             NewaxDatabase.MIGRATION_1_2,
             NewaxDatabase.MIGRATION_2_3,
             NewaxDatabase.MIGRATION_3_4,
@@ -266,7 +304,8 @@ class MigrationTest {
             NewaxDatabase.MIGRATION_15_16,
             NewaxDatabase.MIGRATION_16_17,
             NewaxDatabase.MIGRATION_17_18,
-            NewaxDatabase.MIGRATION_18_19
+            NewaxDatabase.MIGRATION_18_19,
+            NewaxDatabase.MIGRATION_19_20
         )
     }
 
@@ -318,6 +357,53 @@ class MigrationTest {
                 val v = vectorDao.getByPeer("dev-m")!!
                 assert(v.lastAppliedHlcWall == 5L)
                 assert(v.lastAppliedHlcCounter == 2L)
+            }
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * The conversation DAOs round-trip against the v20 schema: recent-first
+     * list, oldest-first transcript, touch/rename, and the transactional
+     * delete that removes messages with the conversation. Runs on an
+     * in-memory DB (same pattern as syncDaosRoundTrip) so the generated DAO
+     * implementations are exercised, not just the tables.
+     */
+    @Test
+    @Throws(IOException::class)
+    fun conversationDaosRoundTrip() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, NewaxDatabase::class.java).build()
+        try {
+            val dao = db.conversationDao()
+            runBlocking {
+                dao.upsertConversation(ConversationEntity(id = "c1", title = "First chat", createdAtMs = 1, updatedAtMs = 1))
+                dao.upsertConversation(ConversationEntity(id = "c2", title = "Second chat", createdAtMs = 2, updatedAtMs = 2))
+                dao.upsertMessage(MessageEntity(id = "m1", conversationId = "c1", fromUser = MessageRole.USER, text = "hi", timestampMs = 1))
+                dao.upsertMessage(MessageEntity(id = "m2", conversationId = "c1", fromUser = MessageRole.ASSISTANT, text = "hello there", timestampMs = 2))
+
+                // Recent-first list.
+                val convs = dao.recentConversations(10)
+                assert(convs.map { it.id } == listOf("c2", "c1"))
+
+                // Transcript oldest-first.
+                val msgs = dao.messagesFor("c1")
+                assert(msgs.map { it.text } == listOf("hi", "hello there"))
+
+                // Touch bubbles c1 above c2.
+                dao.touchConversation("c1", 99)
+                assert(dao.recentConversations(10).first().id == "c1")
+
+                // Rename.
+                dao.renameConversation("c1", "Renamed", 100)
+                assert(dao.conversationById("c1")!!.title == "Renamed")
+
+                // Delete removes the conversation AND its messages in one transaction.
+                dao.deleteConversation("c1")
+                assert(dao.conversationById("c1") == null)
+                assert(dao.messageCount("c1") == 0L)
+                assert(dao.messageCount("c2") == 0L)
             }
         } finally {
             db.close()
