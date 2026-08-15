@@ -76,6 +76,43 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties          # gitignored
 
 ---
 
+## Slice T4.0 — `:apps:desktop` does not compile ← start here
+
+Before parity, before layout: **the Windows body is broken at `HEAD`.** Verified
+with no local changes. It was invisible because **no CI workflow builds
+`:apps:desktop`** — only `:apps:android` is built anywhere.
+
+```bash
+./gradlew :apps:desktop:compileKotlin
+```
+
+| File | Fault | State |
+|---|---|---|
+| `build.gradle.kts` | `Episode` unresolved — `shared:database` never declared | ✅ fixed |
+| `ProximityCli.kt:49` | `discovery.error` — `ProximityDiscovery` has no such member (it declares only `startAdvertising`, `startScanning`, `stop`, `nearby`) | ⬜ yours |
+| `planner/DesktopGoalPlanner.kt:284` | `Unresolved reference 'id'` on the snapshot graph type | ⬜ yours |
+| `ui/GoalsScreen.kt:539` | function invokes `@Composable` without the annotation | ⬜ yours |
+| `ui/state/GoalsScreenState.kt` | cascades from `DesktopGoalPlanner` | ⬜ yours |
+
+The first was a missing dependency declaration with an unambiguous fix — the
+build file's own comment already described the same pattern for `shared:core`,
+where a type leaks through an `implementation`-only dependency. The rest is API
+drift against `shared/sync` and the planner model, and needs your context.
+
+**On `ProximityCli.kt:49` specifically:** decide whether `ProximityDiscovery`
+should expose an error channel at all. Deleting the line is the smaller change
+but silently drops a "discovery degraded" diagnostic; adding `error` to the
+interface is a `shared/sync` change that affects Android too, so **request it**
+rather than making it.
+
+**Ask Track 1 to add desktop and macOS to a workflow** the moment it compiles.
+`:apps:macos:compileKotlin` passes today — protect that too, or it rots next.
+
+**Done when:** `./gradlew :apps:desktop:compileKotlin :apps:desktop:test` passes
+and a workflow runs it.
+
+---
+
 ## Slice T4.1 — Desktop parity (slice 18) ← start here
 
 **Goal:** the Windows body gets a chat surface.

@@ -178,6 +178,25 @@ ship it after their slice 4. Talk to them.
 
 ---
 
+## Slice T1.4b — Build the bodies nobody builds
+
+**CI builds `:apps:android` and nothing else.** `:apps:desktop`, `:apps:macos`
+and `:apps:ios` appear in no workflow — and `:apps:desktop` had rotted all the
+way to non-compilation before anyone noticed. `:apps:macos:compileKotlin` passes
+today; protect it before it goes the same way.
+
+Sequence matters: **Track 4 fixes the desktop compile first** (their slice T4.0),
+then you add the job. Adding a job that fails on arrival trains people to ignore
+red.
+
+**Also: Android Lint had never been run.** It found 18 errors, two of them real
+crashes on Android 8–9. 16 are fixed; the last two are deleted by slice A-6.
+Add `lintDebug` to CI **after A-6 lands** — and prefer precise
+`@SuppressLint` with justification over a blanket baseline, which would hide new
+violations in the same files.
+
+---
+
 ## Slice T1.5 — Supply chain (ENGINEERING.md slice 22)
 
 1. **Gradle dependency verification** — `gradle/verification-metadata.xml` with

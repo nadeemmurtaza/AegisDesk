@@ -127,6 +127,39 @@ unanswered. Make no schema claims until `MigrationTest` reports.
 everything after it. Expect more, and read the *runner* output rather than the
 Gradle tail each time.
 
+### Audit findings — two bodies are unbuilt, one is broken
+
+**CI builds `:apps:android` and nothing else.** `:apps:desktop`, `:apps:macos`
+and `:apps:ios` appear in no workflow. That is how the next item went unnoticed.
+
+**`:apps:desktop` does not compile.** Verified at `HEAD` with no local changes.
+Four independent faults:
+
+| File | Fault |
+|---|---|
+| `Main.kt` | `Episode` and friends unresolved — `shared:database` was never declared **(fixed)** |
+| `ProximityCli.kt:49` | `discovery.error` — `ProximityDiscovery` exposes no such member |
+| `planner/DesktopGoalPlanner.kt:284` | `Unresolved reference 'id'` |
+| `ui/GoalsScreen.kt:539` | function invokes `@Composable` without being annotated |
+| `ui/state/GoalsScreenState.kt` | cascades from `DesktopGoalPlanner` |
+
+Only the first is fixed here — it was a missing dependency declaration with an
+unambiguous fix, and the build file's own comment already described the same
+pattern for `shared:core`. **The other three are API drift in Track 4's body and
+need that track's context**; guessing at them from outside, with no way to run
+the desktop app, would be worse than routing them.
+
+**Track 1:** once Track 4 has it compiling, add the desktop and macOS targets to
+a workflow. An unbuilt module is an unverified module, and this one rotted all
+the way to non-compilation before anyone noticed.
+
+**Android Lint had never been run.** It found **18 errors**; 16 are fixed here.
+Two were the same crash-on-old-Android family as the Ed25519 fault — see
+`ENGINEERING.md` Gate 0. The remaining two are the `LocalContext as
+FragmentActivity` casts at the two `BiometricPrompt` call sites, which slice
+**A-6** deletes outright; fixing them now would be throwaway work in the one file
+Track 3's decomposition owns. **Track 1: add `lintDebug` to CI after A-6 lands.**
+
 **Ownership gap:** `shared/sync` has no owner in the map below. Flagged rather
 than assumed.
 

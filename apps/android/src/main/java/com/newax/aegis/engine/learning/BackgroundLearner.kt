@@ -3,6 +3,7 @@ package com.newax.aegis.engine.learning
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.provider.CallLog
+import android.os.Build
 import android.provider.MediaStore
 import android.provider.Telephony
 import android.util.Log
@@ -309,6 +310,12 @@ object BackgroundLearner {
     // ── Downloads ────────────────────────────────────────────────────────────
 
     private fun scanDownloads(context: Context, db: NewaxDatabase, source: ScanSource, llmBudget: IntArray, triplesBudget: IntArray): List<LearningDraft> {
+        // MediaStore.Downloads arrived in API 29. Below that the field does not
+        // exist and touching it throws NoSuchFieldError — an Error, which the
+        // catch(Exception) below does NOT catch, so this crashed the learning
+        // worker outright on Android 8 and 9 rather than degrading.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyList()
+
         val offset = ScanProgress.getOffset(source)
         val drafts = mutableListOf<LearningDraft>()
 

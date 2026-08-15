@@ -35,6 +35,14 @@ dependencies {
     // channel, the encrypted Quick Share protocol — P2 desktop listener).
     implementation(project(":shared:sync"))
 
+    // Room entities (Episode and friends) surface in DesktopSync's return types,
+    // and the module that provides them declares shared:database as
+    // implementation-only — so the types are not on this module's compile
+    // classpath unless it declares them too. Same rule as shared:core above.
+    // Without this the desktop body does not compile at all, which went
+    // unnoticed because no CI workflow builds it.
+    implementation(project(":shared:database"))
+
     // The shared desktop sync engine (identity, LAN transport loop, Room
     // journal at ~/.aegis/sync.db, memory materialization, pairing) — one
     // implementation for both the Windows and macOS desktop bodies.

@@ -29,6 +29,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -183,13 +184,16 @@ private fun healthColor(status: String?): Color = when (status) {
  */
 @Composable
 private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
-    var tick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { AgentStream.events.collect { tick++ } }
+    // Observe the stream properly. The previous version collected into a `tick`
+    // counter to force recomposition — but nothing ever *read* `tick`, so Compose
+    // tracked no dependency on it and the panel never refreshed. A hand-rolled
+    // invalidation that does not invalidate is worse than none: it looks handled.
+    val events by AgentStream.events.collectAsState()
+    val feed = events.takeLast(5)
     val sessions = AgentRuntimeEngine.activeSessions()
     val frozen = AgentRuntimeEngine.frozenSessions()
     val healthRows = AgentRuntimeEngine.allHealth().associateBy { it.agentId }
     val agentNames = remember { AgentRegistry.agents().associate { it.agentId to it.name } }
-    val feed = AgentStream.events.value.takeLast(5)
     val name = { id: String -> agentNames[id] ?: id }
 
     // ── live sessions ───────────────────────────────────────────────────────

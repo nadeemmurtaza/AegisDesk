@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Debug
 import com.newax.aegis.engine.resource.ResourceGovernor
 import java.io.BufferedReader
@@ -55,10 +56,16 @@ object ResourceProfiler {
         val batPct = if (batScale > 0) (batLevel * 100 / batScale) else -1
         val plugged = (battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: 0) != 0
 
-        val thermalStatus = try {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
-            pm.currentThermalStatus
-        } catch (_: Exception) { 0 }
+        // getCurrentThermalStatus arrived in API 29. Calling it below that throws
+        // NoSuchMethodError — an Error, which catch(Exception) does not catch, so
+        // the try block was not the guard it looked like. 0 is the API's own
+        // THERMAL_STATUS_NONE, so "unknown" and "cool" read the same here.
+        val thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                pm.currentThermalStatus
+            } catch (_: Exception) { 0 }
+        } else 0
 
         val stats = ResourceGovernor.devStats()
 

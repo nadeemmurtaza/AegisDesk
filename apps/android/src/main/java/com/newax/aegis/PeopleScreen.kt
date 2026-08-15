@@ -21,6 +21,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -305,7 +307,16 @@ private fun PersonHeaderCard(person: PersonFactStore.PersonImportance) {
                 Row {
                     Text("Last seen ", fontSize = 12.sp, color = PsTextTer)
                     Text(
-                        SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(person.lastSeenMs)),
+                        SimpleDateFormat(
+                            "MMM d, yyyy",
+                            // Read from the composition-local Configuration so a
+                            // locale change recomposes; Locale.getDefault() does
+                            // not. The list is never empty in practice, so the
+                            // fallback is defensive — and must not itself be
+                            // getDefault(), or the observability is lost again.
+                            ConfigurationCompat.getLocales(LocalConfiguration.current)[0]
+                                ?: Locale.ROOT,
+                        ).format(Date(person.lastSeenMs)),
                         fontSize = 12.sp,
                         color = PsTextSec
                     )
