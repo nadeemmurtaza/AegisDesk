@@ -92,9 +92,35 @@ never open its database. It was invisible because the Ed25519 crash fired first.
 **Fixed** — `getNewaxDatabase` loads the library before opening, and turns a
 linker error naming a method into one naming the actual problem.
 
-**Still open, and Track 2's:** `MigrationTest` has *still* never completed a
-run — two startup crashes in a row stopped it before it began. Whether the 18
-migrations pass is genuinely unknown. Make no schema claims until it reports.
+### And behind *that*, a dependency split
+
+With both crashes fixed, the app started and **`MigrationTest` ran for the first
+time in the project's history.** It failed — but still not on a migration:
+
+```
+AbstractMethodError: abstract method
+  "KSerializer[] GeneratedSerializer.typeParametersSerializers()"
+    at androidx.room.migration.bundle.FieldBundle$$serializer.deserialize
+    at AndroidMigrationTestHelper.loadSchema
+```
+
+It could not *parse* the schema JSON. The androidTest classpath had
+`kotlinx-serialization-json:1.8.1` running against `kotlinx-serialization-core`
+pinned to `{strictly 1.7.3}`.
+
+The mechanism is worth recording because it is not visible in any build file:
+`androidx.lifecycle-viewmodel-compose:2.11.0` and `androidx.savedstate:1.4.0`
+pull core 1.7.3 into the **app** runtime; AGP's *consistent resolution* then pins
+androidTest's core to that same 1.7.3. `room-testing:2.8.4` brings json 1.8.1,
+and because json is absent from the app runtime, nothing pins it — so only half
+the family aligns.
+
+**Fixed** with `kotlinx-serialization-bom:1.8.1` in `apps/android`, which fixes
+both halves where a single-module constraint would not.
+
+**Still open, and Track 2's:** whether the 18 migrations actually pass. Three
+distinct faults have now been cleared in front of that question and it is still
+unanswered. Make no schema claims until `MigrationTest` reports.
 
 **The pattern worth noting:** each fix reveals the next fault, because
 `Application.onCreate` does a great deal of eager work and the first throw masks

@@ -104,12 +104,16 @@ is untouched — it was always correct.
 
 ### Your actual job
 
-**Nobody knows whether the 18 migrations pass.** `MigrationTest` has still never
-completed a run in the project's history — two startup crashes in a row stopped
-it before it began. Make no claim about the schema until it has reported.
+**Nobody knows whether the 18 migrations pass.** `MigrationTest` finally *ran*
+after both startup crashes were fixed — and failed on a third, unrelated fault:
+`kotlinx-serialization-json:1.8.1` against core pinned to `{strictly 1.7.3}`,
+so it could not parse the schema JSON at all (`AbstractMethodError` in
+`FieldBundle$$serializer`). Caused by AGP consistent resolution propagating the
+app runtime's core version to androidTest while leaving json unpinned; fixed
+with `kotlinx-serialization-bom:1.8.1`.
 
-Expect the possibility of a third. `Application.onCreate` does a lot of eager
-work, and every throw there masks everything after it.
+Three distinct faults have now been cleared in front of the actual question, and
+it is still unanswered. Make no claim about the schema until it reports.
 
 **Steps:**
 
@@ -130,6 +134,7 @@ work, and every throw there masks everything after it.
 - ✅ `androidTest` deps present, including `room-testing:2.8.4`
 - ✅ Both startup crashes (fixed; neither was a schema problem)
 - ✅ Native-library ABI coverage — x86_64 carries every `.so` arm64 does
+- ✅ The serialization split that stopped schema JSON parsing (fixed)
 
 **The lesson worth carrying:** both wrong diagnoses came from reading the Gradle
 stack trace instead of the test output. `Starting 0 tests` was in the log the
