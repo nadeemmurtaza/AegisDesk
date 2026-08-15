@@ -236,7 +236,16 @@ class MigrationTest {
     @Throws(IOException::class)
     fun migrate19To20() {
         helper.createDatabase(TEST_DB, 19).apply {
-            execSQL("INSERT INTO skills (skillId, name, description, category, version, source, packageDir) VALUES ('s1', 'skill one', 'd', 'c', '1', 'bundled', '/x')")
+            // Every NOT NULL column without a DEFAULT must appear here. `skills`
+            // has eleven of them; an INSERT naming a plausible subset dies with
+            // "NOT NULL constraint failed: skills.capability" and says nothing
+            // about the migration under test. Read the schema, not the entity's
+            // Kotlin defaults — a Kotlin default is not a SQL DEFAULT.
+            execSQL(
+                "INSERT INTO skills (skillId, name, description, category, version, capability, " +
+                    "toolSchema, sandboxRequired, requiresApproval, risks, source, packageDir) " +
+                    "VALUES ('s1', 'skill one', 'd', 'c', '1', 'SEND_MESSAGE', '{}', 0, 0, '', 'bundled', '/x')"
+            )
             close()
         }
         val db = helper.runMigrationsAndValidate(TEST_DB, 20, true, NewaxDatabase.MIGRATION_19_20)
@@ -260,6 +269,16 @@ class MigrationTest {
         assert(msg.getLong(1) == 1L)
         assert(msg.getLong(2) == 0L)
         msg.close()
+
+        // message_blocks: content and metadata carry SQL DEFAULTs, so an insert
+        // naming only the four required columns must succeed and fill them in.
+        db.execSQL("INSERT INTO message_blocks (id, messageId, position, type) VALUES ('b1', 'm1', 0, 'code')")
+        val block = db.query("SELECT type, content, metadata FROM message_blocks WHERE id = 'b1'")
+        assert(block.moveToFirst())
+        assert(block.getString(0) == "code")
+        assert(block.getString(1) == "")
+        assert(block.getString(2) == "")
+        block.close()
     }
 
     @Test

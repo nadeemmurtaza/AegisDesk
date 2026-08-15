@@ -238,6 +238,15 @@ real.
 **Read the document the slice points you at, before designing the thing it is
 about.** `docs/UI_DESIGN.md` §7 lists ten block kinds in a table.
 
+And a second one from the same slice, which turned `main` red for three hours:
+`migrate19To20` seeded a `skills` row naming seven columns. That table has eleven
+NOT NULL columns without a SQL DEFAULT, so every run died on
+`NOT NULL constraint failed: skills.capability` before reaching the migration it
+was testing. The test shipped having never passed, because at that moment nothing
+ran it — `instrumented-tests` had not been green since. **A Kotlin default on an
+entity property is not a SQL DEFAULT.** Read the exported `N.json` for the version
+you are seeding, not the entity class.
+
 ---
 
 ## Slice T2.5 — Wire streaming (slice 9)
