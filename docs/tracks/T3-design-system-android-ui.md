@@ -63,7 +63,92 @@ across both themes and will fail you — that is the point.
 
 ---
 
-## Slice T3.1 — Decomposition (slice 6) ← **do this first, alone**
+## Slice T3.0 — Three handovers from Track 2 ← **do these first, in one small PR**
+
+Track 2 finished its half of three slices and each one ends inside your files.
+None is large. All three unblock something, and all three get harder once T3.1
+starts moving code around.
+
+### T3.0a — Delete `private enum class Risk`
+
+`MainActivity.kt:619`, used at 621–644.
+
+There are three risk vocabularies in this repo and there should be two.
+`RiskLevel` describes the **action**; `PolicyMode` describes the required
+**gate**; `Risk {Routine, Sensitive, HighImpact}` is a third, local one — and it
+is *wrong*: it buckets irreversible deletes with sends, under-classifies calendar
+events, and over-classifies searches. A badge that disagrees with the engine
+about how dangerous something is, is a safety-surface defect, not a cosmetic one.
+
+**Steps:**
+
+1. Read the concept registry in `ARCHITECTURE.md` Part 1.
+2. Replace the local classification (lines 621–634) with `action.riskLevel`.
+3. Derive the badge label and colours from `RiskLevel` (lines 642–644). Four
+   levels now, not three — `LOW`/`MEDIUM`/`HIGH`/`CRITICAL`.
+4. Tell Track 1 when it is gone, so they can add `enum class Risk` to the
+   banned-symbol guard. That guard **cannot** be added before you delete it — it
+   would fail on the code it exists to prevent.
+
+**Verify:** `./gradlew :apps:android:assembleDebug :apps:android:testDebugUnitTest`
+
+### T3.0b — Wire `conversationDao` so chat survives process death
+
+Chat is `mutableStateListOf` in `MainViewModel` and dies with the process. Schema
+v20 gives you three tables and a DAO with reactive `Flow` queries.
+
+**Messages are stacked content blocks (`docs/UI_DESIGN.md` §7), not strings.**
+Read §7's table of ten kinds before you design the rendering.
+
+| Concept | Where it lives |
+|---|---|
+| Chat-list row | `conversations`, recent-first by `updatedAtMs` |
+| Plain-text rendering — snippet, search, block-less surfaces | `messages.text` |
+| The actual content of a rich message | `message_blocks`, ordered by `position` |
+
+Three properties of that schema that will bite you if you miss them:
+
+- **A plain-text turn stores no block rows at all.** "No blocks" reads as one
+  implicit text block. Do not write a `TEXT` block for every plain message — the
+  common case is meant to stay one row.
+- **`type` is a string on purpose.** A block kind written by a newer build must
+  round-trip through an older reader rather than being dropped. Render an
+  unrecognised kind as its `content`; never discard it.
+- **`deleteConversation` is the only correct delete path.** It removes blocks,
+  then messages, then the row, in one transaction, in that order. Calling the
+  pieces yourself in the wrong order orphans every block in the conversation.
+
+**Verify:** the DAO round-trips are instrumented (`MigrationTest`). Your side is
+`:apps:android:testDebugUnitTest` over the state holder.
+
+### T3.0c — Render the stream, and read this before designing the stop button
+
+`ModelProvider.complete()` is now the collected `stream()`, with **no provider
+overriding it**, so switching `MainViewModel` to collect `stream()` directly buys
+incremental rendering with no contract change.
+
+**`ModelProvider.cancel()` is a documented no-op on both real providers.** Neither
+LiteRT's `sendMessage()` nor kherud's `generate()` is interruptible. Cancelling
+the collecting coroutine stops the UI updating; it does **not** stop the model
+burning tokens and battery.
+
+So: build the stop button on Flow cancellation, say plainly — in the UI and in
+your PR — that generation is *abandoned*, not *aborted*, and **do not write
+"streaming is cancellable" anywhere**. A real cancellation path needs a
+thread-interrupt or session-abort in the native bindings, and that is Track 4's
+to build.
+
+While you are in `ChatBubble`: `UI_DESIGN.md` §7.3 records that the bubble roles
+are inverted today — assistant renders light-on-near-black and user
+dark-on-light, and the spec wants the opposite. Fix it here.
+
+**Verify:** `./gradlew :apps:android:assembleDebug :apps:android:testDebugUnitTest`
+
+**Done when:** all three land in one PR, before decomposition starts.
+
+---
+
+## Slice T3.1 — Decomposition (slice 6) ← **do this next, alone**
 
 **Goal:** `MainActivity` (1403 lines) and `MainViewModel` (1207 lines) become
 per-screen composables and testable state holders.

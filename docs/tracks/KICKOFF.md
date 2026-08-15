@@ -3,41 +3,44 @@
 Copy-pasteable starting instructions for the five tracks, plus an honest
 statement of whether each path is actually clear.
 
-Read this before starting anyone. The first section is a blocker.
+Read this before starting anyone.
 
 ---
 
-## ⛔ Precondition: nothing starts until PR #4 merges
+## ✅ Precondition cleared — PR #4 merged as `19c3253`
 
-**`main` is 26 commits behind this branch, and every one of the following is
-*absent* from `main` right now:**
+The blocker this file used to open with is gone. `main` now carries the Ed25519
+startup fix, the SQLCipher `System.loadLibrary` call, the serialization BOM
+alignment, the `:apps:desktop` compile fixes, all five track briefs,
+`docs/AUTH_DESIGN.md`, `docs/UNWIRED.md` and the unwired guard. All six CI checks
+were green.
 
-| Missing from `main` | Consequence for an agent branching off it |
-|---|---|
-| The Ed25519 startup fix | The app **crashes on launch** on Android 8–11 |
-| The SQLCipher `System.loadLibrary` call | The app **cannot open its database on any device or ABI** |
-| The kotlinx-serialization BOM alignment | `MigrationTest` cannot parse its schema JSON |
-| The `:apps:desktop` compile fixes | The Windows body **does not compile** |
-| `docs/tracks/T*.md`, `TRACKS.md` updates | **The briefs they are told to read do not exist** |
-| `docs/AUTH_DESIGN.md`, `docs/UNWIRED.md` | Design and defect inventory absent |
-| `scripts/check-unwired.sh` + baseline | Guard absent |
+**Branch every agent from the current `main`, not from a track branch.**
 
-Starting five agents against `main` today puts five agents on a codebase whose
-app cannot launch and whose briefs do not exist. **Merge PR #4 first.** Everything
-below assumes it has merged and each agent branches from the updated `main`.
+### One round of track work has already landed, and it is instructive
 
-CI on the branch is green on all six checks. One later run failed on
-`429 Too Many Requests` from Maven Central — infrastructure, not code; re-run it.
+`d390f67` (Track 2) reported four slices done. Re-reading the code against the
+commit message found that three had overstated what shipped — tests that no
+workflow ran, a contract claim that held only for the stub implementation, a
+schema that ignored the spec its own brief pointed at, and a doc that called an
+enum "retired" while it sat in the tree. All four are now closed or handed over,
+and each correction is recorded next to the slice that earned it in
+`docs/tracks/T2-core-data-policy.md`.
+
+Read that file before starting Track 3. **The failures were not coding failures.
+Every one was a claim that outran the code**, and every one would have been
+caught by one `grep`. The rules at the bottom of this document are the
+generalisation, and they are worth more than the slice descriptions.
 
 ---
 
-## Readiness after the merge
+## Readiness
 
 | Track | Path | First slice | Notes |
 |---|---|---|---|
 | **T1** Build/CI | ✅ clear | T1.1 version catalog | Two quick wins waiting: add desktop+macOS to CI, wire the unwired guard |
-| **T2** Core/Data | ✅ clear | T2.2 unify risk vocabularies | T2.1 is **resolved** — the 18 migrations pass |
-| **T3** Design/UI | ✅ clear, **and blocking** | T3.1 decomposition | Must land before T2/T5 enter `apps/android` |
+| **T2** Core/Data | ✅ clear | T2.6 tenancy T-1 | T2.1–T2.5 landed; T2.5's `cancel()` half is still open |
+| **T3** Design/UI | ✅ clear, **and blocking** | T3.0 handovers, then T3.1 decomposition | Three small unblocking edits Track 2 handed over, then the restructure T2/T5 are waiting on |
 | **T4** Platform | ✅ clear | T4.1 desktop parity | T4.0 is **resolved** — desktop compiles, 113 tests pass |
 | **T5** Agents | ✅ clear | T5.1 injection corpus | Pure data; needs no compiler and no other track |
 
@@ -214,13 +217,15 @@ READ FIRST, IN THIS ORDER:
   2. docs/PARALLEL_RULES.md
   3. docs/tracks/T3-design-system-android-ui.md   — your complete brief
   4. docs/UI_DESIGN.md                            — the spec you implement
+  5. ARCHITECTURE.md "Concept registry" (Part 1)  — names two of your first edits
 
 YOU OWN: shared/ui/**, apps/android/**/*Screen.kt, MainActivity.kt,
 MainViewModel.kt, apps/android/.../ui/**, apps/android/src/main/res/**,
 docs/UI_DESIGN.md
 
 YOU NEVER TOUCH: agents/, engine/ (Track 5 owns those, inside your module),
-shared/core, shared/database, platform-impl/*, build files.
+shared/core, shared/database, platform-impl/*, build files. You CONSUME what
+Track 2 published; you do not edit it. Need a change there? Ask, in your PR.
 
 SET UP:
   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64      # NOT 21
@@ -233,7 +238,69 @@ green on every commit. The palette is contrast-verified: do not change a brand
 colour without recomputing. Five values in the original palette failed WCAG AA,
 including a 2.00:1 colour marking policy-blocked actions.
 
-START WITH SLICE T3.1 — DECOMPOSITION, ALONE:
+BOTH OF YOUR CI GATES ALREADY RUN YOUR TESTS: invariants.yml runs
+:shared:ui:jvmTest and :apps:android:testDebugUnitTest. Check that this is still
+true for any NEW module you add — a module is invisible to CI until a workflow
+names it, and that is exactly how 185 of Track 2's tests came to run nowhere.
+
+─────────────────────────────────────────────────────────────────────────────
+SLICE T3.0 — THREE HANDOVERS FROM TRACK 2. Small, mechanical, do them first.
+─────────────────────────────────────────────────────────────────────────────
+
+Track 2 finished its half of three slices and each one ends inside YOUR files.
+None is large. All three are blocking something.
+
+  T3.0a — DELETE `private enum class Risk` (MainActivity.kt:619).
+    There are three risk vocabularies in this repo and there should be two.
+    `RiskLevel` describes the action; `PolicyMode` describes the required gate;
+    `Risk {Routine, Sensitive, HighImpact}` is a third, local, and WRONG — it
+    buckets irreversible deletes with sends, under-classifies calendar events and
+    over-classifies searches. Replace the local classification (lines 621–634)
+    with `action.riskLevel` and derive the badge label and colours from it
+    (lines 642–644). Read the concept registry in ARCHITECTURE.md Part 1 first.
+    Tell Track 1 when it is gone so they can add `enum class Risk` to the
+    banned-symbol guard — it cannot be added before you delete it.
+
+  T3.0b — WIRE `conversationDao`. Chat is `mutableStateListOf` in MainViewModel
+    and dies with the process. Schema v20 gives you `conversations`, `messages`
+    and `message_blocks`, with reactive Flow queries and a transactional delete.
+    Messages are STACKED CONTENT BLOCKS (UI_DESIGN §7, ten kinds), not strings:
+      - `messages.text` is the plain-text rendering — chat-list snippet, search,
+        and any surface that cannot render blocks.
+      - `message_blocks(messageId, position, type, content, metadata)` is the
+        real content, ordered by `position`.
+      - A plain-text turn stores NO block rows. "No blocks" reads as one implicit
+        text block. Do not write a TEXT block for every plain message.
+      - `type` is a string on purpose: an unknown kind from a newer build must
+        round-trip, not be dropped. Render an unknown kind as its `content`.
+    `ConversationDao.deleteConversation` is the only correct delete path — it
+    removes blocks, then messages, then the row, in one transaction, in that
+    order. Do not call the pieces yourself.
+
+  T3.0c — RENDER THE STREAM, AND READ THIS BEFORE DESIGNING THE STOP BUTTON.
+    `ModelProvider.complete()` is now the collected `stream()`, with no provider
+    overriding it, so switching MainViewModel to collect `stream()` directly gets
+    you incremental rendering with no contract change.
+    BUT: `ModelProvider.cancel()` IS A DOCUMENTED NO-OP on both real providers —
+    neither LiteRT's `sendMessage()` nor kherud's `generate()` is interruptible.
+    Cancelling the collecting coroutine stops the UI updating; it does NOT stop
+    the model burning tokens and battery. So:
+      - Build the stop button on Flow cancellation (cancel the collect job).
+      - Say plainly in the UI and in your PR that the generation is abandoned,
+        not aborted, until a provider-level cancellation path exists.
+      - Do NOT write "streaming is cancellable" anywhere. It is not, yet.
+    Also note UI_DESIGN §7.3: the bubble roles are inverted today — assistant
+    renders light-on-near-black, user dark-on-light, and the spec wants the
+    opposite. Fix it while you are in ChatBubble.
+
+  Verify T3.0: ./gradlew :apps:android:assembleDebug :apps:android:testDebugUnitTest
+  Ship these as ONE small PR before decomposition. They are the unblocking edits
+  other tracks are waiting on, and they get harder once files start moving.
+
+─────────────────────────────────────────────────────────────────────────────
+SLICE T3.1 — DECOMPOSITION, ALONE. The one that blocks four tracks.
+─────────────────────────────────────────────────────────────────────────────
+
 MainActivity (1403 lines) and MainViewModel (1207 lines) become per-screen
 composables and testable state holders. Nearly every feature touches these two
 files; until this merges, no other track can safely enter apps/android.
@@ -258,10 +325,10 @@ files; until this merges, no other track can safely enter apps/android.
   Done when: no file over ~400 lines, each state holder has a unit test, and the
   app behaves identically.
 
-BE AWARE: apps/android changed a lot in the last 26 commits — NewaxApplication
-was restructured (startup steps are now classified essential vs optional and a
-failure is recorded in StartupReport), and AgentsScreen, PeopleScreen and several
-engine files were fixed. Read git log before assuming a file matches your brief.
+BE AWARE: apps/android changed a lot recently — NewaxApplication was restructured
+(startup steps are classified essential vs optional and failures are recorded in
+StartupReport), and AgentsScreen, PeopleScreen and several engine files were
+fixed. Read git log before assuming a file matches your brief.
 
 THEN: T3.2 string externalization (do it before the component library or you do
 it twice; tell Track 1 when done so they can enable the guard), T3.3 dark theme,
@@ -273,8 +340,44 @@ it never happens — this repo had zero uses of Modifier.semantics before slice 
 Note contentDescription = null is CORRECT for decorative icons; naming everything
 makes screen readers worse. State goes on the control, not the glyph.
 
+─────────────────────────────────────────────────────────────────────────────
+FIVE WAYS THE LAST TRACK'S WORK LOOKED FINISHED AND WAS NOT. Avoid all five.
+─────────────────────────────────────────────────────────────────────────────
+
+Every one of these reached `main` inside a commit whose message said it was done.
+They were found by reading the code against the claim. Yours will be read the
+same way.
+
+  1. TESTS THAT NO WORKFLOW RUNS. 185 tests compiled on every PR and executed on
+     none. Before you write "covered by tests", grep .github/workflows for the
+     gradle task that runs them.
+
+  2. "RETIRED" / "REMOVED" / "REPLACED" WRITTEN ABOUT CODE STILL IN THE TREE.
+     Deferring to another track is fine. Recording the deferral as completion is
+     not. Write what the code does, not what you intend it to do.
+
+  3. A CLAIM THAT SOMETHING IS "NOW CALLED IN PRODUCTION" WITH NO CALL SITE.
+     `stream()` was declared production-wired while both real providers bypassed
+     it. Name the call site. Then grep for anything that overrides or shadows it.
+     This one is aimed straight at you: T3.0b and T3.0c are both "wire the thing
+     that exists but nothing calls". Prove the wire, do not assert it.
+
+  4. DESIGNING WITHOUT READING THE SPEC THE SLICE POINTED AT. A one-sentence
+     pointer to UI_DESIGN §7 was skipped and the schema shipped as a plain
+     string. You are the track whose entire job is UI_DESIGN. Read the section
+     before you build the component, every time.
+
+  5. DECLARING A DOCUMENT ABSENT INSTEAD OF GREPPING FOR IT. A test header
+     asserted ENGINEERING.md §B7 did not exist. It is at line 534.
+
+AND ONE THAT IS SPECIFICALLY YOURS: do not claim an accessibility property you
+have not exercised. TalkBack, VoiceOver, 200% font scale, RTL and reduced motion
+cannot be verified from a build agent. Semantics that COMPILE are not semantics
+that WORK. Ship the code, list the device checks you could not run, and hand that
+list to the user — do not write "WCAG AA verified" on the back of a green build.
+
 PR: title starts "[T3]". Not agents/ or engine/. Any UI_DESIGN.md change ships in
-the same commit as the code.
+the same commit as the code. State what you ran and what you could not.
 ```
 
 ---
@@ -455,14 +558,48 @@ fully attacker-controlled, what does this change let them do?
 
 ---
 
-## Two rules that apply to all five
+## Rules that apply to all five
 
-**Everything is verified or it is marked unverified.** This project shipped two
-crash-on-launch bugs precisely because CI could not run the app, and a whole
+These are not style preferences. Every one of them is here because it was
+violated, and the violation reached `main` looking finished.
+
+**1 — Everything is verified or it is marked unverified.** This project shipped
+two crash-on-launch bugs precisely because CI could not run the app, and a whole
 platform body rotted to non-compilation because no workflow built it. State what
 you ran and what you did not.
 
-**Read the runner's output, not the wrapper's.** Two wrong diagnoses in this
-repo's history came from reading a Gradle stack-trace tail while `Starting 0
-tests` sat above it. And when a check turns green, check the test *count* — a
-suite that runs zero tests also passes.
+**2 — Read the runner's output, not the wrapper's.** Two wrong diagnoses came
+from reading a Gradle stack-trace tail while `Starting 0 tests` sat above it. And
+when a check turns green, check the test *count* — a suite that runs zero tests
+also passes.
+
+**3 — Before you call a test a gate, find the workflow line that runs it.** Track
+2's property tests — the ones `ENGINEERING.md` §B7 calls the highest-value tests
+in the project — were written, merged, and executed by nothing. `invariants.yml`
+compiled `shared:core` and stopped. 185 tests across three modules compiled on
+every PR and ran on none. `grep` your module in `.github/workflows/*.yml`. If the
+task that runs your tests is not there, your tests are documentation.
+
+**4 — Write the state of the code, not the state of your intent.** A slice landed
+with "that enum is **retired**" in `ARCHITECTURE.md` while the enum was still in
+the tree, still wrong about three action classes. Deferring work to another track
+is correct and expected. Recording deferred work as finished is not — the next
+agent trusts the registry instead of reading the file. "Handed to Track 3, not
+yet deleted" costs six words and is true.
+
+**5 — A default that every real implementation overrides is not a default.** A
+slice made `ModelProvider.complete()` collect `stream()` and wrote "stream() is
+production-called on every inference" into the contract — while both providers
+that actually run a model still overrode it. The claim held only for the no-model
+stub. **When you write "X is now wired", name the call site, then grep for
+anything that shadows it.**
+
+**6 — Read the document the slice points you at, before designing the thing it is
+about.** A slice whose brief said "messages carry stacked content blocks, not
+just text, and designing for plain text now means a second migration later"
+shipped `val text: String`. The pointer was one sentence long and in the steps.
+
+**7 — If a document you were pointed at seems to be missing, grep for it before
+writing that it does not exist.** A test header claimed `ENGINEERING.md` §B7 "is
+not present in this snapshot" and substituted four invariants of its own. §B7 is
+at line 534.
