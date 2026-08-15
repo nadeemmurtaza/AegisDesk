@@ -21,6 +21,10 @@ done-when, and what not to touch), escalation paths, and a PR checklist:
 An agent assigned to a track should need that brief, `AGENTS.md`, and
 `docs/PARALLEL_RULES.md` — nothing else — to start.
 
+**To actually start them:** [`docs/tracks/KICKOFF.md`](tracks/KICKOFF.md) holds a
+copy-pasteable prompt per track, a per-track readiness statement, and the one
+precondition that blocks all five.
+
 ---
 
 ## Current state
