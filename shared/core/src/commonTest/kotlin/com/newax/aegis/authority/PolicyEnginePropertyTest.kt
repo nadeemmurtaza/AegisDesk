@@ -84,7 +84,7 @@ class PolicyEnginePropertyTest {
     // ── I2 + I3 + I4 + I5: every action × origin × mode × toggle ──────────────
 
     @Test
-    fun `the four invariants hold for every action, origin, mode, and toggle`() {
+    fun `the four invariants hold for every action and origin and mode and toggle`() {
         for (action in allActions()) {
             val risk = riskOf(action)
             for (origin in ActionOrigin.entries) {

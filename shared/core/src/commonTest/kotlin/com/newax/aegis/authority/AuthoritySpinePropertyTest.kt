@@ -220,7 +220,7 @@ class AuthoritySpinePropertyTest {
     }
 
     @Test
-    fun `a denied action is rejected and never executed, whatever the mode or origin`() = runTest {
+    fun `a denied action is rejected and never executed whatever the mode or origin`() = runTest {
         for (action in allActions()) {
             for (origin in ActionOrigin.entries) {
                 for (mode in PolicyMode.entries) {

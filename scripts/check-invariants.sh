@@ -12,6 +12,8 @@
 #      build-gates CI job, not here).
 #   3. No `kspCommonMainMetadata` in Gradle build files (known Room KMP footgun — it causes
 #      [MissingType] errors in Room KMP; see shared/database/build.gradle.kts).
+#   4. No commas in backticked test names under commonTest (Kotlin/Native rejects them;
+#      jvmTest passes and only compileTestKotlin<AppleTarget> fails, minutes later, in CI).
 #
 # Exit code 0 = clean, 1 = violation. Prints the violating lines.
 
@@ -55,6 +57,19 @@ if [ -n "$ksp_hits" ]; then
   echo "$ksp_hits"
 else
   echo "OK — no kspCommonMainMetadata in build files"
+fi
+
+echo "== Check 4: no commas in backticked commonTest function names =="
+# Kotlin/Native: "Name contains illegal characters: \",\"". The JVM accepts them, so
+# jvmTest goes green and the failure surfaces only in compileTestKotlin<AppleTarget> —
+# a full CI round-trip after the mistake. This has cost the repo three of them.
+# Backtick-quoted identifiers only; a comma inside a string literal is fine.
+comma_hits=$(grep -rnE 'fun `[^`]*,[^`]*`' shared/*/src/commonTest --include='*.kt' 2>/dev/null || true)
+if [ -n "$comma_hits" ]; then
+  report "Kotlin/Native rejects commas in backticked names — reword these commonTest function names (jvmTest will pass; compileTestKotlinIosArm64 will not):"
+  echo "$comma_hits"
+else
+  echo "OK — no commas in backticked commonTest function names"
 fi
 
 if [ "$violations" -gt 0 ]; then
