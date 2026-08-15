@@ -9,6 +9,10 @@ import androidx.room.RoomDatabaseConstructor
 import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
+// kotlin.concurrent.Volatile, not the JVM-only kotlin.jvm.Volatile that is
+// auto-imported on JVM targets. Without this, the per-target JVM/Android
+// compiles succeed and only compileCommonMainKotlinMetadata fails.
+import kotlin.concurrent.Volatile
 
 @Database(
     entities = [
@@ -822,7 +826,11 @@ abstract class NewaxDatabase : RoomDatabase() {
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_memory_records_validUntil   ON memory_records(validUntil)")
 
                 // Backfill: migrate person_facts → memory_records (type=FACT=1)
-                val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                // Uses this module's own expect/actual time seam (TimeUtils.kt)
+                // rather than a datetime API: kotlinx.datetime.Clock.System moved
+                // to kotlin.time in kotlinx-datetime 0.8.0, and commonMain must
+                // not reach for a platform clock anyway (AGENTS.md §0.5).
+                val now = currentTimeMillis()
                 connection.execSQL("""
                     INSERT INTO memory_records (type, content, category, subject, source, confidence, importance, createdAt, updatedAt, contentHash)
                     SELECT

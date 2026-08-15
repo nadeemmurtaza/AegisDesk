@@ -536,6 +536,7 @@ private val RUN_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern(
 private fun formatRunTime(epochMs: Long): String =
     Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).format(RUN_TIME_FORMATTER)
 
+@Composable
 private fun RunLogCard(runningGoalId: String?, lines: List<RunProgressLine>) {
     Card(
         shape = RoundedCornerShape(16.dp),

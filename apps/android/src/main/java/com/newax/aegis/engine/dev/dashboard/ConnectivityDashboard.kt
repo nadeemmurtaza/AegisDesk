@@ -2,6 +2,7 @@ package com.newax.aegis.engine.dev.dashboard
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -77,6 +78,12 @@ object ConnectivityDashboard {
         return WifiState(isEnabled, ssid.isNotBlank(), ssid, bssid, signal, linkSpeed, freq, ip)
     }
 
+    /**
+     * The telephony reads below are inside runCatching, which catches the
+     * SecurityException raised without READ_PHONE_STATE. Lint cannot see through
+     * runCatching, so it reports handled calls as unhandled.
+     */
+    @SuppressLint("MissingPermission")
     private fun cellularState(context: Context): CellularState {
         val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         val dataEnabled = runCatching { tm.isDataEnabled }.getOrDefault(false)
@@ -87,19 +94,34 @@ object ConnectivityDashboard {
         return CellularState(dataEnabled, networkType, carrier, 0, roaming, simState)
     }
 
+    /**
+     * Every Bluetooth read here is inside runCatching, which catches the
+     * SecurityException this raises when BLUETOOTH_CONNECT is absent. Lint cannot
+     * see through runCatching, so it reports handled calls as unhandled.
+     */
+    @SuppressLint("MissingPermission")
     private fun bluetoothState(context: Context): BluetoothState {
         val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         val adapter = bm?.adapter ?: BluetoothAdapter.getDefaultAdapter()
         val isEnabled = adapter?.isEnabled == true
         val isDiscovering = runCatching { adapter?.isDiscovering == true }.getOrDefault(false)
         val paired = runCatching { adapter?.bondedDevices?.toList() ?: emptyList() }.getOrDefault(emptyList())
-        val scanMode = when (adapter?.scanMode) {
-            BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE -> "DISCOVERABLE"
-            BluetoothAdapter.SCAN_MODE_CONNECTABLE -> "CONNECTABLE"
-            BluetoothAdapter.SCAN_MODE_NONE -> "NONE"
-            else -> "UNKNOWN"
+        // scanMode and BluetoothDevice.name both need BLUETOOTH_CONNECT on
+        // Android 12+, and throw SecurityException without it. The two reads
+        // above were already guarded; these two were not, so this dashboard
+        // crashed rather than showing "UNKNOWN" when the permission was absent.
+        val scanMode = runCatching {
+            when (adapter?.scanMode) {
+                BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE -> "DISCOVERABLE"
+                BluetoothAdapter.SCAN_MODE_CONNECTABLE -> "CONNECTABLE"
+                BluetoothAdapter.SCAN_MODE_NONE -> "NONE"
+                else -> "UNKNOWN"
+            }
+        }.getOrDefault("UNKNOWN")
+        val pairedLabels = paired.take(5).map { device ->
+            runCatching { device.name }.getOrNull() ?: device.address
         }
-        return BluetoothState(isEnabled, isDiscovering, paired.size, paired.take(5).map { it.name ?: it.address }, scanMode)
+        return BluetoothState(isEnabled, isDiscovering, paired.size, pairedLabels, scanMode)
     }
 
     private fun internetState(context: Context): InternetState {

@@ -1,5 +1,9 @@
 # PARALLEL WORK-SPLIT — Newax Aegis Assistant (four agents, one repo)
 
+> **General rules for parallel agents live in `docs/PARALLEL_RULES.md`.**
+> This document is one *specific* split (four platform bodies). The rules there
+> apply to any split, and should be read first.
+
 Date: 2026-08-11. This document partitions the remaining work into **four
 parallel tracks — one per device: iOS, Android, macOS, Windows — labeled
 I, A, M, W** — and contains the **complete, paste-ready instructions for

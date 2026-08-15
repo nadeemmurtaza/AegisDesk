@@ -50,6 +50,17 @@ interface ProximityDiscovery {
 
     /** Peers currently visible to discovery, newest last. */
     fun nearby(): List<ProximityEndpoint>
+
+    /**
+     * Why discovery is degraded, or null when it is healthy.
+     *
+     * Defaults to null so implementations without a diagnostic channel need no
+     * change. [LanProximityDiscovery] sets it on advertise failure, scan
+     * failure, and mDNS being unavailable — cases where discovery keeps running
+     * but finds nothing, which is otherwise indistinguishable from "no peers
+     * nearby". The desktop CLI already tried to read this and did not compile.
+     */
+    val error: String? get() = null
 }
 
 /** Platform seam — the actuals are per-target (jvmAndroidMain: mDNS; P2: BLE). */

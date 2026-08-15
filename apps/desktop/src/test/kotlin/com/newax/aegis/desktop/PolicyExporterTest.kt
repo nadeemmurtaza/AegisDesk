@@ -28,22 +28,25 @@ class PolicyExporterTest {
         actionClass = actionClass,
         actionSummary = actionSummary,
         origin = ActionOrigin.AGENT,
-        risk = RiskLevel.HIGH_IMPACT_SYSTEM,
+        risk = RiskLevel.HIGH,
         mode = PolicyMode.APPROVAL,
         decision = decision,
         reason = reason,
         auditedAtMs = auditedAtMs,
     )
 
+    // Exact-string assertions rather than picking rows out with lineSequence():
+    // RFC-4180 fields may contain embedded newlines, so splitting on newlines
+    // cannot recover a record — which is why the escaping case below used to
+    // fail. They also pin CRLF terminators (trailing one included) and minimal
+    // quoting: only a comma, quote, CR or LF forces quotes.
+
+    private val header =
+        "action_class,action_summary,origin,risk,mode,decision,reason,audited_at_ms"
+
     @Test
-    fun `csv emits the header row`() {
-        val csv = PolicyExporter.csv(emptyList())
-        val header = csv.lineSequence().first()
-        assertEquals(
-            "action_class,action_summary,origin,risk,mode,decision,reason,audited_at_ms",
-            header
-        )
-        assertEquals(1, csv.lineSequence().count())
+    fun `csv emits only the header row when there is nothing to export`() {
+        assertEquals("$header\r\n", PolicyExporter.csv(emptyList()))
     }
 
     @Test
@@ -51,15 +54,11 @@ class PolicyExporterTest {
         val csv = PolicyExporter.csv(
             listOf(record("Send", PolicyDecision.REQUIRE_APPROVAL, reason = "not configured"))
         )
-        val row = csv.lineSequence().toList()[1]
-        assertTrue(row.contains("\"Send\""))
-        assertTrue(row.contains("open spotify"))
-        assertTrue(row.contains("AGENT"))
-        assertTrue(row.contains("HIGH_IMPACT_SYSTEM"))
-        assertTrue(row.contains("APPROVAL"))
-        assertTrue(row.contains("REQUIRE_APPROVAL"))
-        assertTrue(row.contains("not configured"))
-        assertTrue(row.contains("5000"))
+        assertEquals(
+            "$header\r\n" +
+                "Send,open spotify,AGENT,HIGH,APPROVAL,REQUIRE_APPROVAL,not configured,5000\r\n",
+            csv,
+        )
     }
 
     @Test
@@ -67,10 +66,13 @@ class PolicyExporterTest {
         val csv = PolicyExporter.csv(
             listOf(record("Send", PolicyDecision.DENY, reason = "a, \"quoted\" and\nnewline"))
         )
-        val row = csv.lineSequence().toList()[1]
-        // RFC-4180: quoted, internal quotes doubled, and the embedded newline stays inside the field.
-        assertTrue(row.startsWith("\"Send\""))
-        assertTrue(row.contains("\"a, \"\"quoted\"\" and\nnewline\""))
+        // The embedded newline stays inside the quoted field — which is exactly
+        // why a record cannot be recovered by splitting on newlines.
+        assertEquals(
+            "$header\r\n" +
+                "Send,open spotify,AGENT,HIGH,APPROVAL,DENY,\"a, \"\"quoted\"\" and\nnewline\",5000\r\n",
+            csv,
+        )
     }
 
     @Test

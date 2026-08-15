@@ -1,9 +1,24 @@
 <resources>
+    <!--
+      The XML theme covers the window chrome that exists before Compose draws:
+      the launch window background, the status bar, and the navigation bar.
+      Its values must MATCH the Compose palette in shared:ui
+      (NewaxLightColors, docs/UI_DESIGN.md §4) — this theme previously carried a
+      dark navy/teal scheme (#08111F bars, #15C7B8 accent) that contradicted the
+      light Compose UI, so the app flashed dark chrome around a light surface.
+
+      Values below are the shared tokens:
+        windowBackground / statusBar / navigationBar = bg          #F7F7F5
+        colorAccent                                  = accent      #0B7A5F
+      windowLightStatusBar is true because the bars are now light, so the system
+      icons must be drawn dark to stay legible.
+    -->
     <style name="Theme.NewaxAegis" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#15C7B8</item>
-        <item name="android:navigationBarColor">#08111F</item>
-        <item name="android:statusBarColor">#08111F</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#F7F7F5</item>
+        <item name="android:colorAccent">#0B7A5F</item>
+        <item name="android:navigationBarColor">#F7F7F5</item>
+        <item name="android:statusBarColor">#F7F7F5</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

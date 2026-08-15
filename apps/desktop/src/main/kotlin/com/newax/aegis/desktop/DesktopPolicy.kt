@@ -287,7 +287,15 @@ object DesktopPolicyHolder {
     ) {
         synchronized(lock) {
             if (engine != null) return
-            auditStore = FilePolicyAuditStore(auditFile)
+            val store = FilePolicyAuditStore(auditFile)
+            auditStore = store
+            // Rehydrate the trail. FilePolicyAuditStore.load() existed and was
+            // never called, so every decision was written to disk and never read
+            // back: the policy audit silently started empty on every launch. An
+            // audit trail that forgets across restarts is not an audit trail,
+            // and nothing caught it because no CI job builds this module.
+            audits.clear()
+            audits.addAll(store.load().takeLast(MAX_POLICY_AUDIT_RECORDS))
             engine = PolicyEngine(
                 store = FilePolicyStore(policyFile),
                 // Desktop has no automation toggles: CONFIGURABLE conservatively

@@ -63,6 +63,7 @@ import com.newax.aegis.desktop.ui.state.PolicyUiModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 /**
  * Policy tab — the desktop face of the authority spine (mirroring Android's
@@ -493,7 +494,7 @@ private fun PolicyAuditCard(record: PolicyAuditRecord, fmt: DateTimeFormatter) {
 }
 
 // ── Labels & colors (shared with the audit decision rendering) ─────────────
-private val DenyColor = Color(0xFF64748B)
+private val DenyColor = NewaxLightColors.textTertiary
 private val AutoColor = ReadyColor
 
 private fun modeLabel(mode: PolicyMode): String = when (mode) {

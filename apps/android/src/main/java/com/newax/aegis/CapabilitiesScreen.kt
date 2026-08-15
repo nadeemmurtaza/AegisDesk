@@ -28,21 +28,25 @@ import com.newax.aegis.platform.CapabilityStatus
 import com.newax.aegis.platform.PlatformCapability
 import com.newax.aegis.platform.PrivilegeLevel
 import kotlinx.coroutines.delay
+import com.newax.aegis.ui.theme.NewaxLightColors
 
-// ── Design tokens (REFINED_THEME.md) ────────────────────────────────────────
-private val Surface      = Color(0xFFFFFFFF)
-private val SurfaceMuted = Color(0xFFF2F2EF)
-private val TextPri      = Color(0xFF1B1B1A)
-private val TextSec      = Color(0xFF686864)
-private val TextTer      = Color(0xFF8D8D87)
-private val Border       = Color(0xFFD8D8D3)
+// ── Design tokens — aliases onto shared:ui NewaxLightColors (docs/UI_DESIGN.md §4).
+// Light-theme only for now; per-screen migration to NewaxTheme.colors (which
+// carries dark mode) is a later slice. Values live in ONE place: NewaxColors.kt.
 
-private val ReadyColor      = Color(0xFF22C55E)
-private val MissingPermCol  = Color(0xFFF59E0B)
-private val MissingCredCol  = Color(0xFFF97316)
-private val DisabledCol     = Color(0xFF94A3B8)
-private val UnavailableCol  = Color(0xFFEF4444)
-private val NotSupportedCol = Color(0xFF9CA3AF)
+private val Surface      = NewaxLightColors.surface
+private val SurfaceMuted = NewaxLightColors.surfaceMuted
+private val TextPri      = NewaxLightColors.textPrimary
+private val TextSec      = NewaxLightColors.textSecondary
+private val TextTer      = NewaxLightColors.textTertiary
+private val Border       = NewaxLightColors.border
+
+private val ReadyColor      = NewaxLightColors.success
+private val MissingPermCol  = NewaxLightColors.warning
+private val MissingCredCol  = NewaxLightColors.warning
+private val DisabledCol     = NewaxLightColors.textTertiary
+private val UnavailableCol  = NewaxLightColors.error
+private val NotSupportedCol = NewaxLightColors.textTertiary
 
 private data class CapabilityRow(
     val id: CapabilityId,

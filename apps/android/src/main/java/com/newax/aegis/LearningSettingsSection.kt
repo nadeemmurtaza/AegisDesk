@@ -32,21 +32,22 @@ import com.newax.aegis.engine.learning.ScanProgress
 import com.newax.aegis.engine.learning.ScanSource
 import java.text.SimpleDateFormat
 import java.util.*
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-private val LS_Surface      = Color(0xFFFFFFFF)
-private val LS_SurfaceMuted = Color(0xFFF2F2EF)
-private val LS_SurfaceStr   = Color(0xFFE7E7E2)
-private val LS_Primary      = Color(0xFF1B1B1A)
-private val LS_TextPri      = Color(0xFF1B1B1A)
-private val LS_TextSec      = Color(0xFF686864)
-private val LS_TextTer      = Color(0xFF8D8D87)
-private val LS_Border       = Color(0xFFD8D8D3)
-private val LS_Green        = Color(0xFF16A34A)
-private val LS_GreenBg      = Color(0xFFDCFCE7)
-private val LS_Amber        = Color(0xFFD97706)
-private val LS_AmberBg      = Color(0xFFFEF3C7)
-private val LS_Red          = Color(0xFFDC2626)
+private val LS_Surface      = NewaxLightColors.surface
+private val LS_SurfaceMuted = NewaxLightColors.surfaceMuted
+private val LS_SurfaceStr   = NewaxLightColors.surfaceStrong
+private val LS_Primary      = NewaxLightColors.textPrimary
+private val LS_TextPri      = NewaxLightColors.textPrimary
+private val LS_TextSec      = NewaxLightColors.textSecondary
+private val LS_TextTer      = NewaxLightColors.textTertiary
+private val LS_Border       = NewaxLightColors.border
+private val LS_Green        = NewaxLightColors.success
+private val LS_GreenBg      = NewaxLightColors.successFill
+private val LS_Amber        = NewaxLightColors.warning
+private val LS_AmberBg      = NewaxLightColors.warningFill
+private val LS_Red          = NewaxLightColors.error
 
 private val SOURCE_ICONS: Map<ScanSource, ImageVector> = mapOf(
     ScanSource.CONTACTS    to Icons.Outlined.Contacts,

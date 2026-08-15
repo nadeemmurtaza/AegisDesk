@@ -281,7 +281,7 @@ object DesktopGoalPlanner {
         stateMachines.clear()
         plans.clear()
         snapshot.goals.forEach { goals[it.id] = it }
-        snapshot.graphs.forEach { graphs[it.id] = it }
+        snapshot.graphs.forEach { graphs[it.goalId] = it }
         snapshot.states.forEach { (id, state) ->
             stateMachines[id] = StateMachines.goal().apply { restore(state) }
         }

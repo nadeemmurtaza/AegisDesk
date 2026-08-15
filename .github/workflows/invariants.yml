@@ -61,5 +61,12 @@ jobs:
       - name: Compile shared:database per target (expect/actual + Room KSP gate)
         run: ./gradlew :shared:database:desktopJar :shared:database:assemble --stacktrace
 
+      # shared:ui holds the design tokens. jvmTest runs ContrastTest, which
+      # enforces the WCAG 2.2 AA floors from docs/UI_DESIGN.md §3.1 on every
+      # colour pair — the palette's accessibility guarantee is checked by
+      # arithmetic here, not by review. assemble compiles the androidTarget.
+      - name: Compile shared:ui per target + run token contrast tests
+        run: ./gradlew :shared:ui:compileKotlinJvm :shared:ui:assemble :shared:ui:jvmTest --stacktrace
+
       - name: "Build Android app — invariant: Android stays green"
         run: ./gradlew :apps:android:assembleDebug :apps:android:testDebugUnitTest --stacktrace

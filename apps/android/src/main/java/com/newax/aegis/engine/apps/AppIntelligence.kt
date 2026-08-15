@@ -85,7 +85,7 @@ object AppIntelligence {
             Strategy.UI_PROCEDURE -> {
                 val proc = resolution.procedure ?: return false
                 val steps = StepSerializer.deserialize(proc.steps)
-                val result = ProcedureExecutor.execute(steps, context, db, proc.id)
+                val result = ProcedureExecutor.execute(steps, context, db, proc.id, proc.packageName)
                 if (result.success) recordProcedureSuccess(db, proc.id)
                 else recordProcedureFailure(db, proc.id)
                 result.success

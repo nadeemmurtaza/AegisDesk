@@ -24,21 +24,51 @@ object ProcedureExecutor {
     private const val SETTLE_STABLE_MS = 600L
     private const val STEP_TIMEOUT_MS  = 6000L
 
+    /**
+     * @param expectedPackage the package this procedure was recorded against.
+     *   Once execution has *arrived* in that app, any later step that finds a
+     *   different app in the foreground aborts — the pre-flight check from
+     *   `COMPUTER_USE.md` §5. Null skips the check.
+     */
     suspend fun execute(
         steps: List<ProcedureStep>,
         context: Context,
         db: NewaxDatabase? = null,
-        procedureId: Long? = null
+        procedureId: Long? = null,
+        expectedPackage: String? = null,
     ): ExecutionResult {
         val svc = NewaxAccessibilityService.instance
             ?: return ExecutionResult(false, 0, steps.size, 0, "Accessibility service not running")
 
         var completed = 0
+        // The expected-package check only starts once we have actually reached
+        // that app. A procedure's own LaunchApp step legitimately runs from
+        // somewhere else, and enforcing before arrival would abort every
+        // procedure on its first step.
+        var arrived = expectedPackage == null
+
         for ((idx, step) in steps.withIndex()) {
             if (!coroutineContext.isActive) break
             val currentPkg = svc.currentPackage
-            if (ExecutionGuard.check(context, currentPkg) == ExecutionGuard.GuardResult.BLOCKED) {
-                return ExecutionResult(false, completed, steps.size, idx, "Blocked: protected package $currentPkg")
+            if (!arrived && currentPkg != null && currentPkg == expectedPackage) arrived = true
+
+            val (guard, reason) = ExecutionGuard.checkWithContext(
+                currentPackage = currentPkg,
+                guardContext = ExecutionGuard.GuardContext(
+                    expectedPackage = if (arrived) expectedPackage else null,
+                ),
+            )
+            if (guard == ExecutionGuard.GuardResult.BLOCKED) {
+                val detail = when (reason) {
+                    ExecutionGuard.BlockReason.PROTECTED_PACKAGE ->
+                        "Blocked: protected package $currentPkg"
+                    ExecutionGuard.BlockReason.UNEXPECTED_PACKAGE ->
+                        "Blocked: expected $expectedPackage but found $currentPkg — the screen changed mid-procedure"
+                    ExecutionGuard.BlockReason.FINANCIAL_ACTION ->
+                        "Blocked: financial action needs approval"
+                    null -> "Blocked"
+                }
+                return ExecutionResult(false, completed, steps.size, idx, detail)
             }
             // Pre-condition check
             step.pre?.let { cond ->
@@ -77,8 +107,10 @@ object ProcedureExecutor {
         stepsJson: String,
         context: Context,
         db: NewaxDatabase? = null,
-        procedureId: Long? = null
-    ): ExecutionResult = execute(StepSerializer.deserialize(stepsJson), context, db, procedureId)
+        procedureId: Long? = null,
+        expectedPackage: String? = null,
+    ): ExecutionResult =
+        execute(StepSerializer.deserialize(stepsJson), context, db, procedureId, expectedPackage)
 
     // ── Step execution ────────────────────────────────────────────────────────
 

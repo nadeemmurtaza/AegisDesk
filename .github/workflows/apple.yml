@@ -38,4 +38,12 @@ jobs:
             :shared:core:compileKotlinMacosArm64 \
             :shared:platform-api:compileKotlinMacosArm64 \
             :shared:model-api:compileKotlinMacosArm64 \
+            :shared:ui:compileKotlinIosArm64 \
+            :shared:ui:compileKotlinIosSimulatorArm64 \
             --stacktrace
+
+      # NB shared:ui declares no macosArm64 target, unlike the modules above.
+      # Compose Multiplatform ships UI for iOS (native) and JVM Desktop only —
+      # there are no macosArm64 Compose artifacts to resolve against. The macOS
+      # body is apps/macos, a Compose Desktop app on the JVM target, so it is
+      # covered by the Linux invariants job rather than here.

@@ -51,22 +51,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.sync.PairedPeer
 import org.json.JSONObject
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val Surface = Color(0xFFFFFFFF)
-private val SurfaceMuted = Color(0xFFF2F2EF)
-private val Primary = Color(0xFF1B1B1A)
-private val TextPri = Color(0xFF1B1B1A)
-private val TextSec = Color(0xFF686864)
-private val TextTer = Color(0xFF8D8D87)
-private val Border = Color(0xFFD8D8D3)
-private val AccentGreen = Color(0xFF22C55E)
-private val AccentRed = Color(0xFFDC2626)
+private val Surface = NewaxLightColors.surface
+private val SurfaceMuted = NewaxLightColors.surfaceMuted
+private val Primary = NewaxLightColors.textPrimary
+private val TextPri = NewaxLightColors.textPrimary
+private val TextSec = NewaxLightColors.textSecondary
+private val TextTer = NewaxLightColors.textTertiary
+private val Border = NewaxLightColors.border
+private val AccentGreen = NewaxLightColors.success
+private val AccentRed = NewaxLightColors.error
 
 /**
  * The sync control surface (docs/SYNC_DESIGN.md §3, §9 — the wiring slice's
@@ -78,6 +80,15 @@ private val AccentRed = Color(0xFFDC2626)
 @Composable
 fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
     val context = LocalContext.current
+
+    // Every control below needs the device identity, and on a platform without
+    // Ed25519 (below Android 12) there is none. Say so plainly rather than
+    // showing a screen whose every button throws.
+    if (!SyncRuntime.isAvailable) {
+        SyncUnavailable(padding, SyncRuntime.unavailableReason)
+        return
+    }
+
     var autoOn by remember { mutableStateOf(SyncRuntime.enabled()) }
     var statusText by remember { mutableStateOf(SyncRuntime.status()) }
     var peers by remember { mutableStateOf(SyncRuntime.peers()) }
@@ -691,6 +702,60 @@ private fun PairedPeerRow(
             IconButton(onClick = onUnpair) {
                 Icon(Icons.Rounded.Delete, contentDescription = "Unpair", tint = AccentRed, modifier = Modifier.size(18.dp))
             }
+        }
+    }
+}
+
+/**
+ * Shown instead of the Sync screen when this device cannot hold a sync identity.
+ *
+ * Names the limit and its boundary. A user on Android 10 seeing "sync is off"
+ * with no explanation reasonably concludes the app is broken; the fix for the
+ * crash is only half a fix if the replacement is silence.
+ */
+@Composable
+private fun SyncUnavailable(
+    padding: androidx.compose.foundation.layout.PaddingValues,
+    reason: String?,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(NewaxLightColors.bg)
+            .padding(padding)
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Outlined.Sync,
+                contentDescription = null,
+                tint = TextTer,
+                modifier = Modifier.size(44.dp),
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "Device sync isn't available here",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPri,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                reason ?: "This device can't set up the secure keys sync needs.",
+                fontSize = 14.sp,
+                color = TextSec,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Nothing else is affected — memory, tasks and the assistant all " +
+                    "work normally, and everything stays on this device.",
+                fontSize = 13.sp,
+                color = TextTer,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

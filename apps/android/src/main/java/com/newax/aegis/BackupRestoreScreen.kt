@@ -30,23 +30,24 @@ import com.newax.aegis.backup.BackupManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-private val BR_Surface      = Color(0xFFFFFFFF)
-private val BR_SurfaceMuted = Color(0xFFF2F2EF)
-private val BR_TextPri      = Color(0xFF1B1B1A)
-private val BR_TextSec      = Color(0xFF686864)
-private val BR_TextTer      = Color(0xFF8D8D87)
-private val BR_Border       = Color(0xFFD8D8D3)
-private val BR_Green        = Color(0xFF16A34A)
-private val BR_GreenBg      = Color(0xFFDCFCE7)
-private val BR_Red          = Color(0xFFDC2626)
-private val BR_RedBg        = Color(0xFFFEE2E2)
-private val BR_Amber        = Color(0xFFD97706)
-private val BR_AmberBg      = Color(0xFFFEF3C7)
-private val BR_Blue         = Color(0xFF2563EB)
-private val BR_BlueBg       = Color(0xFFDBEAFE)
-private val BR_Primary      = Color(0xFF1B1B1A)
+private val BR_Surface      = NewaxLightColors.surface
+private val BR_SurfaceMuted = NewaxLightColors.surfaceMuted
+private val BR_TextPri      = NewaxLightColors.textPrimary
+private val BR_TextSec      = NewaxLightColors.textSecondary
+private val BR_TextTer      = NewaxLightColors.textTertiary
+private val BR_Border       = NewaxLightColors.border
+private val BR_Green        = NewaxLightColors.success
+private val BR_GreenBg      = NewaxLightColors.successFill
+private val BR_Red          = NewaxLightColors.error
+private val BR_RedBg        = NewaxLightColors.errorFill
+private val BR_Amber        = NewaxLightColors.warning
+private val BR_AmberBg      = NewaxLightColors.warningFill
+private val BR_Blue         = NewaxLightColors.info
+private val BR_BlueBg       = NewaxLightColors.infoFill
+private val BR_Primary      = NewaxLightColors.textPrimary
 
 private sealed class BackupStatus {
     data object Idle    : BackupStatus()

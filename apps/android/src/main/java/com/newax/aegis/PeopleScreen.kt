@@ -21,6 +21,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -36,16 +38,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import com.newax.aegis.ui.theme.NewaxLightColors
 
 // Design tokens — mirrored from MainActivity (private to that file)
-private val PsBg           = Color(0xFFF7F7F5)
-private val PsSurface      = Color(0xFFFFFFFF)
-private val PsSurfaceMuted = Color(0xFFF2F2EF)
-private val PsTextPri      = Color(0xFF1B1B1A)
-private val PsTextSec      = Color(0xFF686864)
-private val PsTextTer      = Color(0xFF8D8D87)
-private val PsBorder       = Color(0xFFD8D8D3)
-private val PsPrimary      = Color(0xFF1B1B1A)
+private val PsBg           = NewaxLightColors.bg
+private val PsSurface      = NewaxLightColors.surface
+private val PsSurfaceMuted = NewaxLightColors.surfaceMuted
+private val PsTextPri      = NewaxLightColors.textPrimary
+private val PsTextSec      = NewaxLightColors.textSecondary
+private val PsTextTer      = NewaxLightColors.textTertiary
+private val PsBorder       = NewaxLightColors.border
+private val PsPrimary      = NewaxLightColors.textPrimary
 
 @Composable
 fun PeopleScreen(vm: MainViewModel, padding: PaddingValues) {
@@ -304,7 +307,16 @@ private fun PersonHeaderCard(person: PersonFactStore.PersonImportance) {
                 Row {
                     Text("Last seen ", fontSize = 12.sp, color = PsTextTer)
                     Text(
-                        SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(person.lastSeenMs)),
+                        SimpleDateFormat(
+                            "MMM d, yyyy",
+                            // Read from the composition-local Configuration so a
+                            // locale change recomposes; Locale.getDefault() does
+                            // not. The list is never empty in practice, so the
+                            // fallback is defensive — and must not itself be
+                            // getDefault(), or the observability is lost again.
+                            ConfigurationCompat.getLocales(LocalConfiguration.current)[0]
+                                ?: Locale.ROOT,
+                        ).format(Date(person.lastSeenMs)),
                         fontSize = 12.sp,
                         color = PsTextSec
                     )

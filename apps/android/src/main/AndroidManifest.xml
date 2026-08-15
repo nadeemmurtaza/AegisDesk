@@ -13,7 +13,14 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
-    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    <!-- BIND_NOTIFICATION_LISTENER_SERVICE is a signature permission: it can
+         never be granted to a normal app, so requesting it here did nothing.
+         The correct declaration is android:permission on the <service> tag
+         below, which is already present. -->
+    <!-- SMS permissions imply telephony hardware. Without this the app is
+         un-installable on tablets and ChromeOS devices that have no radio,
+         even though SMS is one optional feature among many. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -51,7 +58,7 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
-    <application android:name=".NewaxApplication" android:theme="@style/Theme.NewaxNewax" android:label="Newax Newax" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false">
+    <application android:name=".NewaxApplication" android:theme="@style/Theme.NewaxAegis" android:label="Newax Aegis" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false">
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <activity android:name=".MainActivity" android:exported="true">
@@ -64,7 +71,7 @@
         <activity
             android:name=".ui.devconsole.DevConsoleActivity"
             android:exported="false"
-            android:theme="@style/Theme.NewaxNewax"
+            android:theme="@style/Theme.NewaxAegis"
             android:label="Newax Dev Console" />
         <service
             android:name=".accessibility.NewaxAccessibilityService"

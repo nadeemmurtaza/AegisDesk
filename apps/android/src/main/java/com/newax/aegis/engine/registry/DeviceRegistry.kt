@@ -1,6 +1,7 @@
 package com.newax.aegis.engine.registry
 
 import android.bluetooth.BluetoothDevice
+import android.annotation.SuppressLint
 import android.content.Context
 import com.newax.aegis.engine.bus.NewaxEvent
 import com.newax.aegis.engine.bus.NewaxEventBus
@@ -58,22 +59,39 @@ object DeviceRegistry {
 
     fun count(): Int = devices.size
 
+    /**
+     * bluetoothClass and name both need BLUETOOTH_CONNECT on Android 12+ and
+     * throw SecurityException without it. The one internal caller wraps this in
+     * runCatching, but the function is public — so it carries its own guard
+     * rather than depending on every future caller remembering.
+     *
+     * The address is safe: it comes from the already-bonded device record.
+     */
+    @SuppressLint("MissingPermission")
     fun fromBluetooth(btDevice: BluetoothDevice): DeviceRecord {
-        val type = when (btDevice.bluetoothClass?.majorDeviceClass) {
-            224 -> DeviceType.BLUETOOTH_AUDIO
-            1280 -> DeviceType.BLUETOOTH_HID
-            512 -> DeviceType.BLUETOOTH_PHONE
-            else -> DeviceType.UNKNOWN
-        }
+        val type = runCatching {
+            when (btDevice.bluetoothClass?.majorDeviceClass) {
+                224 -> DeviceType.BLUETOOTH_AUDIO
+                1280 -> DeviceType.BLUETOOTH_HID
+                512 -> DeviceType.BLUETOOTH_PHONE
+                else -> DeviceType.UNKNOWN
+            }
+        }.getOrDefault(DeviceType.UNKNOWN)
         return DeviceRecord(
             id = btDevice.address,
-            name = btDevice.name ?: "Unknown",
+            name = runCatching { btDevice.name }.getOrNull() ?: "Unknown",
             type = type,
             address = btDevice.address,
             isConnected = true
         )
     }
 
+    /**
+     * bondedDevices needs BLUETOOTH_CONNECT on Android 12+; the whole body is
+     * inside runCatching, which catches the SecurityException. Lint cannot see
+     * through runCatching.
+     */
+    @SuppressLint("MissingPermission")
     fun scanBluetooth(context: Context) {
         runCatching {
             val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager

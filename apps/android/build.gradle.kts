@@ -18,11 +18,11 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.newax.aegis"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.newax.aegis"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -81,9 +81,28 @@ base {
 
 dependencies {
     implementation(project(":shared:core"))
+    // Shared design tokens (docs/UI_DESIGN.md §4) — the one source of truth
+    // for colour, type, spacing, and shape across all four bodies.
+    implementation(project(":shared:ui"))
     implementation(project(":shared:model-api"))
     implementation(project(":shared:sync"))
     implementation(project(":platform-impl:android"))
+    // Align the whole kotlinx-serialization family on one version.
+    //
+    // Without this the androidTest classpath ends up with json 1.8.1 against
+    // core 1.7.3, and every MigrationTest case dies reading its schema JSON:
+    //
+    //   AbstractMethodError: abstract method "KSerializer[]
+    //     GeneratedSerializer.typeParametersSerializers()"
+    //
+    // The split is not obvious. androidx.lifecycle-viewmodel-compose 2.11.0 and
+    // androidx.savedstate 1.4.0 pull core 1.7.3 into the app runtime; AGP's
+    // consistent resolution then pins androidTest's core to that same 1.7.3.
+    // room-testing 2.8.4 brings json 1.8.1, and because json is absent from the
+    // app runtime there is nothing to pin it down — so only half the family gets
+    // aligned. A BOM fixes both halves at once, which a single-module constraint
+    // would not.
+    implementation(platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1"))
     implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.material3:material3")

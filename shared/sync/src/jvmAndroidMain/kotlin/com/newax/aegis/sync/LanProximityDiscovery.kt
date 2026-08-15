@@ -31,7 +31,7 @@ class LanProximityDiscovery : ProximityDiscovery {
 
     /** Non-null when mDNS could not start — discovery is off, not fatal. */
     @Volatile
-    var error: String? = null
+    override var error: String? = null
         private set
 
     override fun startAdvertising(profile: ProximityProfile) {

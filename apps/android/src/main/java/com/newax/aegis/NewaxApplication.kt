@@ -26,12 +26,31 @@ import com.newax.aegis.engine.model.ModelManager
 import com.newax.aegis.engine.resource.ResourceGovernor
 import com.newax.aegis.memory.EncryptedMemory
 import com.newax.aegis.sync.AndroidSyncContext
+import com.newax.aegis.startup.StartupReport
+import com.newax.aegis.startup.StepCriticality
+import com.newax.aegis.agents.AgentRegistry
+import com.newax.aegis.agents.AgentRuntimeEngine
+import com.newax.aegis.agents.LearningEngine
+import com.newax.aegis.agents.SkillManager
+import com.newax.aegis.engine.learning.EvolutionWorker
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 class NewaxApplication : Application() {
+
+    companion object {
+        /**
+         * Which optional startup steps failed, if any.
+         *
+         * Read by the dev console and the Settings diagnostics row. Exposed
+         * because containing a failure silently is its own defect: an app that
+         * quietly loses its learning engine looks like an app whose learning
+         * engine does not work, which is a bug report nobody can act on.
+         */
+        val startup = StartupReport()
+    }
 
     private val memoryPressureCallbacks = object : ComponentCallbacks2 {
         override fun onTrimMemory(level: Int) {
@@ -50,73 +69,27 @@ class NewaxApplication : Application() {
         override fun onConfigurationChanged(newConfig: Configuration) {}
     }
 
+    /**
+     * Startup begins here, and the order below is deliberate.
+     *
+     * This method runs 22 eager initializers. Until recently every one was
+     * unguarded, so a single throw anywhere in it was a crash on launch — and
+     * two shipped that way, each hiding the next:
+     *
+     *  - an eager Ed25519 call that killed every device below Android 12,
+     *  - an unloaded SQLCipher native library that killed *every* device.
+     *
+     * Neither was in something the app needs in order to start. So steps are now
+     * classified: [StepCriticality.ESSENTIAL] still aborts, everything else is
+     * contained and recorded in [startup] so a degraded start is visible.
+     */
     override fun onCreate() {
         super.onCreate()
-        registerComponentCallbacks(memoryPressureCallbacks)
-        // The sync module's Android actuals (BLE/WiFi-Direct discovery, the
-        // TEE-wrapped identity store) read their Context from here — must be
-        // set before any sync API is touched.
-        AndroidSyncContext.init(this)
-        // Sync identity + memory target (the auto-sync loop, SyncWorker).
-        SyncRuntime.init(this)
-        // Initialize encrypted DB before any workers or viewmodels access it
-        val memory = EncryptedMemory(this)
-        SecureKeyVault.init(this)
-        // Register the platform capability surface (files, processes, shell, desktop,
-        // secrets, system) so the UI and future executor can query their state.
-        PlatformCapabilitiesHolder.init(this)
-        // The one policy engine per process (authority spine, Track A2): user
-        // overrides persist encrypted; toggle reads degrade to "off" (approval)
-        // until MainViewModel initializes AutomationSettings — the safe default.
-        PolicyHolder.init(this)
-        DbKeyManager.migrateFromMemoryIfNeeded(memory)
-        NewaxDatabase.init(com.newax.aegis.db.getNewaxDatabase(this, DbKeyManager.getOrCreate()))
-        // Multi-agent registry (docs/AGENTS_DESIGN.md): seeds the built-in
-        // agents (coding/planning/research/organizer) so routing works out of
-        // the box before any package import.
-        com.newax.aegis.agents.AgentRegistry.init(this)
-        // Skills management (docs/AGENTS_DESIGN.md §skills): seeds the shared
-        // skills + default per-agent grants + named sets; migrates the legacy
-        // agents.skills column into grant rows.
-        com.newax.aegis.agents.SkillManager.init(this)
-        // Agent runtime (docs/AGENTS_DESIGN.md §runtime): the PRAM controller
-        // surface (run/abort/status/health_check), the run ledger + health
-        // audit, and the State Archiver for freeze/thaw.
-        com.newax.aegis.agents.AgentRuntimeEngine.init(this)
-        // RLAIF-E self-learning (docs/AGENTS_DESIGN.md §evolution): the
-        // evolution ledger (baseline methods seeded for every skill + agent
-        // pseudo-skill), the HITL staging gatekeeper, and the critic/
-        // cross-agent protocols. The idle-time fuzzer is scheduled below.
-        com.newax.aegis.agents.LearningEngine.init(this)
-        // Goals survive restarts (Track A5): every planner mutation persists a JSON
-        // snapshot to the existing kv_store table (no schema change), and restore
-        // rehydrates the planner before any screen or executor reads it.
-        val goalStore = DbGoalSnapshotStore(NewaxDatabase.get.kvStoreDao())
-        GoalPlanner.onChange = goalStore::save
-        goalStore.restore()
-        // Execution audit trail (Track A8): every goal run is recorded for the
-        // Goals screen's "Recent runs" section; persisted to kv_store like goals.
-        ExecutionAuditHolder.init(NewaxDatabase.get.kvStoreDao())
-        // Policy-decision history (Track A2 follow-up): every evaluation across
-        // sessions, persisted to kv_store like the execution audit. Records made
-        // before the DB was ready are merged in by initAuditPersistence.
-        PolicyHolder.initAuditPersistence(NewaxDatabase.get.kvStoreDao())
-        CoreTriggerEngine.start(this, NewaxDatabase.get) { _, _ -> }
-        // One-shot migration from legacy EncryptedSharedPreferences storage
-        if (runBlocking { NewaxDatabase.get.kvStoreDao().get("migration_v1_done") } != "1") {
-            LegacyMigrationWorker.schedule(this)
-        }
-        // Load USE model from disk if already downloaded; try to download if not
-        EmbeddingEngine.init(this)
-        if (!EmbeddingEngine.isReady()) {
-            EmbeddingEngine.downloadModelIfNeeded(this) { success ->
-                if (success && EmbeddingIndexWorker.isNeeded(NewaxDatabase.get)) {
-                    EmbeddingIndexWorker.schedule(this)
-                }
-            }
-        } else if (EmbeddingIndexWorker.isNeeded(NewaxDatabase.get)) {
-            EmbeddingIndexWorker.schedule(this)
-        }
+
+        // FIRST, before anything that can fail. This handler used to be
+        // installed two-thirds of the way down onCreate, which meant the one
+        // class of crash most worth reporting — a crash during startup — was the
+        // one class it could not catch.
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             val sw = StringWriter()
             throwable.printStackTrace(PrintWriter(sw))
@@ -130,20 +103,88 @@ class NewaxApplication : Application() {
             } catch (_: Exception) {}
             exitProcess(1)
         }
-        scheduleNightlyWork()
-        IntelligenceWorker.schedule(this)
-        scheduleSyncWork()
-        // RLAIF-E continuous fuzzing (skill.sys.background_fuzzer): propose
-        // alternative methods when the device is idle + charging; everything
-        // pauses at the Updates screen's user gate before deploying.
-        com.newax.aegis.engine.learning.EvolutionWorker.schedule(this)
-        // Item 7 — continuous listening: the foreground service keeps the sync
-        // transport up between worker windows so a paired peer can reach this
-        // device at any moment (auto-sync default on; the Sync screen toggles
-        // it and stops/starts the service). START_STICKY restarts it if the
-        // system kills it; the worker stays as the catch-up net.
-        if (SyncRuntime.enabled()) {
-            SyncForegroundService.start(this)
+
+        registerComponentCallbacks(memoryPressureCallbacks)
+
+        // ── Essential: the app is not safe to run without these ──────────────
+        // The sync module's Android actuals (BLE/WiFi-Direct discovery, the
+        // TEE-wrapped identity store) read their Context from here — must be
+        // set before any sync API is touched.
+        AndroidSyncContext.init(this)
+        val memory = EncryptedMemory(this)
+        SecureKeyVault.init(this)
+        // The one policy engine per process (authority spine, Track A2). This is
+        // ESSENTIAL in the strict sense: an assistant that can drive the device
+        // with no policy engine is more dangerous than one that will not start.
+        PolicyHolder.init(this)
+        DbKeyManager.migrateFromMemoryIfNeeded(memory)
+        NewaxDatabase.init(com.newax.aegis.db.getNewaxDatabase(this, DbKeyManager.getOrCreate()))
+
+        // ── Optional: a failure costs one feature, not the app ───────────────
+        with(startup) {
+            // Never throws now (SyncAvailability), but wrapped so a future
+            // regression degrades sync rather than bricking launch again.
+            step("Sync identity") { SyncRuntime.init(this@NewaxApplication) }
+            // The platform capability surface (files, processes, shell, secrets).
+            step("Platform capabilities") { PlatformCapabilitiesHolder.init(this@NewaxApplication) }
+            // Multi-agent registry — seeds the built-in agents so routing works
+            // before any package import.
+            step("Agent registry") { AgentRegistry.init(this@NewaxApplication) }
+            // Skills: shared skills, per-agent grants, named sets.
+            step("Skill manager") { SkillManager.init(this@NewaxApplication) }
+            // PRAM controller surface, run ledger, State Archiver.
+            step("Agent runtime") { AgentRuntimeEngine.init(this@NewaxApplication) }
+            // RLAIF-E: evolution ledger, HITL staging gatekeeper, critic protocols.
+            step("Learning engine") { LearningEngine.init(this@NewaxApplication) }
+            // Goals survive restarts: planner mutations persist to kv_store.
+            step("Goal persistence") {
+                val goalStore = DbGoalSnapshotStore(NewaxDatabase.get.kvStoreDao())
+                GoalPlanner.onChange = goalStore::save
+                goalStore.restore()
+            }
+            step("Execution audit") { ExecutionAuditHolder.init(NewaxDatabase.get.kvStoreDao()) }
+            // Policy-decision history. Optional because the spine still gates
+            // every action without it — what is lost is the durable record, not
+            // the enforcement. It is the closest of these to essential, so a
+            // failure here deserves attention rather than a shrug.
+            step("Policy audit persistence") {
+                PolicyHolder.initAuditPersistence(NewaxDatabase.get.kvStoreDao())
+            }
+            step("Trigger engine") {
+                CoreTriggerEngine.start(this@NewaxApplication, NewaxDatabase.get) { _, _ -> }
+            }
+            // One-shot migration from legacy EncryptedSharedPreferences storage.
+            step("Legacy migration") {
+                if (runBlocking { NewaxDatabase.get.kvStoreDao().get("migration_v1_done") } != "1") {
+                    LegacyMigrationWorker.schedule(this@NewaxApplication)
+                }
+            }
+            // Load the USE model from disk if downloaded; try to fetch if not.
+            step("Embeddings") {
+                EmbeddingEngine.init(this@NewaxApplication)
+                if (!EmbeddingEngine.isReady()) {
+                    EmbeddingEngine.downloadModelIfNeeded(this@NewaxApplication) { success ->
+                        if (success && EmbeddingIndexWorker.isNeeded(NewaxDatabase.get)) {
+                            EmbeddingIndexWorker.schedule(this@NewaxApplication)
+                        }
+                    }
+                } else if (EmbeddingIndexWorker.isNeeded(NewaxDatabase.get)) {
+                    EmbeddingIndexWorker.schedule(this@NewaxApplication)
+                }
+            }
+            step("Nightly work") { scheduleNightlyWork() }
+            step("Intelligence worker") { IntelligenceWorker.schedule(this@NewaxApplication) }
+            step("Sync worker") { scheduleSyncWork() }
+            // RLAIF-E continuous fuzzing: proposes alternative methods when idle
+            // and charging; everything still pauses at the user gate.
+            step("Evolution worker") { EvolutionWorker.schedule(this@NewaxApplication) }
+            // The foreground service keeps the sync transport up between worker
+            // windows so a paired peer can reach this device at any moment.
+            step("Sync service") {
+                if (SyncRuntime.isAvailable && SyncRuntime.enabled()) {
+                    SyncForegroundService.start(this@NewaxApplication)
+                }
+            }
         }
     }
 
@@ -153,6 +194,9 @@ class NewaxApplication : Application() {
      * explicit in the Sync screen.
      */
     private fun scheduleSyncWork() {
+        // Don't enqueue a 15-minute periodic job that can only ever no-op.
+        // The worker bails too, but scheduling it would still wake the device.
+        if (!SyncRuntime.isAvailable) return
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
