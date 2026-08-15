@@ -83,24 +83,35 @@ output is validated somewhere. It is not.
 
 ---
 
-## 3 · Safety-relevant: `ExecutionGuard.checkWithContext`
+## 3 · Safety-relevant: `ExecutionGuard.checkWithContext` — ✅ FIXED
 
-```
-apps/android/.../engine/procedure/ExecutionGuard.kt:69
-```
+It had **zero references anywhere, including its own file** — the pre-flight
+check from `COMPUTER_USE.md` §5, written and never called. `check()` (the
+`PROTECTED_PACKAGES` block) was wired, so the protection that existed was "never
+touch Settings" and the protection that did not was "confirm the screen did not
+change under you".
 
-**Zero references anywhere, including its own file.**
+Now called from `ProcedureExecutor` on every step. Wiring it surfaced three more
+faults inside it:
 
-This is the pre-flight check — it takes a `GuardContext` with an
-`expectedPackage` and verifies the screen is what the plan assumed before acting.
-That is the C-3 guard in `COMPUTER_USE.md` §5 ("verify, then act"), already
-written and never called.
+1. **A `Context` parameter neither function used** — which made the guard look
+   like it needed a device to test. It did not. Removed; the guard is now pure
+   and has **11 unit tests**, its first ever.
+2. **A package mismatch reported `WRONG_PERSON`.** An app switching under you is
+   not a person mix-up, and an audit row saying so actively misleads. Now
+   `UNEXPECTED_PACKAGE`.
+3. **`GuardContext` carried `expectedPersonEntityId`, `expectedFileId` and
+   `isDestructiveAction` that nothing read.** Setting them looked like protection
+   and bought none — the same failure mode as the unwired function itself, one
+   level down. Removed rather than left silently ignored; re-add them with the
+   code that enforces them.
 
-`ExecutionGuard.check()` — the simpler `PROTECTED_PACKAGES` block — **is** wired.
-So the protection that exists is "never touch Settings", and the protection that
-does not is "confirm the screen did not change under you".
-
-**Route to Track 5, slice C-3.** It does not need writing; it needs calling.
+**The one subtlety worth keeping:** enforcement starts only once execution has
+*arrived* in the expected app. A procedure's own `LaunchApp` step legitimately
+runs from somewhere else, so checking before arrival would abort every procedure
+on its first step. Once arrived, any later step finding a different foreground
+app aborts — it does not adapt, because adapting to an unexpected screen is
+improvising against an adversary.
 
 ---
 
@@ -191,7 +202,20 @@ Ordered by consequence, not by size:
 6. **`platform-impl/{ios,macos}`** — Track 4, already planned. No action beyond
    keeping the failure honest.
 
-**A standing guard would be cheaper than repeating this.** Track 1 could add a
-scan for classes with no external reference, allow-listing manifest-declared
-components. It will not be silent on day one — that is the point of this
-document.
+## The standing guard — ✅ ADDED
+
+`scripts/check-unwired.sh` now runs this scan on demand and in CI once Track 1
+wires it into `invariants.yml`.
+
+It is **baselined, not zero-tolerance**: `scripts/unwired-baseline.txt` freezes
+today's 173 entries so the debt cannot grow, while a hard failure on all of them
+would simply get the check disabled. New unwired classes fail; entries that
+disappear are reported as progress so the baseline can be trimmed.
+
+Manifest-declared components are allow-listed by **reading the manifest**, not by
+a hand-maintained list — that was the false positive this scan produced first
+time, and hand-lists rot.
+
+**Verified failing**, not merely written: a deliberate unreferenced object was
+added, the check exited 1 and named it, and the check returned to OK when it was
+removed. A guard nobody has seen fail is not a guard.

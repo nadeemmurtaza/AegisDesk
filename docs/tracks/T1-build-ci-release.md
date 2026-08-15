@@ -197,6 +197,19 @@ violations in the same files.
 
 ---
 
+## Slice T1.4c — Wire the unwired-class guard into CI
+
+`scripts/check-unwired.sh` exists and is **verified failing** on a deliberate
+violation. It needs adding to `invariants.yml`'s `static-invariants` job beside
+`check-invariants.sh` — it is pure shell, no toolchain, seconds to run.
+
+It is baselined (`scripts/unwired-baseline.txt`, 173 entries) rather than
+zero-tolerance, because a check that fails on all of today's debt gets disabled
+within a week. New unwired classes fail; the baseline shrinks as `docs/UNWIRED.md`
+is worked through.
+
+---
+
 ## Slice T1.5 — Supply chain (ENGINEERING.md slice 22)
 
 1. **Gradle dependency verification** — `gradle/verification-metadata.xml` with

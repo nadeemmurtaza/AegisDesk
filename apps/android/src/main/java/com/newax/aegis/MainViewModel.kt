@@ -400,7 +400,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         res.procedure != null -> {
                             viewModelScope.launch {
                                 val result = withContext(Dispatchers.IO) {
-                                    ProcedureExecutor.executeFromJson(res.procedure.steps, getApplication(), db, res.procedure.id)
+                                    ProcedureExecutor.executeFromJson(
+                                        res.procedure.steps, getApplication(), db, res.procedure.id,
+                                        res.procedure.packageName,
+                                    )
                                 }
                                 if (result.success) {
                                     AppIntelligence.recordProcedureSuccess(db, res.procedure.id)
@@ -437,7 +440,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 messages += ChatMessage("Executing procedure for $appLabel…", false)
                                 val result = withContext(Dispatchers.IO) {
                                     ProcedureExecutor.executeFromJson(
-                                        resolution.procedure.steps, getApplication(), db, resolution.procedure.id
+                                        resolution.procedure.steps, getApplication(), db,
+                                        resolution.procedure.id, resolution.procedure.packageName,
                                     )
                                 }
                                 if (result.success) {
