@@ -38,7 +38,7 @@ data class NewaxColors(
      * chip fills.
      *
      * **Not text-bearing**, with one sanctioned exception: [textPrimary], which
-     * clears 13.89:1 here (the "Sensitive" risk chip). Do not place
+     * clears 13.89:1 here (the Medium risk chip, `riskBadgeStyle`). Do not place
      * [textTertiary], [accent], or [success] on it — they do not clear 4.5:1
      * against a fill this dark, which is why the contrast test asserts only
      * [textPrimary] for this level. If you need text on a neutral fill, use

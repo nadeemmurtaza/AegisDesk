@@ -33,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,22 +42,17 @@ import androidx.compose.ui.unit.sp
 import com.newax.aegis.agents.AgentRegistry
 import com.newax.aegis.agents.SkillGuard
 import com.newax.aegis.agents.SkillManager
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.components.SkillRow
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val Surface = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val Primary = NewaxLightColors.textPrimary
-private val TextPri = NewaxLightColors.textPrimary
-private val TextSec = NewaxLightColors.textSecondary
-private val TextTer = NewaxLightColors.textTertiary
-private val Border = NewaxLightColors.border
-private val AccentGreen = NewaxLightColors.success
-private val AccentRed = NewaxLightColors.error
-private val AccentAmber = NewaxLightColors.warning
-private val SurfaceStr = NewaxLightColors.surfaceStrong
-
-private val SECTIONS = listOf("Skills", "Skill sets", "Permissions", "Approvals", "Evolution")
+private val SECTIONS = listOf(
+    R.string.skills_tab_skills,
+    R.string.skills_tab_sets,
+    R.string.skills_tab_permissions,
+    R.string.skills_tab_approvals,
+    R.string.skills_tab_evolution,
+)
 
 /**
  * The skills management surface (docs/AGENTS_DESIGN.md §skills; R13): the
@@ -79,16 +76,16 @@ fun SkillsScreen(padding: PaddingValues) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SECTIONS.forEach { s ->
-                    FilterChip(selected = section == s, onClick = { section = s }, label = { Text(s, fontSize = 12.sp) })
+                    FilterChip(selected = section == s, onClick = { section = s }, label = { Text(stringResource(s), fontSize = 12.sp) })
                 }
             }
         }
         when (section) {
-            "Skills" -> item { SkillsSection() }
-            "Skill sets" -> item { SkillSetsSection() }
-            "Permissions" -> item { PermissionsSection() }
-            "Approvals" -> item { ApprovalsSection() }
-            "Evolution" -> item { EvolutionSection() }
+            R.string.skills_tab_skills -> item { SkillsSection() }
+            R.string.skills_tab_sets -> item { SkillSetsSection() }
+            R.string.skills_tab_permissions -> item { PermissionsSection() }
+            R.string.skills_tab_approvals -> item { ApprovalsSection() }
+            R.string.skills_tab_evolution -> item { EvolutionSection() }
         }
     }
 }
@@ -112,76 +109,60 @@ private fun SkillsSection() {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("${skills.size} skills — shared by all agents (permissions decide who uses what)", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.skills_count_header, skills.size), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = { picker.launch(arrayOf("application/zip", "application/x-zip-compressed", "*/*")) }) { Text("Import skill (.zip)") }
+                Button(onClick = { picker.launch(arrayOf("application/zip", "application/x-zip-compressed", "*/*")) }) { Text(stringResource(R.string.action_import_skill_zip)) }
                 Spacer(Modifier.width(10.dp))
-                Button(onClick = { setPicker.launch(arrayOf("application/json", "text/json", "*/*")) }) { Text("Import skill set (.json)") }
+                Button(onClick = { setPicker.launch(arrayOf("application/json", "text/json", "*/*")) }) { Text(stringResource(R.string.action_import_skill_set)) }
                 Spacer(Modifier.width(10.dp))
-                TextButton(onClick = { skills = SkillManager.skills() }) { Text("Refresh") }
+                TextButton(onClick = { skills = SkillManager.skills() }) { Text(stringResource(R.string.action_refresh)) }
             }
-            message?.let { Spacer(Modifier.height(8.dp)); Text(it, fontSize = 13.sp, color = if (it.startsWith("Import failed")) AccentRed else AccentGreen) }
+            message?.let { Spacer(Modifier.height(8.dp)); Text(it, fontSize = 13.sp, color = if (it.startsWith("Import failed")) NewaxTheme.colors.error else NewaxTheme.colors.success) }
         }
     }
 
     Spacer(Modifier.height(8.dp))
     skills.forEach { skill ->
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = if (skill.enabled) Surface else SurfaceMuted),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-            elevation = CardDefaults.cardElevation(0.dp)
-        ) {
-            Column(Modifier.padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("${skill.name} — v${skill.version}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
-                    Text("${skill.category} · ${skill.skillId} · ${skill.source}", fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
-                    val flags = buildString {
-                        if (skill.capability.isNotBlank()) { append("capability: ${skill.capability}") }
-                        if (skill.sandboxRequired) { if (isNotEmpty()) append(" · "); append("sandbox") }
-                        if (skill.requiresApproval) { if (isNotEmpty()) append(" · "); append("approval") }
-                    }
-                    if (flags.isNotEmpty()) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(flags, fontSize = 11.sp, color = if (skill.requiresApproval || skill.sandboxRequired) AccentRed else TextTer)
-                    }
+        // T3.4c: the shared skill row (docs/UI_DESIGN.md §8 — SkillRow). The
+        // flag colour is the caller's call — red when the skill demands approval
+        // or a sandbox, neutral otherwise.
+        val flags = listOfNotNull(
+            if (skill.capability.isNotBlank()) context.getString(R.string.skills_flag_capability, skill.capability) else null,
+            if (skill.sandboxRequired) context.getString(R.string.skills_flag_sandbox) else null,
+            if (skill.requiresApproval) context.getString(R.string.skills_flag_approval) else null
+        ).joinToString(" · ").ifBlank { null }
+        SkillRow(
+            title       = stringResource(R.string.skills_name_version, skill.name, skill.version),
+            idLabel     = "${skill.category} · ${skill.skillId} · ${skill.source}",
+            description = skill.description,
+            enabled     = skill.enabled,
+            onToggle    = { on ->
+                SkillManager.setEnabled(skill.skillId, on)
+                skills = SkillManager.skills()
+            },
+            flagsLabel  = flags,
+            flagsColor  = if (skill.requiresApproval || skill.sandboxRequired) NewaxTheme.colors.error else null,
+            uninstallLabel = if (skill.source != "builtin") stringResource(R.string.action_uninstall) else null,
+            onUninstall = if (skill.source != "builtin") {
+                {
+                    SkillManager.uninstall(skill.skillId)
+                    skills = SkillManager.skills()
                 }
-                    Switch(
-                        checked = skill.enabled,
-                        onCheckedChange = { on ->
-                            SkillManager.setEnabled(skill.skillId, on)
-                            skills = SkillManager.skills()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White, checkedTrackColor = Primary,
-                            uncheckedThumbColor = Color.White, uncheckedTrackColor = TextTer
-                        )
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(skill.description, fontSize = 13.sp, color = TextSec)
-                if (skill.source != "builtin") {
-                    Spacer(Modifier.height(6.dp))
-                    TextButton(onClick = {
-                        SkillManager.uninstall(skill.skillId)
-                        skills = SkillManager.skills()
-                    }) { Text("Uninstall", fontSize = 12.sp, color = AccentRed) }
-                }
-            }
-        }
+            } else null
+        )
         Spacer(Modifier.height(6.dp))
     }
 }
 
 @Composable
 private fun SkillSetsSection() {
+    val context = LocalContext.current
     var sets by remember { mutableStateOf(SkillManager.sets()) }
     var setId by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
@@ -189,23 +170,23 @@ private fun SkillSetsSection() {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Named bundles — grant/revoke skills in groups", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.skills_bundles_hint), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = setId, onValueChange = { setId = it }, label = { Text("Set id") }, singleLine = true, modifier = Modifier.weight(1f))
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(value = setId, onValueChange = { setId = it }, label = { Text(stringResource(R.string.field_set_id)) }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.field_name)) }, singleLine = true, modifier = Modifier.weight(1f))
                 Button(onClick = {
                     SkillManager.createSet(setId.trim(), name.trim(), "")
-                    message = "Created $name"
+                    message = context.getString(R.string.skills_created, name)
                     sets = SkillManager.sets(); setId = ""; name = ""
-                }, enabled = setId.isNotBlank() && name.isNotBlank()) { Text("Create") }
+                }, enabled = setId.isNotBlank() && name.isNotBlank()) { Text(stringResource(R.string.action_create)) }
             }
-            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = TextSec) }
+            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary) }
         }
     }
 
@@ -223,34 +204,34 @@ private fun SetCard(setId: String, setName: String, onDeleted: () -> Unit) {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(setName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri, modifier = Modifier.weight(1f))
+                Text(setName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary, modifier = Modifier.weight(1f))
                 TextButton(onClick = {
                     SkillManager.deleteSet(setId)
                     onDeleted()
-                }) { Text("Delete set", fontSize = 12.sp, color = AccentRed) }
+                }) { Text(stringResource(R.string.action_delete_set), fontSize = 12.sp, color = NewaxTheme.colors.error) }
             }
             if (members.isEmpty()) {
-                Text("Empty set", fontSize = 12.sp, color = TextTer)
+                Text(stringResource(R.string.skills_empty_set), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
             } else {
                 members.forEach { m ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("· ${m.name} (${m.skillId})", fontSize = 12.sp, color = TextSec, modifier = Modifier.weight(1f))
+                        Text("· ${m.name} (${m.skillId})", fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, modifier = Modifier.weight(1f))
                         TextButton(onClick = {
                             SkillManager.removeFromSet(setId, m.skillId)
                             members = SkillManager.skillsInSet(setId)
-                        }) { Text("Remove", fontSize = 11.sp, color = AccentRed) }
+                        }) { Text(stringResource(R.string.action_remove), fontSize = 11.sp, color = NewaxTheme.colors.error) }
                     }
                 }
             }
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = addId, onValueChange = { addId = it }, label = { Text("Add skill id") }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(value = addId, onValueChange = { addId = it }, label = { Text(stringResource(R.string.field_add_skill_id)) }, singleLine = true, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     val id = addId.trim()
@@ -259,7 +240,7 @@ private fun SetCard(setId: String, setName: String, onDeleted: () -> Unit) {
                         members = SkillManager.skillsInSet(setId)
                         addId = ""
                     }
-                }, enabled = addId.isNotBlank()) { Text("Add", fontSize = 13.sp) }
+                }, enabled = addId.isNotBlank()) { Text(stringResource(R.string.action_add), fontSize = 13.sp) }
             }
         }
     }
@@ -274,7 +255,7 @@ private fun PermissionsSection() {
     var grants by remember { mutableStateOf(selected?.let { SkillManager.grantedSkillIds(it) } ?: emptySet()) }
 
     if (agents.isEmpty()) {
-        Text("No agents installed", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.skills_no_agents), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
         return
     }
     if (selected == null || agents.none { it.agentId == selected }) {
@@ -295,19 +276,19 @@ private fun PermissionsSection() {
                 )
             }
         }
-        Text("Which skills may ${agents.first { it.agentId == selected }.name} use? — grant rows are the permission", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.skills_grant_hint, agents.first { it.agentId == selected }.name), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
         Spacer(Modifier.height(4.dp))
         skills.forEach { skill ->
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surfaceMuted),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(skill.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
-                        Text(skill.skillId, fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                        Text(skill.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
+                        Text(skill.skillId, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                     }
                     Switch(
                         checked = skill.skillId in grants,
@@ -317,8 +298,8 @@ private fun PermissionsSection() {
                             grants = SkillManager.grantedSkillIds(agentId)
                         },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White, checkedTrackColor = Primary,
-                            uncheckedThumbColor = Color.White, uncheckedTrackColor = TextTer
+                            checkedThumbColor = Color.White, checkedTrackColor = NewaxTheme.colors.textPrimary,
+                            uncheckedThumbColor = Color.White, uncheckedTrackColor = NewaxTheme.colors.textTertiary
                         )
                     )
                 }
@@ -343,22 +324,22 @@ private fun EvolutionSection() {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Evolution ledger — ${bySkill.size} skills learning", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Text(stringResource(R.string.skills_ledger_header, bySkill.size), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Each method's confidence is its observed success rate pulled toward 50% while evidence is thin. Methods only change the live skill after your approval.", fontSize = 12.sp, color = TextSec)
+            Text(stringResource(R.string.skills_ledger_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(6.dp))
-            TextButton(onClick = { tick++ }) { Text("Refresh", fontSize = 12.sp) }
+            TextButton(onClick = { tick++ }) { Text(stringResource(R.string.action_refresh), fontSize = 12.sp) }
         }
     }
 
     if (bySkill.isEmpty()) {
         Spacer(Modifier.height(8.dp))
-        Text("No ledger entries yet — they appear as skills are used.", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.skills_no_ledger), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
         return
     }
 
@@ -366,14 +347,14 @@ private fun EvolutionSection() {
         Spacer(Modifier.height(8.dp))
         Card(
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+            colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surfaceMuted),
+            border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(Modifier.padding(12.dp)) {
                 val label = skillsByName[skillId]?.name ?: skillId
-                Text(label, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPri)
-                Text(skillId, fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                Text(label, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
+                Text(skillId, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                 Spacer(Modifier.height(6.dp))
                 methods.forEach { m ->
                     val pct = (m.confidence * 100).toInt()
@@ -381,23 +362,23 @@ private fun EvolutionSection() {
                     val successRate = if (total > 0) (m.successCount * 100.0 / total).toInt() else 0
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("${m.methodId} · ${m.source} · ${m.status}", fontSize = 11.sp, color = TextSec, fontFamily = FontFamily.Monospace)
+                            Text("${m.methodId} · ${m.source} · ${m.status}", fontSize = 11.sp, color = NewaxTheme.colors.textSecondary, fontFamily = FontFamily.Monospace)
                             Spacer(Modifier.height(2.dp))
                             LinearProgressIndicator(
                                 progress = { m.confidence.toFloat() },
                                 modifier = Modifier.fillMaxWidth(),
-                                color = if (m.status == "ACTIVE") AccentGreen else if (m.status == "REJECTED") AccentRed else AccentAmber,
-                                trackColor = SurfaceStr
+                                color = if (m.status == "ACTIVE") NewaxTheme.colors.success else if (m.status == "REJECTED") NewaxTheme.colors.error else NewaxTheme.colors.warning,
+                                trackColor = NewaxTheme.colors.surfaceStrong
                             )
                         }
                         Spacer(Modifier.width(8.dp))
-                        Text("$pct% · $successRate% ($total runs)", fontSize = 10.sp, color = TextTer)
+                        Text("$pct% · $successRate% ($total runs)", fontSize = 10.sp, color = NewaxTheme.colors.textTertiary)
                     }
                     Spacer(Modifier.height(4.dp))
                 }
                 if (methods.any { it.lastError.isNotBlank() }) {
                     val err = methods.first { it.lastError.isNotBlank() }.lastError
-                    Text("last error: ${err.take(100)}", fontSize = 10.sp, color = AccentRed, maxLines = 1)
+                    Text(stringResource(R.string.skills_last_error, err.take(100)), fontSize = 10.sp, color = NewaxTheme.colors.error, maxLines = 1)
                 }
             }
         }
@@ -414,22 +395,22 @@ private fun ApprovalsSection() {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Paused executions — a skill request needs your decision", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.skills_paused_header), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = {
                 approvals = SkillGuard.pendingApprovals()
                 history = SkillGuard.recentApprovals(20)
-            }) { Text("Refresh") }
+            }) { Text(stringResource(R.string.action_refresh)) }
         }
     }
     Spacer(Modifier.height(8.dp))
     if (approvals.isEmpty()) {
-        Text("No pending approvals — high-impact skills pause here before they run.", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.skills_no_pending), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
     } else {
         approvals.forEach { a ->
             val agentName = agentsById[a.agentId]?.name ?: a.agentId
@@ -437,20 +418,20 @@ private fun ApprovalsSection() {
             val skill = skillsById[a.skillId]
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surfaceMuted),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(12.dp)) {
-                    Text("$agentName → $skillName", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPri)
+                    Text("$agentName → $skillName", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
                     if (a.untrustedSource) {
-                        Text("⚠ triggered from UNTRUSTED content (prompt-injection guard)", fontSize = 11.sp, color = AccentRed)
+                        Text(stringResource(R.string.skills_untrusted), fontSize = 11.sp, color = NewaxTheme.colors.error)
                     }
                     if (a.requestContext.isNotBlank()) {
-                        Text("Context: ${a.requestContext}", fontSize = 12.sp, color = TextSec, maxLines = 3)
+                        Text(stringResource(R.string.skills_context, a.requestContext), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, maxLines = 3)
                     }
                     skill?.risks?.takeIf { it.isNotBlank() }?.let {
-                        Text("Risk: $it", fontSize = 11.sp, color = TextTer)
+                        Text(stringResource(R.string.skills_risk, it), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
                     }
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -461,12 +442,12 @@ private fun ApprovalsSection() {
                                 history = SkillGuard.recentApprovals(20)
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                        ) { Text("Allow once", fontSize = 12.sp) }
+                        ) { Text(stringResource(R.string.action_allow_once), fontSize = 12.sp) }
                         TextButton(onClick = {
                             SkillGuard.decideApproval(a.approvalId, allow = false)
                             approvals = SkillGuard.pendingApprovals()
                             history = SkillGuard.recentApprovals(20)
-                        }) { Text("Deny", fontSize = 12.sp, color = AccentRed) }
+                        }) { Text(stringResource(R.string.action_deny), fontSize = 12.sp, color = NewaxTheme.colors.error) }
                     }
                 }
             }
@@ -475,9 +456,9 @@ private fun ApprovalsSection() {
     }
     if (history.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
-        Text("Recent decisions", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer)
+        Text(stringResource(R.string.skills_recent_decisions), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textTertiary)
         history.filter { it.status != "PENDING" }.take(10).forEach { a ->
-            Text("${a.status} · ${agentsById[a.agentId]?.name ?: a.agentId} → ${skillsById[a.skillId]?.name ?: a.skillId}", fontSize = 11.sp, color = TextTer)
+            Text("${a.status} · ${agentsById[a.agentId]?.name ?: a.agentId} → ${skillsById[a.skillId]?.name ?: a.skillId}", fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
         }
     }
 }

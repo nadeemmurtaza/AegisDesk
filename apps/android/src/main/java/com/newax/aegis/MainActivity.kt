@@ -1,53 +1,40 @@
 package com.newax.aegis
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.provider.Settings
-import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricPrompt
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.NearMe
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.*
@@ -57,71 +44,72 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import android.hardware.SensorManager
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.newax.aegis.ui.devconsole.DevConsoleActivity
-import com.newax.aegis.assistant.ChatMessage
 import com.newax.aegis.assistant.ProposedAction
+import com.newax.aegis.ui.a11y.minimumTouchTarget
+import com.newax.aegis.ui.components.ConfirmDialog
+import com.newax.aegis.ui.components.ConversationRow
+import com.newax.aegis.ui.components.TopBar
+import com.newax.aegis.ui.devconsole.DevConsoleActivity
+import com.newax.aegis.ui.state.ConversationListState
+import com.newax.aegis.ui.state.VoiceCaptureState
+import com.newax.aegis.ui.theme.NewaxTheme
+import com.newax.aegis.voice.VoiceCaptureSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
-import com.newax.aegis.ui.theme.NewaxLightColors
-import com.newax.aegis.ui.theme.NewaxTheme
-import com.newax.aegis.ui.a11y.describedAs
-import com.newax.aegis.ui.a11y.liveRegionPolite
-import com.newax.aegis.ui.a11y.reducedMotionEnabled
-import com.newax.aegis.ui.a11y.statusSemantics
-
-// ── Design tokens — aliases onto shared:ui NewaxLightColors (docs/UI_DESIGN.md §4).
-// Light-theme only for now; per-screen migration to NewaxTheme.colors (which
-// carries dark mode) is a later slice. Values live in ONE place: NewaxColors.kt.
-
-private val BG           = NewaxLightColors.bg
-private val Surface      = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val SurfaceSel   = NewaxLightColors.surfaceSelected
-private val SurfaceStr   = NewaxLightColors.surfaceStrong
-private val Primary      = NewaxLightColors.textPrimary
-private val PrimaryPr    = NewaxLightColors.textPrimary
-private val TextPri      = NewaxLightColors.textPrimary
-private val TextSec      = NewaxLightColors.textSecondary
-private val TextTer      = NewaxLightColors.textTertiary
-private val Border       = NewaxLightColors.border
 
 private data class NavEntry(
     val screen: Screen,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val label: String,
+    val labelRes: Int,
     val badge: Int = 0
 )
 
-sealed class Screen(val label: String) {
-    object Chat     : Screen("Chat")
-    object Memory   : Screen("Memory")
-    object Drafts   : Screen("Drafts")
-    object Meeting  : Screen("Meeting")
-    object Settings : Screen("Settings")
-    object Backup   : Screen("Backup")
-    object People   : Screen("People")
-    object AppPermissions : Screen("App Permissions")
-    object Capabilities : Screen("Capabilities")
-    object Goals : Screen("Goals")
-    object Nearby : Screen("Nearby")
-    object Sync : Screen("Sync")
-    object PolicyHistory : Screen("Policy History")
-    object AgentMemory : Screen("Agent Memory")
-    object Agents : Screen("Agents")
-    object Skills : Screen("Skills")
-    object Updates : Screen("Updates")
+// T3.2 — screen labels are string-resource ids, not literals. `labelRes` is the
+// drawer label; the top bar resolves a few screens to a longer title via
+// [topBarTitleRes].
+sealed class Screen(@androidx.annotation.StringRes val labelRes: Int) {
+    object Chat     : Screen(R.string.nav_chat)
+    object Conversations : Screen(R.string.nav_chats)
+    // T3.5d — the compact-IA section homes: Memory (2.x) and Tasks (3.x) have
+    // sub-routes and get a home; Capabilities (4.1) and Settings (5) link
+    // straight to their landing screens from the drawer.
+    object MemoryHome : Screen(R.string.nav_memory)
+    object TasksHome : Screen(R.string.nav_tasks)
+    object Memory   : Screen(R.string.nav_memory)
+    object Drafts   : Screen(R.string.nav_drafts)
+    object Meeting  : Screen(R.string.nav_meeting)
+    object Settings : Screen(R.string.nav_settings)
+    object Backup   : Screen(R.string.nav_backup)
+    object People   : Screen(R.string.nav_people)
+    object AppPermissions : Screen(R.string.screen_title_app_permissions)
+    object Capabilities : Screen(R.string.nav_capabilities)
+    object Goals : Screen(R.string.nav_goals)
+    object Nearby : Screen(R.string.nav_nearby)
+    object Sync : Screen(R.string.nav_sync)
+    object PolicyHistory : Screen(R.string.screen_title_policy_history)
+    object AgentMemory : Screen(R.string.nav_agent_memory)
+    object Agents : Screen(R.string.nav_agents)
+    object Skills : Screen(R.string.nav_skills)
+    object Updates : Screen(R.string.nav_updates)
+    // T3.5e — route 4.3: the apps index, reached from Capabilities (4.1 → 4.3).
+    object AppsIndex : Screen(R.string.apps_index_title)
+}
+
+/** The top-bar title for a screen — most screens reuse their drawer label. */
+private fun topBarTitleRes(screen: Screen): Int = when (screen) {
+    Screen.Drafts -> R.string.screen_title_learning_drafts
+    Screen.Backup -> R.string.screen_title_backup_restore
+    Screen.Updates -> R.string.screen_title_pending_updates
+    Screen.Nearby -> R.string.screen_title_nearby_share
+    else -> screen.labelRes
 }
 
 class MainActivity : FragmentActivity() {
@@ -159,6 +147,11 @@ fun NewaxApp(
     val drawerState   = rememberDrawerState(DrawerValue.Closed)
     val scope         = rememberCoroutineScope()
     var screen by remember { mutableStateOf<Screen>(Screen.Chat) }
+    // Clear-chat confirm (T3.0b → T3.5a): deletion goes through vm.clearChat()
+    // → ChatHistoryStore.deleteConversation → ConversationDao.deleteConversation
+    // — the one transactional delete path (blocks, then messages, then the
+    // row), now scoped to the active conversation.
+    var showClearChatDialog by remember { mutableStateOf(false) }
     // Bumped when a policy-blocked goal task jumps to the Capabilities screen,
     // which scrolls itself to the Policy modes section.
     var policyScrollSignal by remember { mutableIntStateOf(0) }
@@ -168,6 +161,10 @@ fun NewaxApp(
     var policyScrollTarget by remember { mutableStateOf<String?>(null) }
     val pendingDrafts by vm.pendingDrafts.collectAsStateWithLifecycle()
     val draftCount = pendingDrafts.size
+    val conversations by vm.conversations.collectAsStateWithLifecycle()
+    // T3.5d — the drawer (route 1.1 compact) shows the same rows and relative
+    // time labels as the full 1.1 route, via the same tested holder.
+    val conversationListState = remember { ConversationListState() }
     // RLAIF-E live notification (docs/AGENTS_DESIGN.md §evolution): poll the
     // staging registry; the count feeds the Updates nav badge and the banner
     // that pops up the minute a patch is staged.
@@ -183,55 +180,194 @@ fun NewaxApp(
         if (pendingUpdateCount == 0) updateBannerDismissed = false
     }
 
-    val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            ?.takeIf { it.isNotBlank() }?.let { vm.submit(it) }
-    }
     val modelLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(vm::importModel)
     }
 
+    // T3.5b — route 1.12: the export sheet's state and the SAF write. The
+    // rendered bytes are stashed at launch ([pendingExport]) and written to the
+    // Uri the picker returns; the outcome drives the sheet's live region.
+    var pendingExport by remember { mutableStateOf<String?>(null) }
+    var pendingExportName by remember { mutableStateOf("") }
+    var exportStatus by remember { mutableStateOf<ExportStatus>(ExportStatus.Idle) }
+    val context = LocalContext.current
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
+        val text = pendingExport
+        pendingExport = null
+        if (uri == null || text == null) return@rememberLauncherForActivityResult
+        val result = runCatching {
+            val stream = context.contentResolver.openOutputStream(uri)
+                ?: throw IllegalStateException("Unable to open the chosen file")
+            stream.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+        }
+        exportStatus = if (result.isSuccess) {
+            // The provider's name for the written file; falls back to the name
+            // we suggested (a file name is data, not chrome).
+            ExportStatus.Done(uri.lastPathSegment ?: pendingExportName)
+        } else {
+            ExportStatus.Failed(result.exceptionOrNull()?.message ?: "write failed")
+        }
+    }
+
+    // T3.5b — the chat overlays: 1.4 model sheet, 1.9 step detail, 1.12 export.
+    var showModelSheet by remember { mutableStateOf(false) }
+    var showExportSheet by remember { mutableStateOf(false) }
+    var showStepDetail by remember { mutableStateOf(false) }
+    var stepDetailAction by remember { mutableStateOf<ProposedAction?>(null) }
+    var chatMenuOpen by remember { mutableStateOf(false) }
+    // Close the step-detail sheet when the pending action changes or resolves
+    // (approve/reject/auto-execute) — it must never show a stale action, or
+    // pop open for a queued one the user did not ask about.
+    LaunchedEffect(vm.pendingAction) {
+        if (showStepDetail && vm.pendingAction != stepDetailAction) {
+            showStepDetail = false
+        }
+    }
+
+    // T3.5c — route 1.10 voice capture. The mic opens a capture sheet instead
+    // of the one-shot system recognizer: the live level meter needs
+    // onRmsChanged and the running transcript needs onPartialResults, which
+    // only the SpeechRecognizer API provides. The recognizer is a platform
+    // seam ([VoiceCaptureSession]); [VoiceCaptureState] holds the sheet's
+    // phases and is unit-tested. RECORD_AUDIO is a runtime permission on
+    // minSdk 26, so the first capture requests it — denial opens the sheet in
+    // the permission error phase rather than failing silently.
+    var showVoiceCapture by remember { mutableStateOf(false) }
+    val voiceState = remember { VoiceCaptureState() }
+    val voiceSession = remember { VoiceCaptureSession(context) }
+    DisposableEffect(voiceSession) {
+        onDispose { voiceSession.destroy() }
+    }
+
+    fun beginVoiceCapture() {
+        voiceState.reset()
+        if (!voiceSession.available) {
+            voiceState.onError(R.string.voice_error_unavailable)
+            showVoiceCapture = true
+            return
+        }
+        voiceSession.start(object : VoiceCaptureSession.Listener {
+            override fun onReady() { voiceState.onListening() }
+            override fun onRmsChanged(rms: Float) { voiceState.onAmplitude(rms) }
+            override fun onPartial(text: String) { voiceState.onPartial(text) }
+            override fun onFinal(text: String) { voiceState.onFinal(text) }
+            override fun onError(labelRes: Int) { voiceState.onError(labelRes) }
+        })
+        showVoiceCapture = true
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            beginVoiceCapture()
+        } else {
+            voiceState.onError(R.string.voice_error_permission)
+            showVoiceCapture = true
+        }
+    }
+
+    fun openVoiceCapture() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            beginVoiceCapture()
+        }
+    }
+
     // The shared theme (shared:ui) installs the Material 3 colour scheme from
-    // the same tokens the aliases above read, and provides NewaxTheme.colors /
-    // .typography / .spacing / .shapes to everything below. darkTheme is pinned
-    // to light for now: the screens still read the top-level light aliases, so
-    // flipping this would produce a half-dark UI. Unpinning it is the last step
-    // of the per-screen migration to NewaxTheme.colors.
-    NewaxTheme(darkTheme = false) {
+    // the same tokens, and provides NewaxTheme.colors / .typography / .spacing /
+    // .shapes to everything below. darkTheme now follows the system setting
+    // (T3.3 — every screen reads NewaxTheme.colors at the call site, so the
+    // dark palette applies everywhere). The in-app override lives behind the
+    // Settings theme route (UI_DESIGN.md 5.1.4).
+    NewaxTheme {
         ModalNavigationDrawer(
             drawerState   = drawerState,
             drawerContent = {
-                ModalDrawerSheet(drawerContainerColor = Surface, modifier = Modifier.width(280.dp)) {
+                ModalDrawerSheet(drawerContainerColor = NewaxTheme.colors.surface, modifier = Modifier.width(280.dp)) {
+                    val drawerItemColors = NavigationDrawerItemDefaults.colors(
+                        selectedContainerColor   = NewaxTheme.colors.surfaceSelected,
+                        unselectedContainerColor = Color.Transparent,
+                        selectedIconColor        = NewaxTheme.colors.textPrimary,
+                        selectedTextColor        = NewaxTheme.colors.textPrimary,
+                        unselectedIconColor      = NewaxTheme.colors.textSecondary,
+                        unselectedTextColor      = NewaxTheme.colors.textSecondary,
+                    )
                     Spacer(Modifier.height(24.dp))
                     Text(
-                        "Newax",
+                        stringResource(R.string.nav_brand),
                         modifier = Modifier.padding(horizontal = 20.dp),
                         fontWeight = FontWeight.SemiBold,
                         fontSize   = 22.sp,
-                        color      = TextPri
+                        color      = NewaxTheme.colors.textPrimary
                     )
                     Spacer(Modifier.height(20.dp))
+                    // T3.5d — route 1.1 compact: the drawer IS the conversation
+                    // list. New chat and search sit at the top, the threads
+                    // below, and the four sections + model footer at the
+                    // bottom. The full 1.1 route stays as ConversationsScreen
+                    // (reached through the search row).
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.action_new_chat), fontSize = 15.sp) },
+                        icon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                        selected = false,
+                        onClick = {
+                            vm.newChat()
+                            screen = Screen.Chat
+                            scope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        colors = drawerItemColors,
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.conversations_search_hint), fontSize = 15.sp) },
+                        icon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                        selected = false,
+                        onClick = {
+                            screen = Screen.Conversations
+                            scope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        colors = drawerItemColors,
+                    )
+                    HorizontalDivider(color = NewaxTheme.colors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    if (conversations.isEmpty()) {
+                        Text(
+                            stringResource(R.string.conversations_empty_title),
+                            fontSize = 13.sp,
+                            color = NewaxTheme.colors.textTertiary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
+                    } else {
+                        // The same rows as the full 1.1 route, so the drawer
+                        // and the route cannot disagree about recency or titles.
+                        LazyColumn(Modifier.weight(1f)) {
+                            items(conversations, key = { it.id }) { summary ->
+                                ConversationRow(
+                                    title = summary.title.ifBlank { stringResource(R.string.conversation_untitled) },
+                                    timeLabel = conversationListState.relativeTimeLabel(summary.updatedAtMs, System.currentTimeMillis()),
+                                    onClick = {
+                                        vm.openConversation(summary.id)
+                                        screen = Screen.Chat
+                                        scope.launch { drawerState.close() }
+                                    },
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = NewaxTheme.colors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     listOf(
-                        NavEntry(Screen.Chat,     Icons.Outlined.ChatBubbleOutline, "Chat"),
-                        NavEntry(Screen.Memory,   Icons.Outlined.Psychology,        "Memory"),
-                        NavEntry(Screen.Drafts,   Icons.Outlined.AutoAwesome,       "Drafts", draftCount),
-                        NavEntry(Screen.Meeting,  Icons.Outlined.Groups,            "Meeting"),
-                        NavEntry(Screen.People,   Icons.Outlined.Person,            "People"),
-                        NavEntry(Screen.Backup,   Icons.Outlined.CloudSync,         "Backup"),
-                        NavEntry(Screen.Settings, Icons.Outlined.Settings,          "Settings"),
-                        NavEntry(Screen.Goals, Icons.Rounded.CheckCircle,            "Goals"),
-                        NavEntry(Screen.Capabilities, Icons.Rounded.Shield,         "Capabilities"),
-                        NavEntry(Screen.Nearby, Icons.Outlined.NearMe,              "Nearby"),
-                        NavEntry(Screen.Sync, Icons.Rounded.Sync,                  "Sync"),
-                        NavEntry(Screen.AgentMemory, Icons.Outlined.Memory,         "Agent Memory"),
-                        NavEntry(Screen.Agents, Icons.Outlined.SmartToy,            "Agents"),
-                        NavEntry(Screen.Skills, Icons.Outlined.Build,               "Skills"),
-                        NavEntry(Screen.Updates, Icons.Outlined.Notifications,      "Updates", pendingUpdateCount)
+                        NavEntry(Screen.MemoryHome, Icons.Outlined.Psychology, R.string.nav_memory, draftCount),
+                        NavEntry(Screen.TasksHome, Icons.Rounded.CheckCircle, R.string.nav_tasks),
+                        NavEntry(Screen.Capabilities, Icons.Rounded.Shield, R.string.nav_capabilities),
+                        NavEntry(Screen.Settings, Icons.Outlined.Settings, R.string.nav_settings, pendingUpdateCount)
                     ).forEach { entry ->
                         NavigationDrawerItem(
                             label  = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(entry.label, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                                    Text(stringResource(entry.labelRes), fontSize = 15.sp, modifier = Modifier.weight(1f))
                                     if (entry.badge > 0) {
                                         Box(
                                             Modifier
@@ -240,7 +376,7 @@ fun NewaxApp(
                                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                                         ) {
                                             Text(
-                                                if (entry.badge > 99) "99+" else entry.badge.toString(),
+                                                if (entry.badge > 99) stringResource(R.string.badge_overflow) else entry.badge.toString(),
                                                 fontSize   = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color      = Color.White
@@ -249,76 +385,107 @@ fun NewaxApp(
                                     }
                                 }
                             },
-                            icon   = { Icon(entry.icon, contentDescription = entry.label) },
+                            icon   = { Icon(entry.icon, contentDescription = null) },
                             selected = screen == entry.screen,
                             onClick  = { screen = entry.screen; scope.launch { drawerState.close() } },
                             modifier = Modifier.padding(horizontal = 12.dp),
-                            colors   = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor   = SurfaceSel,
-                                unselectedContainerColor = Color.Transparent,
-                                selectedIconColor        = Primary,
-                                selectedTextColor        = Primary,
-                                unselectedIconColor      = TextSec,
-                                unselectedTextColor      = TextSec
-                            )
+                            colors   = drawerItemColors,
                         )
                     }
-                    Spacer(Modifier.weight(1f))
-                    HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 20.dp))
+                    HorizontalDivider(color = NewaxTheme.colors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     Spacer(Modifier.height(12.dp))
-                    StatusBadge(vm.modelStatus, vm.modelBusy, Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                    // T3.5b — route 1.1 item 8: the model status footer opens the
+                    // model sheet (1.4). The badge itself is unchanged; the row
+                    // gains a real 44 dp target.
+                    StatusBadge(
+                        vm.modelStatus, vm.modelBusy,
+                        Modifier
+                            .padding(horizontal = 20.dp, vertical = 4.dp)
+                            .minimumTouchTarget()
+                            .clickable {
+                                scope.launch { drawerState.close() }
+                                showModelSheet = true
+                            }
+                    )
                     Spacer(Modifier.height(20.dp))
                 }
             }
         ) {
             Scaffold(
-                containerColor = BG,
+                containerColor = NewaxTheme.colors.bg,
                 topBar = {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text(
-                                    when (screen) {
-                                        Screen.Chat     -> "Chat"
-                                        Screen.Memory   -> "Memory"
-                                        Screen.Drafts   -> "Learning Drafts"
-                                        Screen.Meeting  -> "Meeting"
-                                        Screen.Backup   -> "Backup & Restore"
-                                        Screen.People   -> "People"
-                                        Screen.Settings -> "Settings"
-                                        Screen.AppPermissions -> "App Permissions"
-                                        Screen.Capabilities -> "Capabilities"
-                                        Screen.Goals -> "Goals"
-                                        Screen.AgentMemory -> "Agent Memory"
-                                        Screen.Agents -> "Agents"
-                                        Screen.Skills -> "Skills"
-                                        Screen.Updates -> "Pending System Updates"
-                                        Screen.Nearby -> "Nearby Share"
-                                        Screen.Sync -> "Sync"
-                                        Screen.PolicyHistory -> "Policy History"
-                                    },
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize   = 18.sp,
-                                    color      = TextPri
-                                )
-                                if (screen == Screen.Chat) {
-                                    StatusBadge(vm.modelStatus, vm.modelBusy)
+                    // T3.4c: the shared shell TopBar (docs/UI_DESIGN.md §8 — Shell).
+                    TopBar(
+                        title = stringResource(topBarTitleRes(screen)),
+                        underTitle = {
+                            if (screen == Screen.Chat) {
+                                StatusBadge(vm.modelStatus, vm.modelBusy)
+                            }
+                        },
+                        onMenu = { scope.launch { drawerState.open() } },
+                        menuLabel = stringResource(R.string.cd_menu),
+                        actions = {
+                            if (screen == Screen.Chat) {
+                                // T3.5b — route 1.6/1.12: the thread's overflow
+                                // menu. Export opens the export sheet; Delete
+                                // keeps the existing clear-chat confirm.
+                                Box {
+                                    IconButton(onClick = { chatMenuOpen = true }) {
+                                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.cd_chat_overflow), tint = NewaxTheme.colors.textSecondary)
+                                    }
+                                    DropdownMenu(expanded = chatMenuOpen, onDismissRequest = { chatMenuOpen = false }) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.chat_export)) },
+                                            onClick = {
+                                                chatMenuOpen = false
+                                                exportStatus = ExportStatus.Idle
+                                                showExportSheet = true
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.chat_delete_conversation)) },
+                                            onClick = {
+                                                chatMenuOpen = false
+                                                showClearChatDialog = true
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = TextPri)
+                            if (screen == Screen.Conversations) {
+                                // 1.1 — New chat (pencil-in-square icon per the spec).
+                                IconButton(onClick = { vm.newChat(); screen = Screen.Chat }) {
+                                    Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.action_new_chat), tint = NewaxTheme.colors.textSecondary)
+                                }
                             }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = BG),
-                        modifier = Modifier
+                        }
                     )
                 }
             ) { padding ->
                 Box(Modifier.fillMaxSize()) {
                     when (screen) {
-                    Screen.Chat     -> ChatScreen(vm, padding, voiceLauncher)
+                    Screen.Chat     -> ChatScreen(
+                        vm,
+                        padding,
+                        onOpenModelSheet = { showModelSheet = true },
+                        onOpenStepDetail = {
+                            stepDetailAction = vm.pendingAction
+                            showStepDetail = true
+                        },
+                        onOpenVoiceCapture = ::openVoiceCapture
+                    )
+                    Screen.Conversations -> ConversationsScreen(
+                        vm,
+                        padding,
+                        onOpenThread = { id ->
+                            vm.openConversation(id)
+                            screen = Screen.Chat
+                        },
+                        onNewChat = { vm.newChat(); screen = Screen.Chat }
+                    )
+                    // T3.5d — the compact-IA section homes (2.x / 3.x).
+                    Screen.MemoryHome -> MemoryHomeScreen(padding, draftCount) { screen = it }
+                    Screen.TasksHome -> TasksHomeScreen(padding) { screen = it }
                     Screen.Memory   -> MemoryScreen(vm, padding)
                     Screen.Drafts   -> DraftsScreen(vm, padding)
                     Screen.Meeting  -> MeetingScreen(vm, padding)
@@ -331,8 +498,14 @@ fun NewaxApp(
                         onScrollHandled = { policyScrollSignal = 0 },
                         onOpenPolicyHistory = { screen = Screen.PolicyHistory },
                         policyScrollTarget = policyScrollTarget,
-                        onTargetHandled = { policyScrollTarget = null }
+                        onTargetHandled = { policyScrollTarget = null },
+                        // T3.5e — routes 4.2/4.3: the apps index, and the
+                        // remedy destinations for a non-operational capability.
+                        onOpenAppsIndex = { screen = Screen.AppsIndex },
+                        onOpenAppPermissions = { screen = Screen.AppPermissions },
+                        onOpenSettings = { screen = Screen.Settings }
                     )
+                    Screen.AppsIndex -> AppsIndexScreen(vm, padding)
                     Screen.PolicyHistory -> PolicyHistoryScreen(
                         padding,
                         onOpenActionClass = { actionClass ->
@@ -353,7 +526,18 @@ fun NewaxApp(
                             screen = Screen.Capabilities
                         }
                     )
-                    Screen.Settings -> SettingsScreen(vm, padding, modelLauncher, onAccessibility, onNotifications, onNavigateToBackup = { screen = Screen.Backup }, onNavigateToPeople = { screen = Screen.People }, onNavigateToAppPermissions = { screen = Screen.AppPermissions }, onNavigateToSync = { screen = Screen.Sync })
+                    Screen.Settings -> SettingsScreen(
+                        vm, padding, modelLauncher, onAccessibility, onNotifications,
+                        onNavigateToBackup = { screen = Screen.Backup },
+                        onNavigateToPeople = { screen = Screen.People },
+                        onNavigateToAppPermissions = { screen = Screen.AppPermissions },
+                        onNavigateToSync = { screen = Screen.Sync },
+                        // T3.5d — the settings sub-routes that left the drawer
+                        // now live inside the Settings page (spec §6.7).
+                        onNavigateToPolicyHistory = { screen = Screen.PolicyHistory },
+                        onNavigateToNearby = { screen = Screen.Nearby },
+                        onNavigateToUpdates = { screen = Screen.Updates },
+                    )
                     Screen.Nearby -> NearbyShareScreen(padding)
                     Screen.Sync -> SyncScreen(padding)
                     Screen.AgentMemory -> AgentMemoryScreen(padding)
@@ -375,6 +559,88 @@ fun NewaxApp(
             }
             BiometricOverlay(vm)
         }
+        if (showClearChatDialog) {
+            // T3.4: the shared confirm dialog — destructive actions are
+            // confirmed before they run (SC 3.3.4/3.3.6).
+            ConfirmDialog(
+                title         = stringResource(R.string.chat_clear_title),
+                body          = stringResource(R.string.chat_clear_body),
+                confirmLabel  = stringResource(R.string.action_clear),
+                dismissLabel  = stringResource(R.string.action_cancel),
+                onConfirm     = { showClearChatDialog = false; vm.clearChat() },
+                onDismiss     = { showClearChatDialog = false },
+                destructive   = true
+            )
+        }
+        // T3.5b — the chat overlays, above everything else in the shell.
+        if (showModelSheet) {
+            ModelSheet(
+                vm = vm,
+                onDismiss = { showModelSheet = false },
+                onImport = { modelLauncher.launch(arrayOf("application/octet-stream", "*/*")) },
+                onAllModelSettings = {
+                    showModelSheet = false
+                    screen = Screen.Settings
+                },
+            )
+        }
+        if (showExportSheet) {
+            val exportTitle = conversations.firstOrNull { it.id == vm.activeConversationId }?.title.orEmpty()
+            ExportSheet(
+                messages = vm.transcriptForExport(),
+                title = exportTitle,
+                status = exportStatus,
+                onDismiss = {
+                    showExportSheet = false
+                    exportStatus = ExportStatus.Idle
+                    pendingExport = null
+                    pendingExportName = ""
+                },
+                onExport = { text, _, suggestedName ->
+                    pendingExport = text
+                    pendingExportName = suggestedName
+                    exportLauncher.launch(suggestedName)
+                },
+            )
+        }
+        if (showStepDetail) {
+            vm.pendingAction?.let { action ->
+                StepDetailSheet(
+                    action = action,
+                    onDismiss = { showStepDetail = false },
+                    onSeeInHistory = {
+                        showStepDetail = false
+                        screen = Screen.PolicyHistory
+                    },
+                    onChangePolicy = {
+                        showStepDetail = false
+                        screen = Screen.Settings
+                    },
+                )
+            }
+        }
+        if (showVoiceCapture) {
+            // T3.5c — route 1.10: Stop inserts the transcript into the
+            // composer (1.2) and returns; Cancel discards. Stop with nothing
+            // heard leaves the sheet open on the nothing-recognized error
+            // (the state moved to ERROR) instead of closing silently.
+            VoiceCaptureSheet(
+                state = voiceState,
+                onStop = {
+                    val transcript = voiceState.stop()
+                    voiceSession.cancel()
+                    if (transcript != null) {
+                        vm.composerText = transcript
+                        showVoiceCapture = false
+                    }
+                },
+                onCancel = {
+                    voiceState.cancel()
+                    voiceSession.cancel()
+                    showVoiceCapture = false
+                },
+            )
+        }
     }
 }
 
@@ -384,7 +650,7 @@ private fun StatusBadge(status: String, busy: Boolean, modifier: Modifier = Modi
     val isReady = status.contains("ready", true)
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (busy) {
-            CircularProgressIndicator(Modifier.size(8.dp), strokeWidth = 1.5.dp, color = TextSec)
+            CircularProgressIndicator(Modifier.size(8.dp), strokeWidth = 1.5.dp, color = NewaxTheme.colors.textSecondary)
         } else {
             Box(
                 Modifier
@@ -395,1022 +661,12 @@ private fun StatusBadge(status: String, busy: Boolean, modifier: Modifier = Modi
         }
         Spacer(Modifier.width(6.dp))
         Text(
-            if (busy) "Processing…" else if (isReady) "Offline ready" else "Basic mode",
+            if (busy) stringResource(R.string.status_processing)
+            else if (isReady) stringResource(R.string.status_offline_ready)
+            else stringResource(R.string.status_basic_mode),
             fontSize = 12.sp,
-            color    = TextSec
+            color    = NewaxTheme.colors.textSecondary
         )
-    }
-}
-
-// ── Chat Screen ───────────────────────────────────────────────────────────────
-@Composable
-fun ChatScreen(
-    vm: MainViewModel,
-    padding: PaddingValues,
-    voiceLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
-) {
-    var input by remember { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    // Read once for the whole chat surface; both the bubble entrance and the
-    // typing indicator honour it (docs/UI_DESIGN.md §3.2, WCAG SC 2.3.3).
-    val reduceMotion = reducedMotionEnabled()
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(vm.messages.size) {
-        if (vm.messages.isNotEmpty()) listState.animateScrollToItem(vm.messages.lastIndex)
-    }
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-    ) {
-        val showEmpty = vm.messages.size <= 1 && !vm.modelBusy
-
-        if (showEmpty) {
-            EmptyState(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-            ) { chip -> input = chip }
-        } else {
-            LazyColumn(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                state               = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding      = PaddingValues(top = 12.dp, bottom = 4.dp)
-            ) {
-                items(vm.messages, key = { it.id }) { msg ->
-                    // SC 2.3.3: the slide-in is decorative. Under reduced motion
-                    // the bubble appears immediately — same end state, no travel.
-                    AnimatedVisibility(
-                        visible = true,
-                        enter   = if (reduceMotion) EnterTransition.None
-                                  else slideInVertically(initialOffsetY = { it / 3 }) + fadeIn(tween(200))
-                    ) {
-                        ChatBubble(msg)
-                    }
-                }
-                if (vm.modelBusy) {
-                    item { TypingIndicator() }
-                }
-            }
-        }
-
-        vm.pendingAction?.let { ActionProposalCard(it, onApprove = vm::approve, onReject = vm::reject) }
-
-        ChatComposer(
-            input       = input,
-            onInput     = { input = it },
-            busy        = vm.modelBusy,
-            onSubmit    = { if (input.isNotBlank()) { vm.submit(input); input = "" } },
-            onMic       = {
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                }
-                voiceLauncher.launch(intent)
-            }
-        )
-    }
-}
-
-// ── Empty State ───────────────────────────────────────────────────────────────
-@Composable
-private fun EmptyState(modifier: Modifier, onChip: (String) -> Unit) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("Newax Aegis", fontWeight = FontWeight.SemiBold, fontSize = 28.sp, color = TextPri)
-        Spacer(Modifier.height(8.dp))
-        Text("Your private, on-device assistant.", color = TextSec, fontSize = 15.sp)
-        Spacer(Modifier.height(32.dp))
-        val chips = listOf("What's on my screen?", "Open an app", "Draft a reply", "What do you remember?")
-        chips.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val c0 = row.getOrNull(0)
-                val c1 = row.getOrNull(1)
-                if (c0 != null) SuggestionChip(
-                    onClick  = { onChip(c0) },
-                    label    = { Text(c0, fontSize = 13.sp) },
-                    modifier = Modifier.weight(1f),
-                    border   = SuggestionChipDefaults.suggestionChipBorder(enabled = true, borderColor = Border)
-                )
-                if (c1 != null) SuggestionChip(
-                    onClick  = { onChip(c1) },
-                    label    = { Text(c1, fontSize = 13.sp) },
-                    modifier = Modifier.weight(1f),
-                    border   = SuggestionChipDefaults.suggestionChipBorder(enabled = true, borderColor = Border)
-                ) else Spacer(Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(8.dp))
-        }
-        Spacer(Modifier.height(24.dp))
-        Text("Processed on this device.", color = TextTer, fontSize = 12.sp)
-    }
-}
-
-// ── Chat Bubble ───────────────────────────────────────────────────────────────
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ChatBubble(msg: ChatMessage) {
-    val context = LocalContext.current
-    val time    = remember(msg.timestamp) {
-        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(msg.timestamp))
-    }
-
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (msg.fromUser) Arrangement.End else Arrangement.Start
-    ) {
-        Column(horizontalAlignment = if (msg.fromUser) Alignment.End else Alignment.Start) {
-            Box(
-                Modifier
-                    // Was widthIn(max = 300.dp). A fixed dp cap does not grow
-                    // with the font scale, so at the 200% required by WCAG 2.2
-                    // SC 1.4.4 the text clipped. A fraction of the available
-                    // width scales with the container instead (§3.1).
-                    .fillMaxWidth(0.86f)
-                    .wrapContentWidth(if (msg.fromUser) Alignment.End else Alignment.Start)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart    = 18.dp,
-                            topEnd      = 18.dp,
-                            bottomStart = if (msg.fromUser) 18.dp else 4.dp,
-                            bottomEnd   = if (msg.fromUser) 4.dp else 18.dp
-                        )
-                    )
-                    .background(if (msg.fromUser) SurfaceSel else Primary)
-                    .combinedClickable(
-                        onClick      = {},
-                        onLongClick  = {
-                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            cm.setPrimaryClip(ClipData.newPlainText("Newax", msg.text))
-                        }
-                    )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    msg.text,
-                    color = if (msg.fromUser) TextPri else Color.White,
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp
-                )
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(time, fontSize = 11.sp, color = TextTer)
-        }
-    }
-}
-
-// ── Typing Indicator ──────────────────────────────────────────────────────────
-/**
- * "The assistant is working" — announced, and motion-optional.
- *
- * Two accessibility obligations are met here (docs/UI_DESIGN.md §3):
- *  - SC 2.3.3: the pulsing dots are an unbounded `infiniteRepeatable`. Under
- *    reduced motion they are replaced by a static label rather than simply
- *    removed, so the state stays visible.
- *  - SC 1.4.1 / 4.1.3: three animating dots convey nothing to a screen reader.
- *    The row carries a description and is a polite live region, so the state is
- *    announced without interrupting whatever is being read.
- */
-@Composable
-private fun TypingIndicator() {
-    val reduceMotion = reducedMotionEnabled()
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(SurfaceMuted)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .describedAs("Newax Aegis is thinking")
-            .liveRegionPolite(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        if (reduceMotion) {
-            Text("Thinking…", fontSize = 13.sp, color = TextSec)
-            return@Row
-        }
-        val infiniteTransition = rememberInfiniteTransition(label = "typing")
-        repeat(3) { i ->
-            val alpha by infiniteTransition.animateFloat(
-                initialValue = 0.3f,
-                targetValue  = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation  = tween(500, delayMillis = i * 150),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "dot$i"
-            )
-            Box(
-                Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(TextSec.copy(alpha = alpha))
-            )
-        }
-    }
-}
-
-// ── Risk Badge ────────────────────────────────────────────────────────────────
-private enum class Risk { Routine, Sensitive, HighImpact }
-
-private fun ProposedAction.risk(): Risk = when (this) {
-    is ProposedAction.DeleteFile, is ProposedAction.DeleteContact,
-    is ProposedAction.DeleteProject, is ProposedAction.ForgetFact,
-    is ProposedAction.RunScript, is ProposedAction.PostSocialMedia,
-    is ProposedAction.Send, is ProposedAction.SendImage -> Risk.HighImpact
-
-    is ProposedAction.Type, is ProposedAction.Tap, is ProposedAction.TapPixels,
-    is ProposedAction.OpenApp, is ProposedAction.UpdateMemory,
-    is ProposedAction.UpdateGraph, is ProposedAction.LogCommunication,
-    is ProposedAction.UpdateNode, is ProposedAction.UpdateProject,
-    is ProposedAction.CreateEvent, is ProposedAction.AuditSecurity,
-    is ProposedAction.SearchAll -> Risk.Sensitive
-
-    else -> Risk.Routine
-}
-
-// ── Action Proposal Card ──────────────────────────────────────────────────────
-@Composable
-private fun ActionProposalCard(action: ProposedAction, onApprove: () -> Unit, onReject: () -> Unit) {
-    val risk = action.risk()
-    val (riskLabel, riskBg, riskTxt) = when (risk) {
-        Risk.HighImpact -> Triple("High Impact", Primary, Color.White)
-        Risk.Sensitive  -> Triple("Sensitive",   SurfaceStr, TextPri)
-        Risk.Routine    -> Triple("Routine",     SurfaceMuted, TextSec)
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape  = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.Shield,
-                    contentDescription = null,
-                    tint     = TextSec,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Approval Required", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri, modifier = Modifier.weight(1f))
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(riskBg)
-                        .padding(horizontal = 10.dp, vertical = 3.dp)
-                ) {
-                    Text(riskLabel, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = riskTxt)
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = Border)
-            Spacer(Modifier.height(10.dp))
-            Text(action.summary, color = TextSec, fontSize = 14.sp, lineHeight = 20.sp)
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                OutlinedButton(
-                    onClick = onReject,
-                    border  = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                    colors  = ButtonDefaults.outlinedButtonColors(contentColor = TextSec)
-                ) { Text("Cancel", fontSize = 14.sp) }
-                Button(
-                    onClick = onApprove,
-                    colors  = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("Approve", fontSize = 14.sp) }
-            }
-        }
-    }
-}
-
-// ── Chat Composer ─────────────────────────────────────────────────────────────
-@Composable
-private fun ChatComposer(input: String, onInput: (String) -> Unit, busy: Boolean, onSubmit: () -> Unit, onMic: () -> Unit) {
-    Surface(
-        modifier   = Modifier.fillMaxWidth(),
-        color      = BG,
-        tonalElevation = 0.dp
-    ) {
-        Row(
-            Modifier
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Surface)
-                .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onMic, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Rounded.Mic, contentDescription = "Voice", tint = TextSec, modifier = Modifier.size(22.dp))
-            }
-            BasicTextField(input, onInput, modifier = Modifier.weight(1f))
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(if (input.isNotBlank()) Primary else Color.Transparent),
-                contentAlignment = Alignment.Center
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = if (input.isNotBlank()) Color.White else TextSec)
-                } else {
-                    IconButton(onClick = onSubmit, enabled = input.isNotBlank(), modifier = Modifier.size(40.dp)) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = if (input.isNotBlank()) Color.White else TextTer,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BasicTextField(value: String, onValue: (String) -> Unit, modifier: Modifier = Modifier) {
-    OutlinedTextField(
-        value              = value,
-        onValueChange      = onValue,
-        modifier           = modifier,
-        placeholder        = { Text("Ask or command…", color = TextTer, fontSize = 15.sp) },
-        colors             = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor   = Color.Transparent,
-            unfocusedBorderColor = Color.Transparent,
-            cursorColor          = TextPri
-        ),
-        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = TextPri),
-        singleLine = false,
-        maxLines   = 5
-    )
-}
-
-// ── Memory Screen ─────────────────────────────────────────────────────────────
-@Composable
-fun MemoryScreen(vm: MainViewModel, padding: PaddingValues) {
-    val categories = listOf("personal", "business", "education", "relationships", "goals", "pain_points", "rules")
-    var expandedCategory by remember { mutableStateOf<String?>(null) }
-    var showClearDialog by remember { mutableStateOf(false) }
-    val allCats = remember(vm.memoryVersion) { vm.memory.getAllCategories() }
-    val totalCount = allCats.values.sumOf { it.size }
-
-    LazyColumn(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(vertical = 12.dp)
-    ) {
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("$totalCount memories", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Encrypted on this device", fontSize = 13.sp, color = TextSec)
-                    }
-                    Icon(Icons.Rounded.Lock, contentDescription = null, tint = TextSec, modifier = Modifier.size(20.dp))
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Categories") }
-
-        items(categories) { cat ->
-            val entries = allCats[cat].orEmpty()
-            MemoryCategoryCard(
-                category = cat,
-                entries  = entries,
-                expanded = expandedCategory == cat,
-                onToggle = { expandedCategory = if (expandedCategory == cat) null else cat },
-                onSave   = { updated -> vm.memory.setCategory(cat, updated); vm.bumpMemoryVersion() }
-            )
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Knowledge Graph") }
-
-        val nodes = com.newax.aegis.engine.KnowledgeGraph.getAllNodes()
-        if (nodes.isEmpty()) {
-            item { EmptyChip("No graph nodes yet") }
-        } else {
-            items(nodes) { node ->
-                Card(
-                    shape  = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                    elevation = CardDefaults.cardElevation(0.dp)
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text(node.id, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPri)
-                        if (node.properties.isNotEmpty()) {
-                            Spacer(Modifier.height(4.dp))
-                            node.properties.forEach { (k, v) ->
-                                Text("$k: $v", fontSize = 12.sp, color = TextSec, fontFamily = FontFamily.Monospace)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Projects") }
-
-        val projects = com.newax.aegis.engine.ProjectTracker.getAllProjects()
-        if (projects.isEmpty()) {
-            item { EmptyChip("No projects yet") }
-        } else {
-            items(projects) { p ->
-                Card(
-                    shape  = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                    elevation = CardDefaults.cardElevation(0.dp)
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text(p.id, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPri)
-                        Text("${p.status} — ${p.notes}", fontSize = 12.sp, color = TextSec)
-                    }
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Communication Log") }
-
-        val logs = com.newax.aegis.engine.CommunicationLog.getAllLogs().sortedByDescending { it.timestamp }
-        if (logs.isEmpty()) {
-            item { EmptyChip("No logged interactions yet") }
-        } else {
-            items(logs.take(20)) { log ->
-                Card(
-                    shape  = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                    elevation = CardDefaults.cardElevation(0.dp)
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text(log.contact, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPri)
-                        Text(log.summary, fontSize = 12.sp, color = TextSec, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-        }
-
-        item {
-            Spacer(Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = { showClearDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-                border   = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = TextSec)
-            ) { Text("Clear all memory", fontSize = 14.sp) }
-        }
-    }
-
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            containerColor   = Surface,
-            title = { Text("Clear all memory?", fontWeight = FontWeight.SemiBold, color = TextPri) },
-            text  = { Text("This permanently removes all saved facts, categories, and user data.", color = TextSec) },
-            confirmButton = {
-                Button(
-                    onClick = { vm.memory.forgetAll(); vm.bumpMemoryVersion(); showClearDialog = false },
-                    colors  = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("Clear") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("Cancel", color = TextSec) }
-            }
-        )
-    }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text,
-        fontSize   = 11.sp,
-        fontWeight = FontWeight.Medium,
-        color      = TextTer,
-        modifier   = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
-    )
-}
-
-@Composable
-private fun EmptyChip(text: String) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(SurfaceMuted)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-    ) { Text(text, fontSize = 13.sp, color = TextTer) }
-}
-
-@Composable
-private fun MemoryCategoryCard(
-    category: String,
-    entries: List<String>,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onSave: (List<String>) -> Unit
-) {
-    var draft by remember(category) { mutableStateOf(entries.joinToString("\n")) }
-
-    Card(
-        shape  = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onToggle)
-                    // The chevron below is the only expanded/collapsed cue, and
-                    // an icon swap conveys nothing to a screen reader. State
-                    // belongs on the control, not the glyph (SC 4.1.2) — the
-                    // icon stays contentDescription = null because the row's
-                    // text already names it.
-                    .statusSemantics(if (expanded) "Expanded" else "Collapsed")
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    category.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                    fontWeight = FontWeight.Medium,
-                    fontSize   = 14.sp,
-                    color      = TextPri,
-                    modifier   = Modifier.weight(1f)
-                )
-                Text("${entries.size}", fontSize = 12.sp, color = TextTer)
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = null,
-                    tint = TextSec,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            if (expanded) {
-                HorizontalDivider(color = Border)
-                Column(Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value         = draft,
-                        onValueChange = { draft = it },
-                        modifier      = Modifier.fillMaxWidth(),
-                        label         = { Text("One fact per line", color = TextTer, fontSize = 12.sp) },
-                        colors        = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor   = Primary,
-                            unfocusedBorderColor = Border
-                        ),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = TextPri),
-                        minLines = 2
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Button(
-                        onClick = { onSave(draft.lines().filter { it.isNotBlank() }) },
-                        modifier = Modifier.align(Alignment.End),
-                        colors   = ButtonDefaults.buttonColors(containerColor = Primary)
-                    ) { Text("Save", fontSize = 14.sp) }
-                }
-            }
-        }
-    }
-}
-
-// ── Settings Screen ───────────────────────────────────────────────────────────
-@Composable
-fun SettingsScreen(
-    vm: MainViewModel,
-    padding: PaddingValues,
-    modelLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
-    onAccessibility: () -> Unit,
-    onNotifications: () -> Unit,
-    onNavigateToBackup: () -> Unit = {},
-    onNavigateToPeople: () -> Unit = {},
-    onNavigateToAppPermissions: () -> Unit = {},
-    onNavigateToSync: () -> Unit = {}
-) {
-    LazyColumn(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(vertical = 12.dp)
-    ) {
-        // ── Automation section (all groups + 2FA) ─────────────────────────
-        item { AutomationSettingsSection(vm) }
-        item { Spacer(Modifier.height(4.dp)) }
-
-        // ── Self-Learning engine ───────────────────────────────────────────
-        item { LearningSettingsSection(vm) }
-        item { Spacer(Modifier.height(4.dp)) }
-
-        item { SectionLabel("Offline AI Model") }
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val isReady = vm.modelStatus.contains("ready", true)
-                        Box(Modifier.size(10.dp).clip(CircleShape).background(if (isReady) Color(0xFF22C55E) else Color(0xFF94A3B8)))
-                        Spacer(Modifier.width(10.dp))
-                        Text(vm.modelStatus, fontSize = 14.sp, color = TextPri, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        if (vm.modelBusy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = TextSec)
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    Button(
-                        onClick  = { modelLauncher.launch(arrayOf("application/octet-stream", "*/*")) },
-                        enabled  = !vm.modelBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors   = ButtonDefaults.buttonColors(containerColor = Primary)
-                    ) { Text("Import model file", fontSize = 14.sp) }
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Ambient Mode") }
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Continuously transcribe and summarize", fontSize = 13.sp, color = TextSec)
-                    Spacer(Modifier.height(12.dp))
-                    val currentMode = com.newax.aegis.voice.VoiceRecognitionService.ambientMode
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Meeting", "Lecture").forEach { mode ->
-                            val sel = currentMode == mode
-                            FilterChip(
-                                selected = sel,
-                                onClick  = {
-                                    if (sel) com.newax.aegis.voice.VoiceRecognitionService.endAmbientMode()
-                                    else com.newax.aegis.voice.VoiceRecognitionService.ambientMode = mode
-                                },
-                                label  = { Text(mode, fontSize = 13.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Primary,
-                                    selectedLabelColor     = Color.White
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Permissions") }
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Column {
-                    PermissionRow("Screen Access (Accessibility)", "Read and operate UI elements", onAccessibility)
-                    HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 16.dp))
-                    PermissionRow("Inbox Access (Notifications)", "Read incoming notifications", onNotifications)
-                    HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 16.dp))
-                    PermissionRow("App Permissions", "Control which apps Newax can interact with", onNavigateToAppPermissions)
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("People") }
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onNavigateToPeople)
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFFEDE9FE)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Outlined.Person, contentDescription = null, tint = Color(0xFF7C3AED), modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("People", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPri)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Browse tracked contacts and their learned facts", fontSize = 12.sp, color = TextSec)
-                    }
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = TextTer, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Device Sync") }
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onNavigateToSync)
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFFDCFCE7)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.Sync, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Device Sync", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPri)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Automatic encrypted sync across your devices", fontSize = 12.sp, color = TextSec)
-                    }
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = TextTer, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("Backup & Restore") }
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onNavigateToBackup)
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFFDBEAFE)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Outlined.CloudSync, contentDescription = null, tint = Color(0xFF2563EB), modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Backup & Restore", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPri)
-                        Spacer(Modifier.height(2.dp))
-                        Text("AES-256-GCM · Export to Google Drive or device", fontSize = 12.sp, color = TextSec)
-                    }
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = TextTer, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel("About") }
-        item {
-            Card(
-                shape  = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    InfoRow("Version", "0.1.0")
-                    InfoRow("Storage", "Encrypted on device")
-                    InfoRow("Network", "Offline — no data sent")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PermissionRow(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPri)
-            Spacer(Modifier.height(2.dp))
-            Text(subtitle, fontSize = 12.sp, color = TextSec)
-        }
-        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = TextTer, modifier = Modifier.size(18.dp))
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth()) {
-        Text(label, fontSize = 13.sp, color = TextSec, modifier = Modifier.weight(1f))
-        Text(value, fontSize = 13.sp, color = TextPri, fontFamily = FontFamily.Monospace)
-    }
-}
-
-// ── Meeting Screen ────────────────────────────────────────────────────────────
-@Composable
-fun MeetingScreen(vm: MainViewModel, padding: PaddingValues) {
-    val meetings = remember(vm.memoryVersion) { vm.memory.getCategory("meetings") }
-    var showDialog by remember { mutableStateOf(false) }
-    var titleInput by remember { mutableStateOf("") }
-    var expandedKey by remember { mutableStateOf<String?>(null) }
-    val fmt = remember { SimpleDateFormat("MMM d · HH:mm", Locale.getDefault()) }
-
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false; titleInput = "" },
-            containerColor   = Surface,
-            shape            = RoundedCornerShape(20.dp),
-            title  = { Text("New Meeting", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = TextPri) },
-            text   = {
-                Column {
-                    Text("Title", fontSize = 13.sp, color = TextSec)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value         = titleInput,
-                        onValueChange = { titleInput = it },
-                        placeholder   = { Text("e.g. Sprint Review", color = TextTer) },
-                        singleLine    = true,
-                        colors        = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor   = Primary,
-                            unfocusedBorderColor = Border,
-                            cursorColor          = TextPri
-                        ),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = TextPri),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (titleInput.isNotBlank()) {
-                        val entry = "${titleInput.trim()} :: ${System.currentTimeMillis()}"
-                        val updated = meetings.toMutableList().also { it.add(0, entry) }
-                        vm.memory.setCategory("meetings", updated)
-                        vm.bumpMemoryVersion()
-                        titleInput = ""
-                        showDialog = false
-                    }
-                }) { Text("Start", color = Primary, fontWeight = FontWeight.SemiBold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false; titleInput = "" }) {
-                    Text("Cancel", color = TextSec)
-                }
-            }
-        )
-    }
-
-    LazyColumn(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding      = PaddingValues(vertical = 12.dp)
-    ) {
-        // Header card
-        item {
-            Card(
-                shape     = RoundedCornerShape(18.dp),
-                colors    = CardDefaults.cardColors(containerColor = Surface),
-                border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${meetings.size} meetings", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Stored on device", fontSize = 13.sp, color = TextSec)
-                    }
-                    Icon(Icons.Outlined.Groups, contentDescription = null, tint = TextSec, modifier = Modifier.size(20.dp))
-                }
-            }
-        }
-
-        // Start new meeting
-        item {
-            Card(
-                shape     = RoundedCornerShape(18.dp),
-                colors    = CardDefaults.cardColors(containerColor = Primary),
-                elevation = CardDefaults.cardElevation(0.dp),
-                onClick   = { showDialog = true }
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Outlined.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text("Start New Meeting", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White, modifier = Modifier.weight(1f))
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.7f))
-                }
-            }
-        }
-
-        if (meetings.isNotEmpty()) {
-            item { Spacer(Modifier.height(4.dp)) }
-            item { SectionLabel("Past Meetings") }
-
-            items(meetings, key = { it }) { entry ->
-                val parts   = entry.split(" :: ")
-                val title   = parts.getOrNull(0) ?: entry
-                val tsMillis = parts.getOrNull(1)?.toLongOrNull()
-                val dateStr  = if (tsMillis != null) fmt.format(Date(tsMillis)) else ""
-                val isExpanded = expandedKey == entry
-
-                Card(
-                    shape     = RoundedCornerShape(16.dp),
-                    colors    = CardDefaults.cardColors(containerColor = Surface),
-                    border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                    elevation = CardDefaults.cardElevation(0.dp),
-                    onClick   = { expandedKey = if (isExpanded) null else entry }
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(title, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPri, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (dateStr.isNotBlank()) {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(dateStr, fontSize = 12.sp, color = TextTer)
-                                }
-                            }
-                            Icon(
-                                if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                                contentDescription = null, tint = TextSec, modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        if (isExpanded) {
-                            Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = Border)
-                            Spacer(Modifier.height(12.dp))
-                            Text("No notes added to this meeting yet.\nUse the chat to say \"remember that [note] for this meeting\" to add notes.", fontSize = 13.sp, color = TextSec, lineHeight = 20.sp)
-                        }
-                    }
-                }
-            }
-        } else {
-            item {
-                Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Outlined.Groups, contentDescription = null, tint = TextTer, modifier = Modifier.size(44.dp))
-                        Spacer(Modifier.height(14.dp))
-                        Text("No meetings yet", fontSize = 15.sp, color = TextSec, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Tap \"Start New Meeting\" above", fontSize = 13.sp, color = TextTer)
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -1433,9 +689,9 @@ fun BiometricOverlay(vm: MainViewModel) {
             })
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Newax Security")
-                .setSubtitle("Verify identity to execute sensitive action")
-                .setNegativeButtonText("Cancel")
+                .setTitle(stringResource(R.string.biometric_title))
+                .setSubtitle(stringResource(R.string.biometric_subtitle))
+                .setNegativeButtonText(stringResource(R.string.action_cancel))
                 .build()
         )
         onDispose { prompt.cancelAuthentication() }

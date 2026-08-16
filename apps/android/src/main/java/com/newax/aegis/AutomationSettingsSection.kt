@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,22 +35,8 @@ import androidx.fragment.app.FragmentActivity
 import com.newax.aegis.engine.AutomationSettings
 import com.newax.aegis.engine.AutomationToggle
 import com.newax.aegis.engine.TotpManager
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
-private val BG           = NewaxLightColors.bg
-private val Surface      = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val SurfaceStr   = NewaxLightColors.surfaceStrong
-private val Primary      = NewaxLightColors.textPrimary
-private val TextPri      = NewaxLightColors.textPrimary
-private val TextSec      = NewaxLightColors.textSecondary
-private val TextTer      = NewaxLightColors.textTertiary
-private val Border       = NewaxLightColors.border
-private val Red          = NewaxLightColors.error
-private val Amber        = NewaxLightColors.warning
-private val Green        = NewaxLightColors.success
-
-// ── State holder for the settings biometric/TOTP flow ────────────────────────
 private enum class SettingsAuthState { IDLE, BIOMETRIC_PENDING, TOTP_PENDING, TOTP_SETUP }
 
 /**
@@ -102,9 +89,9 @@ fun AutomationSettingsSection(vm: MainViewModel) {
             override fun onAuthenticationFailed() {}
         }).authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Newax Automation Security")
-                .setSubtitle("Verify identity to change automation settings")
-                .setNegativeButtonText("Cancel")
+                .setTitle(context.getString(R.string.auto_biometric_title))
+                .setSubtitle(context.getString(R.string.auto_biometric_subtitle))
+                .setNegativeButtonText(context.getString(R.string.action_cancel))
                 .build()
         )
     }
@@ -165,32 +152,32 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                 pendingToggle = null
                 totpCode = ""; totpError = false
             },
-            containerColor = Surface,
+            containerColor = NewaxTheme.colors.surface,
             shape = RoundedCornerShape(20.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Lock, contentDescription = null, tint = Amber, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.Lock, contentDescription = null, tint = NewaxTheme.colors.warning, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Two-Factor Verification", fontWeight = FontWeight.SemiBold, color = TextPri)
+                    Text(stringResource(R.string.auto_totp_verify_title), fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary)
                 }
             },
             text = {
                 Column {
                     Text(
-                        "Enter the 6-digit code from Google Authenticator to enable:\n\"${pendingToggle?.label}\"",
-                        fontSize = 14.sp, color = TextSec, lineHeight = 20.sp
+                        stringResource(R.string.auto_totp_verify_body, pendingToggle?.label),
+                        fontSize = 14.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 20.sp
                     )
                     Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
                         value = totpCode,
                         onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) { totpCode = it; totpError = false } },
-                        label = { Text("6-digit code", color = TextTer) },
+                        label = { Text(stringResource(R.string.auto_code_label), color = NewaxTheme.colors.textTertiary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         isError = totpError,
-                        supportingText = if (totpError) { { Text("Invalid code. Try again.", color = Red) } } else null,
+                        supportingText = if (totpError) { { Text(stringResource(R.string.auto_code_invalid), color = NewaxTheme.colors.error) } } else null,
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, unfocusedBorderColor = Border)
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NewaxTheme.colors.textPrimary, unfocusedBorderColor = NewaxTheme.colors.border)
                     )
                 }
             },
@@ -208,13 +195,13 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                         }
                     },
                     enabled = totpCode.length == 6,
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("Verify") }
+                    colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                ) { Text(stringResource(R.string.action_verify)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     authState = SettingsAuthState.IDLE; pendingToggle = null; totpCode = ""; totpError = false
-                }) { Text("Cancel", color = TextSec) }
+                }) { Text(stringResource(R.string.action_cancel), color = NewaxTheme.colors.textSecondary) }
             }
         )
     }
@@ -227,60 +214,60 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                 if (setupSecret.isNotEmpty()) TotpManager.clearEnrollment()
                 authState = SettingsAuthState.IDLE; setupSecret = ""; setupCode = ""; setupError = false
             },
-            containerColor = Surface,
+            containerColor = NewaxTheme.colors.surface,
             shape = RoundedCornerShape(20.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.QrCode2, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.QrCode2, contentDescription = null, tint = NewaxTheme.colors.textPrimary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Set up Google Authenticator", fontWeight = FontWeight.SemiBold, color = TextPri)
+                    Text(stringResource(R.string.auto_totp_setup_title), fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary)
                 }
             },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("1. Open Google Authenticator\n2. Tap + → Scan QR code OR enter key manually\n3. Enter the 6-digit code to confirm", fontSize = 13.sp, color = TextSec, lineHeight = 19.sp)
+                    Text(stringResource(R.string.auto_totp_setup_steps), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
                     Spacer(Modifier.height(12.dp))
 
                     if (qrBitmap != null) {
                         Image(
                             bitmap = qrBitmap.asImageBitmap(),
-                            contentDescription = "QR Code",
+                            contentDescription = stringResource(R.string.auto_cd_qr),
                             modifier = Modifier.size(200.dp).clip(RoundedCornerShape(8.dp))
                         )
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    Text("Or enter key manually:", fontSize = 12.sp, color = TextTer)
+                    Text(stringResource(R.string.auto_enter_key_manually), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
                     Spacer(Modifier.height(6.dp))
                     Box(
                         Modifier.fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(SurfaceMuted)
+                            .background(NewaxTheme.colors.surfaceMuted)
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
                         Text(
                             setupSecret.chunked(4).joinToString(" "),
                             fontFamily = FontFamily.Monospace,
                             fontSize = 15.sp,
-                            color = TextPri,
+                            color = NewaxTheme.colors.textPrimary,
                             letterSpacing = 1.sp,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                     Spacer(Modifier.height(14.dp))
-                    Text("Account: Newax:NewaxDevice", fontSize = 11.sp, color = TextTer)
+                    Text(stringResource(R.string.auto_account_label), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
                     Spacer(Modifier.height(14.dp))
                     OutlinedTextField(
                         value = setupCode,
                         onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) { setupCode = it; setupError = false } },
-                        label = { Text("Confirm 6-digit code", color = TextTer) },
+                        label = { Text(stringResource(R.string.auto_confirm_code), color = NewaxTheme.colors.textTertiary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         isError = setupError,
-                        supportingText = if (setupError) { { Text("Code mismatch. Check Google Authenticator.", color = Red) } } else null,
+                        supportingText = if (setupError) { { Text(stringResource(R.string.auto_code_mismatch), color = NewaxTheme.colors.error) } } else null,
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, unfocusedBorderColor = Border)
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NewaxTheme.colors.textPrimary, unfocusedBorderColor = NewaxTheme.colors.border)
                     )
                 }
             },
@@ -295,32 +282,32 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                         }
                     },
                     enabled = setupCode.length == 6,
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("Activate 2FA") }
+                    colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                ) { Text(stringResource(R.string.action_activate_2fa)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     TotpManager.clearEnrollment()
                     authState = SettingsAuthState.IDLE; setupSecret = ""; setupCode = ""; setupError = false
-                }) { Text("Cancel", color = TextSec) }
+                }) { Text(stringResource(R.string.action_cancel), color = NewaxTheme.colors.textSecondary) }
             }
         )
     }
 
     // ── Master control card ───────────────────────────────────────────────────
-    AutoSettingsLabel("Automation Control")
+    AutoSettingsLabel(stringResource(R.string.auto_section_control))
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("$totalEnabled / ${AutomationToggle.entries.size} functions automated", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Text(stringResource(R.string.auto_functions_automated, totalEnabled, AutomationToggle.entries.size), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text("Biometric required to change any toggle", fontSize = 12.sp, color = TextSec)
+                    Text(stringResource(R.string.auto_biometric_required), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                 }
                 AutoBadge(enabled = totalEnabled > 0)
             }
@@ -329,14 +316,14 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                 OutlinedButton(
                     onClick = ::requestMasterDisable,
                     modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, Border),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec)
-                ) { Text("Disable All", fontSize = 13.sp) }
+                    border = BorderStroke(1.dp, NewaxTheme.colors.border),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary)
+                ) { Text(stringResource(R.string.action_disable_all), fontSize = 13.sp) }
                 Button(
                     onClick = ::requestMasterEnable,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("Max Auto Mode", fontSize = 13.sp) }
+                    colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                ) { Text(stringResource(R.string.action_max_auto), fontSize = 13.sp) }
             }
         }
     }
@@ -344,10 +331,10 @@ fun AutomationSettingsSection(vm: MainViewModel) {
     Spacer(Modifier.height(4.dp))
 
     // ── 2FA security card ─────────────────────────────────────────────────────
-    AutoSettingsLabel("Two-Factor Authentication (2FA)")
+    AutoSettingsLabel(stringResource(R.string.auto_section_2fa))
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
         border = BorderStroke(1.dp, if (TotpManager.isEnrolled) Color(0xFF86EFAC) else Color(0xFFFCA5A5)),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
@@ -356,19 +343,19 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                 Icon(
                     if (TotpManager.isEnrolled) Icons.Rounded.VerifiedUser else Icons.Rounded.GppBad,
                     contentDescription = null,
-                    tint = if (TotpManager.isEnrolled) Green else Red,
+                    tint = if (TotpManager.isEnrolled) NewaxTheme.colors.success else NewaxTheme.colors.error,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (TotpManager.isEnrolled) "2FA Active" else "2FA Not Set Up",
-                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri
+                        if (TotpManager.isEnrolled) stringResource(R.string.auto_2fa_active) else stringResource(R.string.auto_2fa_not_setup),
+                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary
                     )
                     Text(
-                        if (TotpManager.isEnrolled) "Sensitive toggles require Google Authenticator code"
-                        else "Required to enable sensitive automations (messages, deletions, scripts)",
-                        fontSize = 12.sp, color = TextSec, lineHeight = 17.sp
+                        if (TotpManager.isEnrolled) stringResource(R.string.auto_2fa_active_desc)
+                        else stringResource(R.string.auto_2fa_not_setup_desc),
+                        fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 17.sp
                     )
                 }
             }
@@ -385,18 +372,18 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, Red.copy(alpha = 0.4f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Red)
-                    ) { Text("Remove 2FA", fontSize = 13.sp) }
+                        border = BorderStroke(1.dp, NewaxTheme.colors.error.copy(alpha = 0.4f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.error)
+                    ) { Text(stringResource(R.string.action_remove_2fa), fontSize = 13.sp) }
                 } else {
                     Button(
                         onClick = ::start2faSetup,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
                     ) {
                         Icon(Icons.Rounded.QrCode2, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Set up with Google Authenticator", fontSize = 13.sp)
+                        Text(stringResource(R.string.auto_setup_with_authenticator), fontSize = 13.sp)
                     }
                 }
             }
@@ -409,9 +396,9 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Rounded.Warning, contentDescription = null, tint = Amber, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Rounded.Warning, contentDescription = null, tint = NewaxTheme.colors.warning, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Sensitive toggles are locked until 2FA is active.", fontSize = 12.sp, color = Amber)
+                    Text(stringResource(R.string.auto_locked_warning), fontSize = 12.sp, color = NewaxTheme.colors.warning)
                 }
             }
         }
@@ -420,7 +407,7 @@ fun AutomationSettingsSection(vm: MainViewModel) {
     Spacer(Modifier.height(4.dp))
 
     // ── Automation toggle groups ───────────────────────────────────────────────
-    AutoSettingsLabel("Automation Functions")
+    AutoSettingsLabel(stringResource(R.string.auto_section_functions))
 
     groups.forEach { (groupName, toggles) ->
         val isSensitiveGroup = groupName in sensitiveGroups
@@ -429,8 +416,8 @@ fun AutomationSettingsSection(vm: MainViewModel) {
 
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Surface),
-            border = BorderStroke(1.dp, if (isSensitiveGroup) Color(0xFFFCA5A5).copy(alpha = 0.6f) else Border),
+            colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+            border = BorderStroke(1.dp, if (isSensitiveGroup) Color(0xFFFCA5A5).copy(alpha = 0.6f) else NewaxTheme.colors.border),
             elevation = CardDefaults.cardElevation(0.dp),
             modifier = Modifier.padding(bottom = 8.dp)
         ) {
@@ -444,27 +431,27 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (isSensitiveGroup) {
-                        Icon(Icons.Rounded.Shield, contentDescription = null, tint = Red, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.Shield, contentDescription = null, tint = NewaxTheme.colors.error, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                     }
-                    Text(groupName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri, modifier = Modifier.weight(1f))
+                    Text(groupName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary, modifier = Modifier.weight(1f))
                     if (isSensitiveGroup) {
                         Box(
-                            Modifier.clip(RoundedCornerShape(999.dp)).background(Red.copy(alpha = 0.1f)).padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) { Text("TFA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Red) }
+                            Modifier.clip(RoundedCornerShape(999.dp)).background(NewaxTheme.colors.error.copy(alpha = 0.1f)).padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) { Text(stringResource(R.string.auto_tfa_badge), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NewaxTheme.colors.error) }
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text("$groupEnabled/${toggles.size}", fontSize = 12.sp, color = TextTer)
+                    Text("$groupEnabled/${toggles.size}", fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
                     Spacer(Modifier.width(6.dp))
                     Icon(
                         if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                        contentDescription = null, tint = TextSec, modifier = Modifier.size(18.dp)
+                        contentDescription = null, tint = NewaxTheme.colors.textSecondary, modifier = Modifier.size(18.dp)
                     )
                 }
 
                 AnimatedVisibility(visible = isExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                     Column {
-                        HorizontalDivider(color = Border)
+                        HorizontalDivider(color = NewaxTheme.colors.border)
                         toggles.forEachIndexed { idx, toggle ->
                             val enabled = remember(version) { AutomationSettings.isEnabled(toggle) }
                             val locked = toggle.sensitive && !TotpManager.isEnrolled
@@ -474,7 +461,7 @@ fun AutomationSettingsSection(vm: MainViewModel) {
                                 locked = locked,
                                 onToggle = { if (!locked) requestToggle(toggle) }
                             )
-                            if (idx < toggles.lastIndex) HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 16.dp))
+                            if (idx < toggles.lastIndex) HorizontalDivider(color = NewaxTheme.colors.border, modifier = Modifier.padding(horizontal = 16.dp))
                         }
                     }
                 }
@@ -499,16 +486,16 @@ private fun AutomationToggleRow(
     ) {
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(toggle.label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (locked) TextTer else TextPri)
+                Text(toggle.label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (locked) NewaxTheme.colors.textTertiary else NewaxTheme.colors.textPrimary)
                 if (locked) {
                     Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.Lock, contentDescription = null, tint = TextTer, modifier = Modifier.size(12.dp))
+                    Icon(Icons.Rounded.Lock, contentDescription = null, tint = NewaxTheme.colors.textTertiary, modifier = Modifier.size(12.dp))
                 }
             }
             Spacer(Modifier.height(2.dp))
             Text(
-                if (locked) "Set up 2FA first to enable this" else toggle.description,
-                fontSize = 12.sp, color = TextTer, lineHeight = 17.sp
+                if (locked) stringResource(R.string.auto_locked_hint) else toggle.description,
+                fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, lineHeight = 17.sp
             )
         }
         Switch(
@@ -530,13 +517,13 @@ private fun AutoBadge(enabled: Boolean) {
     Box(
         Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (enabled) Color(0xFFDCFCE7) else SurfaceMuted)
+            .background(if (enabled) Color(0xFFDCFCE7) else NewaxTheme.colors.surfaceMuted)
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(
-            if (enabled) "Active" else "Manual",
+            if (enabled) stringResource(R.string.auto_badge_active) else stringResource(R.string.auto_badge_manual),
             fontSize = 11.sp, fontWeight = FontWeight.Medium,
-            color = if (enabled) Green else TextTer
+            color = if (enabled) NewaxTheme.colors.success else NewaxTheme.colors.textTertiary
         )
     }
 }
@@ -545,7 +532,7 @@ private fun AutoBadge(enabled: Boolean) {
 private fun AutoSettingsLabel(text: String) {
     Text(
         text,
-        fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer,
+        fontSize = 11.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textTertiary,
         modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
     )
 }

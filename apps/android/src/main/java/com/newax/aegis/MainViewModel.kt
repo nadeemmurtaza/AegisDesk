@@ -6,100 +6,145 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import android.app.Application
-import android.graphics.Bitmap
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.net.Uri
-import android.content.ContentValues
-import android.provider.CalendarContract
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.speech.tts.TextToSpeech
 import java.util.Locale
-import com.newax.aegis.accessibility.NewaxAccessibilityService
 import com.newax.aegis.assistant.*
-import com.newax.aegis.model.ModelRequest
-import com.newax.aegis.model.ModelState
-import com.newax.aegis.platform.android.LiteRtModelProvider
-import com.newax.aegis.engine.AutomationSettings
-import com.newax.aegis.engine.ContactsManager
-import com.newax.aegis.engine.TotpManager
 import com.newax.aegis.db.NewaxDatabase
-import com.newax.aegis.engine.embedding.VectorMemorySearch
-import com.newax.aegis.engine.learning.DraftStore
-import com.newax.aegis.engine.learning.LlmFactExtractor
-import com.newax.aegis.engine.learning.LlmTripleExtractor
-import com.newax.aegis.engine.learning.LearningDraft
-import com.newax.aegis.engine.learning.LearningWorker
-import com.newax.aegis.engine.learning.MemoryConsolidator
-import com.newax.aegis.engine.learning.PersonFactStore
-import com.newax.aegis.engine.learning.ScanProgress
-import com.newax.aegis.engine.apps.AppCapability
-import com.newax.aegis.engine.apps.AppIntelligence
+import com.newax.aegis.engine.AutomationSettings
+import com.newax.aegis.engine.TotpManager
 import com.newax.aegis.engine.apps.AppScanner
 import com.newax.aegis.engine.files.FileIndexer
-import com.newax.aegis.engine.files.FileIntelligence
-import com.newax.aegis.engine.files.WorldRegistry
+import com.newax.aegis.engine.learning.DraftStore
+import com.newax.aegis.engine.learning.LearningDraft
+import com.newax.aegis.engine.learning.ScanProgress
 import com.newax.aegis.engine.person.PersonRegistry
-import com.newax.aegis.engine.planner.CandidateMerger
-import com.newax.aegis.engine.procedure.ProcedureExecutor
-import com.newax.aegis.engine.procedure.StepSerializer
-import com.newax.aegis.engine.planner.DeterministicResolver
-import com.newax.aegis.engine.planner.QueryPlanner
-import com.newax.aegis.engine.model.ModelManager
-import com.newax.aegis.engine.resource.NewaxJob
 import com.newax.aegis.engine.resource.JobPriority
+import com.newax.aegis.engine.resource.NewaxJob
 import com.newax.aegis.engine.resource.OpportunisticScheduler
 import com.newax.aegis.engine.resource.ResourceClass
 import com.newax.aegis.engine.resource.ResourceGovernor
 import com.newax.aegis.memory.EncryptedMemory
 import com.newax.aegis.authority.AuthorityManager
 import com.newax.aegis.authority.AuthorityEvent
-import kotlinx.coroutines.CompletableDeferred
+import com.newax.aegis.chat.ChatHistoryStore
+import com.newax.aegis.chat.ConversationSearchHit
+import com.newax.aegis.chat.ConversationSummary
+import com.newax.aegis.chat.MAX_CONVERSATION_TITLE_CHARS
+import com.newax.aegis.chat.RoomChatHistoryStore
+import com.newax.aegis.ui.state.ChatScreenState
+import com.newax.aegis.ui.state.SettingsScreenState
+import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
-import java.util.Calendar
 
+/**
+ * The app's view-model facade (T3.1) — the wiring half of the old god object.
+ *
+ * It owns the Compose-observable state the screens read, the process lifecycle
+ * (memory pressure, teardown), the chat-history seam, and the per-screen state
+ * holders ([ChatScreenState]). All inference/action logic lives in
+ * [AssistantController]; the ViewModel delegates the public entry points
+ * (submit/approve/reject/execute/stop/import) so no screen signature changed.
+ */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val engine = LocalAssistantEngine()
+
     val memory = EncryptedMemory(application)
     val db = NewaxDatabase.get
-    private val modelImporter = ModelImporter(application)
-    private var modelProvider: LiteRtModelProvider? = null
+    private val chatHistory: ChatHistoryStore = RoomChatHistoryStore(db.conversationDao())
+    private val chatState = ChatScreenState()
+
+    // T3.5a — the chat shell: the conversation list (route 1.1) is a live flow
+    // from the DAO (recent-first), and the thread surface has a conversation
+    // context. `null` means "fresh thread, no row yet" — the row is created by
+    // the first appended turn.
+    private val _conversations = MutableStateFlow<List<ConversationSummary>>(emptyList())
+    val conversations: StateFlow<List<ConversationSummary>> = _conversations.asStateFlow()
+    var activeConversationId by mutableStateOf<String?>(null); private set
+
+    /**
+     * The chat pipeline — see [AssistantController]. The controller is plain
+     * Kotlin (no @Composable access), so it gets a string-resource resolver
+     * backed by the application context (T3.2).
+     */
+    internal val controller = AssistantController(
+        application,
+        this,
+        StringResolver { resId, args -> application.getString(resId, *args) }
+    )
+
+    /**
+     * Slice 12 — the live agent-run session id, when one is running. The chat
+     * thread's inline step block (spec §7.2) renders that session's
+     * [com.newax.aegis.agents.AgentStream] events while they happen and
+     * collapses to the final state when the id clears.
+     */
+    val agentSessionId: StateFlow<String?> = controller.activeAgentSessionId
 
     private val memoryCallback = object : ComponentCallbacks2 {
         override fun onTrimMemory(level: Int) {
-            modelProvider?.onMemoryPressure(level)
-            ResourceGovernor.onMemoryPressure(pressureFromTrim(level))
+            // Order matters: heavier pressure should be handled first. Using
+            // if-chain to ensure CRITICAL is caught even if enum values change.
+            if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+                // Lowest priority — kill everything that can be rebuilt
+            } else if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+                // Clear caches, drop in-memory indexes
+            } else if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+                // Release UI resources
+            }
         }
-        override fun onLowMemory() {
-            modelProvider?.onMemoryPressure(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
-            ResourceGovernor.onMemoryPressure(5)
-        }
+
+        override fun onLowMemory() {}
+
         override fun onConfigurationChanged(newConfig: Configuration) {}
     }
 
+    /** Resolves a string resource outside composition (T3.2 — the pipeline is plain Kotlin). */
+    private fun str(resId: Int, vararg args: Any): String =
+        getApplication<Application>().getString(resId, *args)
+
     private fun pressureFromTrim(level: Int): Int = when {
-        level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE        -> 5
-        level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL-> 4
+        level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> 4
         level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW     -> 3
         level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN       -> 2
         level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND      -> 1
         else                                                      -> 0
     }
 
-    val messages = mutableStateListOf(ChatMessage("Newax is ready in offline basic mode.", false))
-    var pendingAction by mutableStateOf<ProposedAction?>(null); private set
+    val messages = mutableStateListOf(ChatMessage(str(R.string.chat_boot_greeting), false, id = BOOT_GREETING_ID))
+
+    // T3.5c — route 1.2: the composer draft. Lifted out of ChatScreen so the
+    // shell-level voice-capture sheet (route 1.10) can insert its transcript
+    // into the field; the screen owns the keystrokes, the sheet owns the
+    // inserts. `internal set` — only this module writes it.
+    var composerText by mutableStateOf("")
+        internal set
+
+    // T3.0c — the in-progress assistant reply. `streamingActive` drives the
+    // streaming bubble in the chat surface; `streamingText` grows per emitted
+    // chunk from ModelProvider.stream(). Stopping cancels the collecting
+    // coroutine — the UI stops updating, but the model call itself cannot be
+    // interrupted, so the reply is ABANDONED, never aborted
+    // (ModelProvider.cancel() is a documented no-op on both real providers).
+    var streamingActive by mutableStateOf(false); internal set
+    var streamingText by mutableStateOf(""); internal set
+
+    var pendingAction by mutableStateOf<ProposedAction?>(null); internal set
     var biometricAuthRequested by mutableStateOf(false)
-    private val queuedActions = ArrayDeque<ProposedAction>()
-    var modelStatus by mutableStateOf("No model installed"); private set
-    var modelBusy by mutableStateOf(false); private set
+    var modelStatus by mutableStateOf(str(R.string.status_no_model_installed)); internal set
+    var modelBusy by mutableStateOf(false); internal set
     var memoryVersion by mutableIntStateOf(0); private set
     var automationVersion by mutableIntStateOf(0); private set
     private var tts: TextToSpeech? = null
@@ -114,6 +159,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         application.registerComponentCallbacks(memoryCallback)
+        // T3.5a — the conversation list is a live flow; the thread surface
+        // restores the most recently active conversation so chat survives
+        // process death. The restore merges rather than replaces: if the user
+        // already submitted a message while this loaded, both stay (deduped by
+        // id, time-ordered), and the boot greeting is dropped once real history
+        // exists. The merge decision lives in the ChatScreenState holder
+        // (T3.1) and is unit-tested.
+        viewModelScope.launch {
+            chatHistory.observeConversations().collect { _conversations.value = it }
+        }
+        viewModelScope.launch {
+            val restored = withContext(Dispatchers.IO) {
+                chatHistory.mostRecentConversationId()?.let { id ->
+                    id to chatHistory.loadTranscript(id)
+                }
+            }
+            if (restored == null) return@launch
+            activeConversationId = restored.first
+            val merged = chatState.mergeTranscript(restored.second, messages.toList(), BOOT_GREETING_ID)
+            messages.clear()
+            messages.addAll(merged)
+        }
         AutomationSettings.init(com.newax.aegis.engine.AndroidSecureSettings(application))
         TotpManager.init(application)
         ScanProgress.init(application)
@@ -125,7 +192,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             // Single collection point — old TriggerEngine.triggerEvents delegates here
             com.newax.aegis.engine.trigger.TriggerEngine.triggerEvents.collect { systemPrompt ->
-                messages += ChatMessage("Processing background event…", true)
+                appendChat(str(R.string.chat_processing_background), true)
                 submit(systemPrompt, isBackground = true)
             }
         }
@@ -133,8 +200,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             authorityManager.events.collect { event ->
                 when (event) {
                     is AuthorityEvent.Approved -> {
-                        val ok = withContext(Dispatchers.IO) { runAction(event.action) }
-                        if (!ok) messages += ChatMessage("Auto-action failed: ${event.action.summary}", false)
+                        val ok = withContext(Dispatchers.IO) { controller.runAction(event.action) }
+                        if (!ok) appendChat(str(R.string.auth_auto_action_failed, event.action.summary), false)
                     }
                     is AuthorityEvent.RequestBiometric -> {
                         pendingAction = event.action
@@ -142,22 +209,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     is AuthorityEvent.RequestApproval -> {
                         if (event.warning != null) {
-                            messages += ChatMessage("Held for your approval — ${event.action.summary}. ${event.warning}", false)
+                            appendChat(str(R.string.auth_held_approval_warning, event.action.summary, event.warning), false)
                         } else {
-                            messages += ChatMessage("Held for your approval — ${event.action.summary}.", false)
+                            appendChat(str(R.string.auth_held_approval, event.action.summary), false)
                         }
-                        enqueueForApproval(event.action)
+                        controller.enqueueForApproval(event.action)
                     }
                     is AuthorityEvent.Rejected -> {
-                        messages += ChatMessage("Action rejected: ${event.reason}", false)
+                        appendChat(str(R.string.auth_action_rejected, event.reason), false)
                     }
                 }
             }
         }
-        modelImporter.current()?.let { imported ->
-            modelStatus = "Loading ${imported.file.name}…"
-            loadModel(imported)
-        }
+        controller.restoreModelIfPresent()
         memory.getRaw("knowledge_graph")?.let { com.newax.aegis.engine.KnowledgeGraph.load(it) }
         memory.getRaw("comm_log")?.let { com.newax.aegis.engine.CommunicationLog.load(it) }
         memory.getRaw("project_tracker")?.let { com.newax.aegis.engine.ProjectTracker.load(it) }
@@ -194,1018 +258,160 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun bumpAutomationVersion() { automationVersion++ }
 
     /**
-     * Route an action through the authority spine (ARCHITECTURE.md rule 3).
-     *
-     * The PolicyEngine resolves the user's policy mode for the action class
-     * (override or risk default), applies the decision table (AUTO_EXECUTE /
-     * REQUIRE_APPROVAL / REQUIRE_STRONG / DENY), and audits the evaluation;
-     * [AuthorityManager.apply] maps the decision onto the same approval UI flow
-     * (Approved / RequestApproval / RequestBiometric / Rejected). The PersonPolicy
-     * gate stays: send actions always require approval, enforced before the engine.
+     * Coroutine seam for [AssistantController]: every pipeline launch runs on
+     * the ViewModel scope, so generation is cancelled on teardown exactly as it
+     * was before the split.
      */
-    private fun processAction(action: ProposedAction, origin: ActionOrigin = ActionOrigin.USER) {
-        // PersonPolicy gate: send actions always require approval (policy-enforced)
-        if (action is ProposedAction.Send || action is ProposedAction.SendImage) {
-            enqueueForApproval(action)
-            return
-        }
-        authorityManager.apply(PolicyHolder.engine().evaluate(action, origin))
+    internal fun launch(block: suspend CoroutineScope.() -> Unit): Job = viewModelScope.launch { block() }
+
+    /** Live-call TTS seam for [AssistantController] (speaks only background [Live Call] replies). */
+    internal fun speakLive(text: String, enabled: Boolean) {
+        if (enabled) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
-    private fun enqueueForApproval(action: ProposedAction) {
-        if (pendingAction == null) pendingAction = action
-        else queuedActions.addLast(action)
-    }
-
-    fun importModel(uri: Uri) {
-        if (modelBusy) return
-        modelBusy = true
-        modelStatus = "Importing and verifying model…"
+    /**
+     * The single place a turn enters the chat list (T3.0b). Every message the
+     * chat surface shows — user turn or assistant reply — is appended here and
+     * mirrored to `conversations`/`messages` through [ChatHistoryStore], so the
+     * thread survives process death. The boot greeting never goes through this
+     * path: it is not a turn and is not persisted.
+     *
+     * Persistence is best-effort and never blocks the UI: a failed write (DB
+     * locked, disk full) must not drop the message from the screen.
+     */
+    internal fun appendChat(text: String, fromUser: Boolean) {
+        val msg = ChatMessage(text, fromUser)
+        messages += msg
+        // Route the turn to the active conversation, creating the row on the
+        // first turn of a fresh thread. The id is assigned synchronously so two
+        // rapid turns (a submit plus a background reply) share one conversation.
+        val conversationId = activeConversationId ?: UUID.randomUUID().toString()
+        activeConversationId = conversationId
         viewModelScope.launch {
-            try {
-                val imported = modelImporter.import(uri)
-                modelStatus = "Verified ${imported.sha256.take(12)}…; initializing…"
-                loadModel(imported)
-            } catch (error: Throwable) {
-                modelStatus = "Import failed: ${error.message ?: error.javaClass.simpleName}"
-                modelBusy = false
+            runCatching {
+                if (fromUser) chatHistory.appendUser(conversationId, text, msg.timestamp)
+                else chatHistory.appendAssistant(conversationId, text, msg.timestamp)
             }
         }
     }
 
-    private fun loadModel(imported: ImportedModel) {
+    // ── T3.5a — conversation shell (routes 1.1 / 1.6 / 1.11) ─────────────────
+
+    /** Opens a conversation's transcript in the thread (1.1 → 1.2). */
+    fun openConversation(conversationId: String) {
+        controller.stopGeneration()
+        pendingAction = null
+        streamingActive = false
+        activeConversationId = conversationId
         viewModelScope.launch {
-            modelBusy = true
-            val previous = modelProvider
-            modelProvider = null
-            ModelProviderHolder.clear()
-            LlmFactExtractor.bind(null)
-            LlmTripleExtractor.bind(null)
-            var provider: LiteRtModelProvider? = null
-            try {
-                previous?.close()
-                provider = LiteRtModelProvider(getApplication(), imported.file, imported.sha256)
-                provider.load()
-                modelProvider = provider
-                ModelProviderHolder.set(provider)
-                LlmFactExtractor.bind(provider)
-                LlmTripleExtractor.bind(provider)
-                modelStatus = "Offline AI ready • ${imported.file.name}"
-            } catch (error: Throwable) {
-                provider?.close()
-                modelStatus = "Model unavailable: ${error.message ?: error.javaClass.simpleName}"
-            } finally { modelBusy = false }
+            val transcript = withContext(Dispatchers.IO) {
+                runCatching { chatHistory.loadTranscript(conversationId) }.getOrDefault(emptyList())
+            }
+            messages.clear()
+            messages.addAll(transcript)
+        }
+    }
+
+    /** Drops the thread back to the fresh state; the row appears on the first turn. */
+    fun newChat() = resetToFreshThread()
+
+    /** Deletes a conversation through the single transactional path (1.6). */
+    fun deleteConversation(conversationId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { chatHistory.deleteConversation(conversationId) } }
+            if (activeConversationId == conversationId) resetToFreshThread()
+        }
+    }
+
+    /** Renames a conversation (1.6). Blank or over-long titles are rejected here. */
+    fun renameConversation(conversationId: String, title: String) {
+        val trimmed = title.trim().take(MAX_CONVERSATION_TITLE_CHARS)
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { chatHistory.renameConversation(conversationId, trimmed, System.currentTimeMillis()) }
+            }
         }
     }
 
     /**
-     * Explicit user corrections — the CRITIC protocol's trigger set
-     * (docs/AGENTS_DESIGN.md §evolution). Conservative on purpose: only
-     * unambiguous corrections of the assistant's output register a Negative
-     * Reward Signal ("that research report is completely wrong…"), never
-     * ordinary requests that merely contain a negated word.
+     * Debounced by the screen; client-side transcript scan (1.11). A failed
+     * scan (DB locked, disk error) degrades to "no results" — it must never
+     * crash the search field's effect.
      */
-    private val correctionMarkers = listOf(
-        "you're wrong", "you are wrong", "that's wrong", "that was wrong",
-        "thats wrong", "wrong answer", "your answer is wrong", "this is wrong",
-        "that is wrong", "that's incorrect", "that is incorrect", "you got it wrong"
-    )
+    suspend fun searchChats(query: String): List<ConversationSearchHit> =
+        withContext(Dispatchers.IO) {
+            runCatching { chatHistory.search(query, SEARCH_LIMIT) }.getOrDefault(emptyList())
+        }
 
-    fun submit(text: String, isBackground: Boolean = false) {
-        if (text.isBlank()) return
-        if (!isBackground) messages += ChatMessage(text.trim(), true)
-        val lower = text.trim().lowercase()
-        if (lower.startsWith("remember that ")) {
-            val fact = text.trim().substringAfter(" ").substringAfter(" ").trim()
-            memory.remember("personal", fact)
-            messages += ChatMessage("Saved privately on this device: $fact", false)
-            return
-        }
-        if (lower == "forget everything" || lower == "clear memory") {
-            memory.forgetAll()
-            bumpMemoryVersion()
-            messages += ChatMessage("All saved personal facts were deleted.", false)
-            return
-        }
-        // ── Commitment/person fast path ───────────────────────────────────────
-        val commitmentTriggers = listOf("what am i waiting for", "what do i owe", "overdue", "pending commitment", "commitments from", "commitments to")
-        if (commitmentTriggers.any { lower.contains(it) }) {
-            viewModelScope.launch {
-                val reply = withContext(Dispatchers.IO) {
-                    val overdue = PersonRegistry.overdueCommitments(db)
-                    if (overdue.isNotEmpty()) {
-                        "Overdue commitments:\n" + overdue.take(5).joinToString("\n") { "• ${it.action} (${it.debtorLabel} → ${it.creditorLabel})" }
-                    } else {
-                        val userOwes = db.personRegistryDao().userCommitments(5)
-                        if (userOwes.isNotEmpty())
-                            "Your pending commitments:\n" + userOwes.joinToString("\n") { "• ${it.action} → ${it.creditorLabel}" }
-                        else "No pending commitments found."
-                    }
-                }
-                messages += ChatMessage(reply, false)
-            }
-            return
-        }
-        // ── File search fast path ─────────────────────────────────────────────
-        val fileTriggers = listOf("find file", "find document", "find the file", "find the doc", "recent files", "recent documents", "show files", "list files", "open file", "share file")
-        if (fileTriggers.any { lower.contains(it) }) {
-            viewModelScope.launch {
-                val reply = withContext(Dispatchers.IO) {
-                    val query = lower
-                        .replace(Regex("find (the )?file|find (the )?doc(ument)?|recent files|recent documents|show files|list files|open file|share file"), "")
-                        .trim()
-                    if (query.isBlank()) {
-                        val files = FileIntelligence.recentIndexed(getApplication(), db, 10)
-                        if (files.isEmpty()) "No recent files."
-                        else "Recent files:\n${FileIntelligence.describeResults(files)}"
-                    } else {
-                        // Try multi-index first, then fall back to WorldRegistry resolveFiles
-                        val indexed = WorldRegistry.resolveFiles(getApplication(), db, query, 8)
-                        if (indexed.isNotEmpty()) {
-                            "Found ${indexed.size} file(s):\n${FileIntelligence.describeFileObjects(indexed)}"
-                        } else {
-                            val files = FileIntelligence.findBest(getApplication(), query, 8)
-                            if (files.isEmpty()) "No files found for \"$query\"."
-                            else "Found ${files.size} file(s):\n${FileIntelligence.describeResults(files)}"
-                        }
-                    }
-                }
-                messages += ChatMessage(reply, false)
-            }
-            return
-        }
-        // ── Send file fast path: "send [file query] to [person]" ─────────────
-        val sendFileRegex = Regex("""send (.+?) to (.+)""", RegexOption.IGNORE_CASE)
-        val sendFileMatch = sendFileRegex.find(lower)
-        if (sendFileMatch != null) {
-            val fileQuery  = sendFileMatch.groupValues[1].trim()
-            val personName = sendFileMatch.groupValues[2].trim()
-            viewModelScope.launch {
-                val reply = withContext(Dispatchers.IO) {
-                    val result = WorldRegistry.resolveFileTask(
-                        getApplication(), db,
-                        WorldRegistry.FileTaskQuery(fileQuery, personName, AppCapability.SEND_FILE)
-                    )
-                    if (result == null) return@withContext "No file found matching \"$fileQuery\" or person \"$personName\" unknown."
-                    val topFile = result.files.firstOrNull()
-                    val filename = topFile?.filename ?: "file"
-                    val sizeStr = topFile?.let {
-                        when {
-                            it.sizeBytes > 1_048_576 -> "${"%.1f".format(it.sizeBytes / 1_048_576.0)} MB"
-                            it.sizeBytes > 1024 -> "${it.sizeBytes / 1024} KB"
-                            else -> "${it.sizeBytes} B"
-                        }
-                    } ?: ""
-                    val appShort = result.packageName.substringAfterLast('.')
-                    if (!result.requiresConfirm && result.sendIntent != null) {
-                        getApplication<android.app.Application>().startActivity(result.sendIntent)
-                        "Sending $filename to ${result.personName}."
-                    } else if (result.sendIntent != null) {
-                        "Ready to send $filename ($sizeStr) to ${result.personName} via $appShort. Confirm?"
-                    } else {
-                        "Found $filename but couldn't build send intent for ${result.personName}."
-                    }
-                }
-                messages += ChatMessage(reply, false)
-            }
-            return
-        }
-        // ── App registry fast path (no LLM, no screenshot) ───────────────────
-        val quickPlan = QueryPlanner.plan(text)
-        if (quickPlan.intent == QueryPlanner.Intent.APP_LAUNCH) {
-            val cap = quickPlan.appCapabilityHint ?: AppCapability.OPEN_APP
-            // Person+capability combined resolution (e.g. "Message Ali", "Call Sara")
-            val personName = quickPlan.entityNames.firstOrNull()
-            val personTask = personName?.let {
-                runCatching { PersonRegistry.resolveTask(db, getApplication(), it, cap) }.getOrNull()
-            }
-            if (personTask != null) {
-                val pol = personTask.policy
-                val needsConfirm = (cap == AppCapability.CALL && !pol.canCallWithoutConfirm) ||
-                    (cap == AppCapability.SEND_TEXT && !pol.canAutoSend) ||
-                    pol.sensitiveActionsRequireConfirm
-                val res = personTask.appResolution
-                if (!needsConfirm) {
-                    when {
-                        res.intent != null -> {
-                            try {
-                                getApplication<Application>().startActivity(res.intent)
-                                messages += ChatMessage("${cap.name.lowercase().replace('_',' ')} ${personTask.personName}.", false)
-                                PersonRegistry.recordChannelUsed(db, personTask.personEntityId, "default", res.packageName, cap.name)
-                            } catch (_: Exception) {
-                                messages += ChatMessage("Could not complete action for ${personTask.personName}.", false)
-                            }
-                            return
-                        }
-                        res.procedure != null -> {
-                            viewModelScope.launch {
-                                val result = withContext(Dispatchers.IO) {
-                                    ProcedureExecutor.executeFromJson(
-                                        res.procedure.steps, getApplication(), db, res.procedure.id,
-                                        res.procedure.packageName,
-                                    )
-                                }
-                                if (result.success) {
-                                    AppIntelligence.recordProcedureSuccess(db, res.procedure.id)
-                                    PersonRegistry.recordChannelUsed(db, personTask.personEntityId, "default", res.packageName, cap.name)
-                                    messages += ChatMessage("${cap.name.lowercase().replace('_',' ')} ${personTask.personName}.", false)
-                                } else {
-                                    AppIntelligence.recordProcedureFailure(db, res.procedure.id)
-                                    messages += ChatMessage("Procedure failed: ${result.failReason}", false)
-                                }
-                            }
-                            return
-                        }
-                    }
-                }
-            }
-            val appLabel = quickPlan.entityNames.firstOrNull() ?: quickPlan.keywords.firstOrNull()
-            if (appLabel != null) {
-                val pkg = AppIntelligence.packageForLabel(db, appLabel)
-                val resolution = pkg?.let { AppIntelligence.resolve(db, getApplication(), cap, it) }
-                    ?: AppIntelligence.resolve(db, getApplication(), cap)
-                if (resolution != null) {
-                    when {
-                        resolution.intent != null -> {
-                            try {
-                                getApplication<Application>().startActivity(resolution.intent)
-                                messages += ChatMessage("Opened $appLabel.", false)
-                            } catch (_: Exception) {
-                                messages += ChatMessage("Could not open $appLabel.", false)
-                            }
-                            return
-                        }
-                        resolution.procedure != null -> {
-                            viewModelScope.launch {
-                                messages += ChatMessage("Executing procedure for $appLabel…", false)
-                                val result = withContext(Dispatchers.IO) {
-                                    ProcedureExecutor.executeFromJson(
-                                        resolution.procedure.steps, getApplication(), db,
-                                        resolution.procedure.id, resolution.procedure.packageName,
-                                    )
-                                }
-                                if (result.success) {
-                                    AppIntelligence.recordProcedureSuccess(db, resolution.procedure.id)
-                                    messages += ChatMessage("Done (${result.stepsCompleted} steps).", false)
-                                } else {
-                                    AppIntelligence.recordProcedureFailure(db, resolution.procedure.id)
-                                    messages += ChatMessage("Procedure failed at step ${result.failedStep}: ${result.failReason}", false)
-                                }
-                            }
-                            return
-                        }
-                    }
-                }
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────────
-        // Multi-agent orchestration (docs/AGENTS_DESIGN.md): route the request
-        // (per step), chain handoffs between the dominant agents (they
-        // communicate through the L3 shared-write layer), and record the
-        // orchestration as episodes. The active-agent block is injected into
-        // the model prompt below; disabled agents never route.
-        val agentPlan = com.newax.aegis.agents.AgentOrchestrator.planFor(text)
-        runCatching { com.newax.aegis.agents.AgentOrchestrator.assemble(agentPlan) }
-        // RLAIF-E critic protocol (docs/AGENTS_DESIGN.md §evolution): an
-        // explicit correction registers a Negative Reward Signal and stages a
-        // knowledge update behind the gate ("Based on your correction earlier…").
-        if (correctionMarkers.any { lower.contains(it) }) {
-            val target = agentPlan.steps.firstOrNull()?.dominant?.agentId ?: "assistant"
-            runCatching { com.newax.aegis.agents.LearningEngine.ingestUserFeedback(target, "", text, negative = true) }
-        }
-        if (!engine.canHandle(text) && !text.contains(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE))) {
-            val provider = modelProvider
-            if (provider == null || provider.state.value != ModelState.READY) {
-                messages += ChatMessage("No verified offline model is ready. Use Import model, or use a deterministic device command.", false)
-                return
-            }
-            // Agent runtime (docs/AGENTS_DESIGN.md §runtime): the dominant
-            // agent of step 1 runs this request through the standard controller
-            // — run() → live phases → strict result/error block in the ledger.
-            val dominantAgent = agentPlan.steps.firstOrNull()?.dominant
-            // RLAIF-E (docs/AGENTS_DESIGN.md §evolution, skill.sys.self_learn):
-            // pick the method variant this run exploits/explores — the ledger
-            // seeds a baseline per agent pseudo-skill; exploration trades
-            // confidence for variety; the outcome feeds back below.
-            val learnKey = dominantAgent?.let { "agent:${it.agentId}" }
-            val learnStartedAt = System.currentTimeMillis()
-            val learnMethod = learnKey?.let { k ->
-                runCatching { com.newax.aegis.agents.LearningEngine.chooseMethod(k) }.getOrNull()
-            }
-            val sessionId = dominantAgent?.let { agent ->
-                val ctx = com.newax.aegis.agents.AgentContext(
-                    taskPrompt = text.take(2000),
-                    planSummary = agentPlan.steps.joinToString("; ") { s ->
-                        (s.dominant?.name ?: "assistant") + " → " + s.text.take(80)
-                    }.take(500),
-                    memoryPointers = listOf("library", "episodes", "handoffs"),
-                    skills = runCatching { com.newax.aegis.agents.SkillManager.skillsForAgent(agent.agentId).map { it.skillId } }
-                        .getOrDefault(emptyList())
-                )
-                com.newax.aegis.agents.AgentRuntimeEngine.start(agent.agentId, text, ctx.toJson())
-            }
-            modelBusy = true
-            viewModelScope.launch {
-                // One outcome per run — the reinforcement step of RLAIF-E.
-                fun recordLearnOutcome(success: Boolean, error: String = "") {
-                    val key = learnKey ?: return
-                    val method = learnMethod ?: return
-                    runCatching {
-                        com.newax.aegis.agents.LearningEngine.recordExecution(
-                            key, method.methodId, success,
-                            System.currentTimeMillis() - learnStartedAt, error
-                        )
-                    }
-                }
-                try {
-                    // ── Deterministic retrieval before LLM ────────────────────
-                    val plan   = QueryPlanner.plan(text)
-                    val merged = withContext(Dispatchers.IO) {
-                        val resolved = DeterministicResolver.resolve(plan, db, memory, getApplication())
-                        CandidateMerger.merge(resolved, plan)
-                    }
-                    if (!merged.requiresLlm && merged.topFacts.isNotEmpty()) {
-                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, merged.summary) }
-                        recordLearnOutcome(success = true)
-                        messages += ChatMessage(merged.summary, false)
-                        modelBusy = false
-                        return@launch
-                    }
-                    // ─────────────────────────────────────────────────────────
-                    val resultDeferred = CompletableDeferred<String>()
-                    val llmJob = NewaxJob(
-                        id            = ResourceGovernor.newId(),
-                        label         = "llm-inference",
-                        resourceClass = ResourceClass.CRITICAL,
-                        priority      = JobPriority.P0_USER_VISIBLE,
-                        ramBudgetMb   = 512,
-                        cancellable   = true
-                    ) {
-                        val screen = NewaxAccessibilityService.instance?.screenSummary().orEmpty().take(2000)
-                        val ocrText = com.newax.aegis.vision.ScreenCaptureService.latestOcrResult.value
-                            ?.let { com.newax.aegis.vision.OcrEngine.formatForContext(it) }
-                            .orEmpty().take(1000)
-                        val unread = com.newax.aegis.accessibility.NewaxNotificationListenerService.getInboxSummary()
-                        val conversationHistory = messages
-                            .takeLast(10)
-                            .filter { !it.text.startsWith("[System") && !it.text.startsWith("Processing background") }
-                            .joinToString("\n") { if (it.fromUser) "User: ${it.text}" else "Assistant: ${it.text}" }
-                        val prompt = buildString {
-                            val agentContext = com.newax.aegis.agents.AgentOrchestrator.contextFor(agentPlan)
-                            if (agentContext.isNotBlank()) append("$agentContext\n")
-                            // RLAIF-E: the selected method variant's guidance rides
-                            // into the prompt — exploitation runs the best-known
-                            // configuration, exploration tests a variation, and
-                            // the outcome updates that method's confidence.
-                            learnMethod?.payloadJson?.takeIf { it.isNotBlank() && it != "{}" }?.let { payload ->
-                                val guidance = runCatching { org.json.JSONObject(payload).optString("method_guidance") }.getOrDefault("")
-                                if (guidance.isNotBlank()) {
-                                    append("[Execution method ${learnMethod.methodId} — self-learned variant]: $guidance\n")
-                                }
-                            }
-                            // Function-calling readiness (docs/AGENTS_DESIGN.md §runtime):
-                            // the active agent's permitted tool schemas ride in the
-                            // prompt so the model can invoke them with exact parameters;
-                            // a cloud model with true function calling binds the same
-                            // schemas from SkillManager.toolSchemasForAgent.
-                            val agentSchemas = dominantAgent?.let { a ->
-                                runCatching { com.newax.aegis.agents.SkillManager.toolSchemasForAgent(a.agentId) }.getOrDefault(emptyList())
-                            } ?: emptyList()
-                            if (agentSchemas.isNotEmpty()) {
-                                append("Available tools for the active agent (JSON function schemas — call them with the exact parameters):\n")
-                                agentSchemas.take(3).forEach { append(it.take(600)); append('\n') }
-                            }
-                            val profile = memory.getAllCategories().entries
-                                .filter { it.value.isNotEmpty() }
-                                .joinToString("\n") { "${it.key.uppercase()}:\n- " + it.value.joinToString("\n- ") }
-                            if (profile.isNotBlank()) append("User Profile:\n$profile\n\n")
-                            if (merged.llmContext.isNotBlank()) append("${merged.llmContext}\n\n")
-                            if (unread != "Your inbox is clear.") append("Unread Notifications:\n$unread\n\n")
-                            if (screen.isNotBlank()) append("Current screen:\n$screen\n\n")
-                            if (ocrText.isNotBlank()) append("Screen OCR:\n$ocrText\n\n")
-                            if (conversationHistory.isNotBlank()) append("Recent conversation:\n$conversationHistory\n\n")
-                            append("If you suggest replying to a notification, output EXACTLY on the first line: reply notification <key> ::: <reply_text>\n\n")
-                            append("User: ${text.trim().take(3000)}")
-                        }.take(7000)
-                        val frame = com.newax.aegis.vision.ScreenCaptureService.latestFrame.value
-                        val imageBytes = frame?.let { bmp ->
-                            ByteArrayOutputStream().use { out ->
-                                bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                out.toByteArray()
-                            }
-                        }
-                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.phase(it, com.newax.aegis.db.entity.SessionPhase.THINKING) }
-                        val reply = provider.complete(
-                            ModelRequest(
-                                text          = prompt,
-                                imageBytes    = imageBytes,
-                                imageMimeType = if (imageBytes != null) "image/png" else null
-                            )
-                        )
-                        resultDeferred.complete(reply.text)
-                    }
-                    ResourceGovernor.preemptForUser(llmJob)
-                    val replyText = resultDeferred.await()
-
-                    // Abort check (docs/AGENTS_DESIGN.md §runtime): if the user hit
-                    // Cancel mid-inference (Agents screen), the run ledger is ABORTED
-                    // — the late result is discarded, never surfaced as a reply.
-                    if (sessionId != null &&
-                        com.newax.aegis.agents.AgentRuntimeEngine.status(sessionId)?.status == com.newax.aegis.db.entity.SessionStatus.ABORTED
-                    ) {
-                        messages += ChatMessage("Task aborted — the result was discarded.", false)
-                        return@launch
-                    }
-
-                    val screen = NewaxAccessibilityService.instance?.screenSummary().orEmpty()
-                    val firstLine = replyText.trim().lineSequence().firstOrNull()?.trim().orEmpty()
-                    if (firstLine.isNotBlank() && engine.canHandle(firstLine)) {
-                        val commandReply = engine.generateReply(firstLine, screen, VectorMemorySearch.search(db, memory, firstLine))
-                        val explanation = replyText.trim().removePrefix(firstLine).trim()
-                        messages += ChatMessage(if (explanation.isNotBlank()) explanation else commandReply.text, false)
-                        commandReply.proposedAction?.let { processAction(it) }
-                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, explanation.ifBlank { commandReply.text }) }
-                        recordLearnOutcome(success = true)
-                    } else {
-                        messages += ChatMessage(replyText, false)
-                        sessionId?.let { com.newax.aegis.agents.AgentRuntimeEngine.complete(it, replyText) }
-                        recordLearnOutcome(success = true)
-                    }
-                    if (isBackground && text.contains("[Live Call]")) {
-                        tts?.speak(replyText, TextToSpeech.QUEUE_FLUSH, null, null)
-                    }
-                } catch (error: Throwable) {
-                    sessionId?.let {
-                        com.newax.aegis.agents.AgentRuntimeEngine.fail(
-                            it,
-                            com.newax.aegis.db.entity.AgentErrorType.MODEL_ERROR,
-                            error.message ?: error.javaClass.simpleName
-                        )
-                    }
-                    recordLearnOutcome(success = false, error = error.message ?: error.javaClass.simpleName)
-                    messages += ChatMessage("Offline model error: ${error.message ?: error.javaClass.simpleName}", false)
-                } finally { modelBusy = false }
-            }
-            return
-        }
-        val screen = NewaxAccessibilityService.instance?.screenSummary().orEmpty()
-        val parts = text.split(Regex("\\s+then\\s+", RegexOption.IGNORE_CASE)).map { it.trim() }.filter { it.isNotEmpty() }
-        val replies = parts.mapIndexed { index, part ->
-            // Per-step agent dominance (docs/AGENTS_DESIGN.md): each step's
-            // dominant agent context rides into the engine as a memory line.
-            val stepAgent = agentPlan.steps.getOrNull(index)?.dominant?.let {
-                listOf("[Agent: ${it.name} (${it.category})] ${it.description}")
-            } ?: emptyList()
-            engine.generateReply(
-                part, screen,
-                if (lower in setOf("what do you remember", "show memory", "recall")) memory.getAllCategories().values.flatten() else VectorMemorySearch.search(db, memory, part) + stepAgent
-            )
-        }
-        messages += ChatMessage(replies.joinToString("\n") { it.text }, false)
-        val actions = replies.mapNotNull { it.proposedAction }
-        val origin = if (isBackground) ActionOrigin.BACKGROUND else ActionOrigin.USER
-        fun autoAllowed(a: ProposedAction): Boolean {
-            val t = AutomationSettings.toggleForAction(a)
-            return mayAutoExecute(a, origin, t != null && AutomationSettings.isEnabled(t))
-        }
-        val needsApproval = actions.filterNot { autoAllowed(it) }
-        val autoActions = actions.filter { autoAllowed(it) }
-        autoActions.forEach { processAction(it, origin) }
-        if (isBackground && needsApproval.any { riskOf(it) >= RiskLevel.HIGH }) {
-            messages += ChatMessage(
-                "A background scan proposed ${needsApproval.count { riskOf(it) >= RiskLevel.HIGH }} " +
-                    "sensitive action(s). These always need your explicit approval.",
-                false
-            )
-        }
-        if (needsApproval.isNotEmpty()) {
-            if (pendingAction == null) {
-                queuedActions.clear()
-                queuedActions.addAll(needsApproval.drop(1))
-                pendingAction = needsApproval.firstOrNull()
-            } else {
-                queuedActions.addAll(needsApproval)
-            }
-        }
-        val approvalCount = needsApproval.size
-        val autoCount = autoActions.size
-        if (approvalCount > 1) messages += ChatMessage("Plan: $approvalCount steps need approval, $autoCount auto-executed.", false)
-        else if (autoCount > 0 && approvalCount == 0) messages += ChatMessage("All $autoCount steps auto-executed.", false)
+    /**
+     * Clears the chat thread (T3.0b → T3.5a): deletes the active conversation.
+     * Deletion goes through [ChatHistoryStore.deleteConversation] →
+     * `ConversationDao.deleteConversation` — the one transactional path (blocks,
+     * then messages, then the row). Memory and saved facts are untouched.
+     */
+    fun clearChat() {
+        activeConversationId?.let { deleteConversation(it) }
     }
 
-    fun approve() {
-        val action = pendingAction ?: return
-        // Derived from riskOf() rather than a parallel hand-maintained list, so a new
-        // destructive action can't be added without inheriting the auth requirement.
-        if (requiresBiometric(action)) {
-            biometricAuthRequested = true
-            messages += ChatMessage("Awaiting biometric authentication…", false)
-            return
-        }
-        executeApprovedAction()
-    }
-
-    private fun needsGhostMode(action: ProposedAction): Boolean = when (action) {
-        is ProposedAction.Tap, is ProposedAction.TapPixels, is ProposedAction.Type,
-        is ProposedAction.Send, is ProposedAction.SendImage, is ProposedAction.Scroll,
-        is ProposedAction.OpenApp, is ProposedAction.PostSocialMedia,
-        ProposedAction.ToggleConnectivity, ProposedAction.Home,
-        ProposedAction.Recents, ProposedAction.Back -> true
-        else -> false
-    }
-
-    fun executeApprovedAction() {
-        val action = pendingAction ?: return
-        val ghostModeActive = needsGhostMode(action)
-        val ghostIntent = android.content.Intent(getApplication(), com.newax.aegis.accessibility.GhostModeService::class.java)
-        if (ghostModeActive) getApplication<Application>().startService(ghostIntent)
-
-        viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { runAction(action) }
-            if (ghostModeActive) getApplication<Application>().stopService(ghostIntent)
-            messages += ChatMessage(if (ok) "Action completed." else "Action failed. Check the active app and Accessibility access.", false)
-            // RLAIF-E feedback: the user's approve/deny of an executed action is
-            // a reward signal for the assistant (no memory rule staged).
-            runCatching {
-                com.newax.aegis.agents.LearningEngine.ingestUserFeedback(
-                    "assistant", "",
-                    if (ok) "Approved action completed successfully" else "Approved action failed to execute",
-                    negative = !ok, stageMemoryRule = false
-                )
-            }
-            pendingAction = if (ok) queuedActions.removeFirstOrNull() else null
-            if (!ok) queuedActions.clear()
-            biometricAuthRequested = false
-        }
-    }
-
-    private suspend fun runAction(action: ProposedAction): Boolean = when (action) {
-        is ProposedAction.UpdateMemory -> {
-            memory.remember(action.category, action.info)
-            bumpMemoryVersion()
-            true
-        }
-        is ProposedAction.QueryCalendar -> {
-            queryCalendar(action.timeframe); true
-        }
-        is ProposedAction.CreateEvent -> {
-            createCalendarEvent(action.title, action.time); true
-        }
-        is ProposedAction.ReplyNotification -> {
-            val success = com.newax.aegis.accessibility.NewaxNotificationListenerService.replyToNotification(getApplication(), action.key, action.text)
-            withContext(Dispatchers.Main) {
-                if (success) messages += ChatMessage("Replied to notification.", false)
-                else messages += ChatMessage("Failed to reply (notification might be gone or doesn't support replies).", false)
-            }
-            success
-        }
-        is ProposedAction.DeleteFile -> {
-            val file = java.io.File(action.path)
-            file.exists() && file.delete()
-        }
-        is ProposedAction.DeleteContact -> {
-            try {
-                val uri = android.provider.ContactsContract.RawContacts.CONTENT_URI.buildUpon()
-                    .appendQueryParameter(android.provider.ContactsContract.CALLER_IS_SYNCADAPTER, "true").build()
-                getApplication<Application>().contentResolver.delete(
-                    uri, "${android.provider.ContactsContract.RawContacts.CONTACT_ID}=?", arrayOf(action.id)
-                ) > 0
-            } catch (_: Exception) { false }
-        }
-        is ProposedAction.TakeScreenshot -> {
-            val frame = com.newax.aegis.vision.ScreenCaptureService.latestFrame.value
-            if (frame == null) false
-            else try {
-                val file = java.io.File(
-                    getApplication<Application>().getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES),
-                    "aegis_ss_${System.currentTimeMillis()}.png"
-                )
-                java.io.FileOutputStream(file).use { frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
-                true
-            } catch (_: Exception) { false }
-        }
-        is ProposedAction.RunScript -> {
-            val result = com.newax.aegis.engine.CodeSandbox.executeJs(action.code, getApplication())
-            com.newax.aegis.engine.TriggerEngine.triggerEvents.tryEmit("[Script Output]\n$result")
-            true
-        }
-        is ProposedAction.AuditSecurity -> {
-            withContext(Dispatchers.IO) { com.newax.aegis.engine.SecurityAuditor.auditApps(getApplication()) }
-            true
-        }
-        is ProposedAction.UpdateGraph -> {
-            com.newax.aegis.engine.KnowledgeGraph.addEdge(action.from, action.relation, action.to)
-            memory.storeRaw("knowledge_graph", com.newax.aegis.engine.KnowledgeGraph.serialize())
-            withContext(Dispatchers.IO) {
-                LlmTripleExtractor.saveEdge(db, action.from, action.relation, action.to)
-            }
-            bumpMemoryVersion()
-            true
-        }
-        is ProposedAction.UpdateNode -> {
-            com.newax.aegis.engine.KnowledgeGraph.updateNodeProperty(action.id, action.key, action.value)
-            memory.storeRaw("knowledge_graph", com.newax.aegis.engine.KnowledgeGraph.serialize())
-            bumpMemoryVersion()
-            true
-        }
-        is ProposedAction.LogCommunication -> {
-            com.newax.aegis.engine.CommunicationLog.logInteraction(action.contact, action.summaryText)
-            val now = System.currentTimeMillis()
-            PersonRegistry.resolve(db, action.contact)?.let { eid ->
-                db.personRegistryDao().touchInteraction(eid, now, now)
-            }
-            memory.storeRaw("comm_log", com.newax.aegis.engine.CommunicationLog.serialize())
-            bumpMemoryVersion()
-            true
-        }
-        is ProposedAction.UpdateProject -> {
-            com.newax.aegis.engine.ProjectTracker.updateProject(action.id, action.status, action.notes)
-            memory.storeRaw("project_tracker", com.newax.aegis.engine.ProjectTracker.serialize())
-            bumpMemoryVersion()
-            true
-        }
-        is ProposedAction.PrefixSearch -> {
-            val result = com.newax.aegis.engine.SemanticSearchEngine.instantPrefixSearch(action.prefix)
-            withContext(Dispatchers.Main) { messages += ChatMessage(result, false) }
-            true
-        }
-        is ProposedAction.SearchAll -> {
-            val result = withContext(Dispatchers.IO) {
-                com.newax.aegis.engine.SemanticSearchEngine.searchAll(action.query)
-            }
-            withContext(Dispatchers.Main) { messages += ChatMessage(result, false) }
-            true
-        }
-        is ProposedAction.ForgetFact -> {
-            memory.forget(action.category, action.fact)
-            bumpMemoryVersion()
-            true
-        }
-        is ProposedAction.DeleteProject -> {
-            val deleted = com.newax.aegis.engine.ProjectTracker.deleteProject(action.id)
-            memory.storeRaw("project_tracker", com.newax.aegis.engine.ProjectTracker.serialize())
-            bumpMemoryVersion()
-            deleted
-        }
-        // ── Self-learning ────────────────────────────────────────────────────
-        is ProposedAction.StartLearning -> {
-            LearningWorker.schedule(getApplication())
-            withContext(Dispatchers.Main) {
-                messages += ChatMessage(
-                    "Self-learning enabled. Scanning in 2 minutes. Sources: contacts → SMS → call logs → gallery → downloads (cycling every 20 min). All extracted facts will appear as drafts for your approval.",
-                    false
-                )
-                refreshDrafts()
-            }
-            true
-        }
-        is ProposedAction.StopLearning -> {
-            LearningWorker.cancel(getApplication())
-            withContext(Dispatchers.Main) {
-                messages += ChatMessage("Self-learning stopped. Your existing drafts and memory are unchanged.", false)
-            }
-            true
-        }
-        is ProposedAction.ScanNow -> {
-            LearningWorker.runOnce(getApplication())
-            withContext(Dispatchers.Main) {
-                messages += ChatMessage("Scan batch queued. New drafts will appear shortly.", false)
-            }
-            true
-        }
-        is ProposedAction.ShowDrafts -> {
-            val drafts = DraftStore.pending(db)
-            withContext(Dispatchers.Main) {
-                refreshDrafts()
-                val text = if (drafts.isEmpty()) {
-                    "No pending drafts. Say 'start learning' to begin scanning."
-                } else {
-                    buildString {
-                        appendLine("${drafts.size} pending draft(s) — say 'approve all' or 'reject all', or approve/reject individually:")
-                        drafts.take(10).forEachIndexed { i, d ->
-                            appendLine("${i + 1}. [${d.category.uppercase()}] ${d.fact}")
-                            appendLine("   Source: ${d.source} | Confidence: ${"%.0f".format(d.confidence * 100)}% | ID: ${d.id.take(8)}")
-                            if (d.sourceSnippet.isNotBlank()) appendLine("   \"${d.sourceSnippet}\"")
-                        }
-                        if (drafts.size > 10) appendLine("... and ${drafts.size - 10} more.")
-                    }
-                }
-                messages += ChatMessage(text, false)
-            }
-            true
-        }
-        is ProposedAction.ApproveDraft -> {
-            val approved = DraftStore.approveDraft(db, action.id)
-            withContext(Dispatchers.Main) {
-                if (approved != null) {
-                    val result = MemoryConsolidator.processApproval(memory, approved)
-                    val msg = when (result.action) {
-                        MemoryConsolidator.Action.STORE_NEW -> {
-                            memory.remember(approved.category, result.resolvedFact ?: approved.fact)
-                            approved.subjectName?.let { PersonFactStore.addFact(db, it, approved) }
-                            bumpMemoryVersion()
-                            "Saved [${approved.category}]: ${approved.fact.take(70)}"
-                        }
-                        MemoryConsolidator.Action.SKIP_DUPLICATE -> {
-                            "Already in memory — duplicate skipped."
-                        }
-                        MemoryConsolidator.Action.REPLACE_EXISTING -> {
-                            result.conflictingFact?.let { memory.forget(approved.category, it) }
-                            memory.remember(approved.category, result.resolvedFact ?: approved.fact)
-                            approved.subjectName?.let { PersonFactStore.addFact(db, it, approved) }
-                            bumpMemoryVersion()
-                            "Memory updated — replaced outdated fact."
-                        }
-                        MemoryConsolidator.Action.PRESENT_CONFLICT -> {
-                            memory.remember(approved.category, result.resolvedFact ?: approved.fact)
-                            approved.subjectName?.let { PersonFactStore.addFact(db, it, approved) }
-                            bumpMemoryVersion()
-                            "Saved — note: similar fact exists: \"${result.conflictingFact?.take(60)}\""
-                        }
-                    }
-                    refreshDrafts()
-                    messages += ChatMessage(msg, false)
-                } else {
-                    messages += ChatMessage("Draft not found: ${action.id.take(8)}", false)
-                }
-            }
-            approved != null
-        }
-        is ProposedAction.RejectDraft -> {
-            DraftStore.rejectDraft(db, action.id)
-            withContext(Dispatchers.Main) {
-                refreshDrafts()
-                messages += ChatMessage("Draft rejected and discarded.", false)
-            }
-            true
-        }
-        is ProposedAction.ApproveAllDrafts -> {
-            val approved = DraftStore.approveAll(db)
-            withContext(Dispatchers.Main) {
-                var stored = 0; var skipped = 0; var replaced = 0
-                approved.forEach { d ->
-                    val result = MemoryConsolidator.processApproval(memory, d)
-                    when (result.action) {
-                        MemoryConsolidator.Action.STORE_NEW -> {
-                            memory.remember(d.category, result.resolvedFact ?: d.fact)
-                            d.subjectName?.let { PersonFactStore.addFact(db, it, d) }
-                            stored++
-                        }
-                        MemoryConsolidator.Action.SKIP_DUPLICATE -> skipped++
-                        MemoryConsolidator.Action.REPLACE_EXISTING -> {
-                            result.conflictingFact?.let { memory.forget(d.category, it) }
-                            memory.remember(d.category, result.resolvedFact ?: d.fact)
-                            d.subjectName?.let { PersonFactStore.addFact(db, it, d) }
-                            replaced++
-                        }
-                        MemoryConsolidator.Action.PRESENT_CONFLICT -> {
-                            memory.remember(d.category, result.resolvedFact ?: d.fact)
-                            d.subjectName?.let { PersonFactStore.addFact(db, it, d) }
-                            stored++
-                        }
-                    }
-                }
-                bumpMemoryVersion()
-                refreshDrafts()
-                messages += ChatMessage(
-                    "Approved ${approved.size} drafts — $stored saved, $replaced updated, $skipped duplicates skipped.",
-                    false
-                )
-            }
-            true
-        }
-        is ProposedAction.RejectAllDrafts -> {
-            DraftStore.rejectAll(db)
-            withContext(Dispatchers.Main) {
-                refreshDrafts()
-                messages += ChatMessage("All pending drafts rejected.", false)
-            }
-            true
-        }
-
-        // ── Contacts ─────────────────────────────────────────────────────────
-        is ProposedAction.AnalyzeContacts -> {
-            withContext(Dispatchers.IO) {
-                try {
-                    val mgr = ContactsManager(getApplication(), memory)
-                    val report = mgr.scanAndClean(dryRun = false, autoMerge = false)
-                    val summary = mgr.formatScanReport(report)
-                    withContext(Dispatchers.Main) { messages += ChatMessage(summary, false) }
-                    true
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        messages += ChatMessage("Contact scan failed: ${e.message}", false)
-                    }
-                    false
-                }
-            }
-        }
-        is ProposedAction.ShowPersonProfile -> {
-            withContext(Dispatchers.IO) {
-                try {
-                    val mgr = ContactsManager(getApplication(), memory)
-                    val profile = mgr.getPersonProfileByName(action.contactName)
-                    val text = if (profile == null) {
-                        "No intelligence profile found for '${action.contactName}'. Try 'build profile for ${action.contactName}' first."
-                    } else buildString {
-                        appendLine("=== ${profile.displayName} ===")
-                        appendLine("Relationship: ${profile.relationship.name.replace('_', ' ')}")
-                        appendLine("Intimacy: ${"%.0f".format(profile.intimacyScore * 100)}% | Trust: ${"%.0f".format(profile.trustScore * 100)}%")
-                        appendLine("Frequency: ${profile.communicationFrequency}")
-                        appendLine("Languages: ${profile.languagesDetected.joinToString(", ")}")
-                        appendLine("Traits: ${profile.personalityTraits.joinToString(", ")}")
-                        appendLine("Topics: ${profile.topicKeywords.take(5).joinToString(", ")}")
-                        appendLine("Avg response time: ${"%.1f".format(profile.avgResponseGapHours)}h")
-                        if (profile.dominantIntent.isNotBlank()) appendLine("Dominant intent: ${profile.dominantIntent}")
-                        if (profile.aiSummary.isNotBlank()) appendLine("\n${profile.aiSummary}")
-                    }
-                    withContext(Dispatchers.Main) { messages += ChatMessage(text, false) }
-                    true
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        messages += ChatMessage("Profile load failed: ${e.message}", false)
-                    }
-                    false
-                }
-            }
-        }
-        is ProposedAction.BuildPersonProfile -> {
-            withContext(Dispatchers.IO) {
-                try {
-                    val mgr = ContactsManager(getApplication(), memory)
-                    val profile = mgr.getPersonProfileByName(action.contactName)?.let {
-                        // Contact exists — rebuild profile
-                        val contacts = mgr.loadAllContacts()
-                        val match = contacts.firstOrNull { c ->
-                            c.displayName.equals(action.contactName, ignoreCase = true)
-                        }
-                        match?.let { mgr.buildPersonProfile(it.contactId) }
-                    } ?: run {
-                        // Try to find by name and build
-                        val contacts = mgr.loadAllContacts()
-                        val match = contacts.firstOrNull { c ->
-                            c.displayName.contains(action.contactName, ignoreCase = true)
-                        }
-                        match?.let { mgr.buildPersonProfile(it.contactId) }
-                    }
-                    val text = if (profile == null) {
-                        "Contact '${action.contactName}' not found."
-                    } else {
-                        "Profile built for ${profile.displayName}. ${profile.totalMessagesIn + profile.totalMessagesOut} messages analyzed. Relationship: ${profile.relationship.name.replace('_', ' ')}. ${profile.personalityTraits.joinToString(", ")}."
-                    }
-                    withContext(Dispatchers.Main) { messages += ChatMessage(text, false) }
-                    true
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        messages += ChatMessage("Profile build failed: ${e.message}", false)
-                    }
-                    false
-                }
-            }
-        }
-        is ProposedAction.MergeContacts -> {
-            withContext(Dispatchers.IO) {
-                try {
-                    val mgr = ContactsManager(getApplication(), memory)
-                    val allContacts = mgr.loadAllContacts()
-                    val c1 = allContacts.firstOrNull { it.displayName.equals(action.contact1, ignoreCase = true) }
-                    val c2 = allContacts.firstOrNull { it.displayName.equals(action.contact2, ignoreCase = true) }
-                    val text = if (c1 == null || c2 == null) {
-                        "Could not find both contacts: '${action.contact1}' and '${action.contact2}'."
-                    } else {
-                        val ok = mgr.mergeContacts(c1.rawContactId, c2.rawContactId)
-                        if (ok) "Merged '${c1.displayName}' and '${c2.displayName}' into one contact."
-                        else "Merge failed — contacts may be on different accounts."
-                    }
-                    withContext(Dispatchers.Main) { messages += ChatMessage(text, false) }
-                    true
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        messages += ChatMessage("Merge failed: ${e.message}", false)
-                    }
-                    false
-                }
-            }
-        }
-        is ProposedAction.PostSocialMedia -> {
-            try {
-                val context = getApplication<Application>()
-                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "image/*"
-                    setPackage(action.packageTarget)
-                    putExtra(android.content.Intent.EXTRA_TEXT, action.caption)
-                    if (action.imagePath.isNotBlank() && action.imagePath != "null") {
-                        val imageUri = if (action.imagePath.startsWith("content://") || action.imagePath.startsWith("http")) {
-                            Uri.parse(action.imagePath)
-                        } else {
-                            androidx.core.content.FileProvider.getUriForFile(
-                                context, "${context.packageName}.fileprovider", java.io.File(action.imagePath)
-                            )
-                        }
-                        putExtra(android.content.Intent.EXTRA_STREAM, imageUri)
-                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                withContext(Dispatchers.Main) { context.startActivity(intent) }
-                val finalizeAction = ProposedAction.Type("FINALIZE_POST|${action.altTag}")
-                NewaxAccessibilityService.instance?.execute(finalizeAction)
-                true
-            } catch (_: Exception) { false }
-        }
-        else -> withContext(Dispatchers.Main) { NewaxAccessibilityService.instance?.execute(action) == true }
-    }
-
-    private suspend fun queryCalendar(timeframe: String) {
-        val context = getApplication<Application>()
-        val now = Calendar.getInstance().timeInMillis
-        val endRange = when {
-            timeframe.contains("tomorrow", true) -> now + 86400000L * 2
-            timeframe.contains("week", true)     -> now + 86400000L * 7
-            timeframe.contains("month", true)    -> now + 86400000L * 30
-            else                                 -> now + 86400000L
-        }
-        val events = withContext(Dispatchers.IO) {
-            com.newax.aegis.engine.CalendarQueries.query(context, now, endRange, 10)
-        }
-        messages += ChatMessage(
-            if (events.isEmpty()) "No events found for $timeframe."
-            else "Found: " + events.joinToString(" | ") { it.formatted() },
-            false
-        )
-    }
-
-    private suspend fun createCalendarEvent(title: String, timeString: String) {
-        val context = getApplication<Application>()
-        try {
-            val calendarId = withContext(Dispatchers.IO) { resolveCalendarId(context) }
-            val targetTime = parseEventTime(timeString)
-            withContext(Dispatchers.IO) {
-                context.contentResolver.insert(
-                    CalendarContract.Events.CONTENT_URI,
-                    ContentValues().apply {
-                        put(CalendarContract.Events.DTSTART, targetTime)
-                        put(CalendarContract.Events.DTEND, targetTime + 3600000L)
-                        put(CalendarContract.Events.TITLE, title)
-                        put(CalendarContract.Events.CALENDAR_ID, calendarId)
-                        put(CalendarContract.Events.EVENT_TIMEZONE, Calendar.getInstance().timeZone.id)
-                    }
-                )
-            }
-            messages += ChatMessage("Created calendar event: '$title' for $timeString", false)
-        } catch (e: Exception) {
-            messages += ChatMessage("Failed to create event. Permissions missing.", false)
-        }
-    }
-
-    private fun resolveCalendarId(context: android.content.Context): Long {
-        return try {
-            val cursor = context.contentResolver.query(
-                CalendarContract.Calendars.CONTENT_URI,
-                arrayOf(CalendarContract.Calendars._ID),
-                "${CalendarContract.Calendars.VISIBLE} = 1",
-                null,
-                "${CalendarContract.Calendars.IS_PRIMARY} DESC"
-            )
-            cursor?.use { if (it.moveToFirst()) it.getLong(0) else 1L } ?: 1L
-        } catch (_: Exception) { 1L }
-    }
-
-    private fun parseEventTime(timeString: String): Long {
-        var target = Calendar.getInstance().timeInMillis
-        val lower = timeString.lowercase()
-        when {
-            lower.contains("tomorrow")                -> target += 86400000L
-            lower.contains("hour")  -> {
-                val h = Regex("\\d+").find(lower)?.value?.toLongOrNull() ?: 1L
-                target += h * 3600000L
-            }
-            lower.contains("minute") -> {
-                val m = Regex("\\d+").find(lower)?.value?.toLongOrNull() ?: 30L
-                target += m * 60000L
-            }
-            else -> target += 3600000L
-        }
-        return target
-    }
-
-    fun reject() {
+    private fun resetToFreshThread() {
+        controller.stopGeneration()
         pendingAction = null
-        queuedActions.clear()
-        // RLAIF-E: a rejected action plan is a negative reward signal.
-        runCatching {
-            com.newax.aegis.agents.LearningEngine.ingestUserFeedback(
-                "assistant", "", "User rejected the proposed action plan", negative = true, stageMemoryRule = false
-            )
-        }
-        messages += ChatMessage("Action plan cancelled.", false)
+        streamingActive = false
+        activeConversationId = null
+        messages.clear()
+        messages += ChatMessage(str(R.string.chat_boot_greeting), false, id = BOOT_GREETING_ID)
     }
+
+    // ── Model sheet (route 1.4) ────────────────────────────────────────────
+
+    /** The imported model's display name, or "" when none is installed. */
+    val modelName: String get() = controller.currentModel()?.file?.name.orEmpty()
+
+    /** The imported model's SHA-256 (identity for the sheet; never a secret). */
+    val modelSha256: String get() = controller.currentModel()?.sha256.orEmpty()
+
+    /**
+     * The model is usable when its status line reports ready. One definition,
+     * shared with the Settings screen ([SettingsScreenState.isModelReady]) —
+     * the thread banner (1.2) and the model sheet (1.4) read it from here.
+     */
+    val modelReady: Boolean get() = SettingsScreenState().isModelReady(modelStatus)
+
+    fun unloadModel() = controller.unloadModel()
+
+    fun reloadModel() = controller.reloadModel()
+
+    /**
+     * The transcript the export sheet (route 1.12) writes: the live thread
+     * minus the boot greeting (which is not a turn and was never persisted).
+     */
+    fun transcriptForExport(): List<ChatMessage> = messages.filter { it.id != BOOT_GREETING_ID }
+
+    // ── Public entry points (delegate to the pipeline; signatures unchanged) ──
+    fun submit(text: String, isBackground: Boolean = false) = controller.submit(text, isBackground)
+
+    fun approve() = controller.approve()
+
+    fun reject() = controller.reject()
+
+    fun executeApprovedAction() = controller.executeApprovedAction()
+
+    fun stopGeneration() = controller.stopGeneration()
+
+    fun importModel(uri: Uri) = controller.importModel(uri)
 
     override fun onCleared() {
         getApplication<Application>().unregisterComponentCallbacks(memoryCallback)
-        modelProvider?.close()
-        ModelProviderHolder.clear()
+        controller.close()
         tts?.shutdown()
         super.onCleared()
+    }
+
+    private companion object {
+        /** Stable id for the boot greeting, so history restore can drop it. */
+        const val BOOT_GREETING_ID = "boot-greeting"
+        /** How many recent conversations the client-side search scans (1.11). */
+        const val SEARCH_LIMIT = 30
     }
 }

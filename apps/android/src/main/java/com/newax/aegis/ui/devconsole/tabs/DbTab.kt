@@ -37,6 +37,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.newax.aegis.R
 import com.newax.aegis.ui.devconsole.DevConsoleViewModel
 
 @Composable
@@ -61,12 +63,12 @@ fun DbTab(vm: DevConsoleViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Tables  (${tableStats.size})",
+                    text = stringResource(R.string.dev_tables_count, tableStats.size),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
                 TextButton(onClick = { showSql = !showSql }) {
-                    Text(if (showSql) "Hide SQL" else "SQL Editor")
+                    Text(if (showSql) stringResource(R.string.dev_hide_sql) else stringResource(R.string.dev_sql_editor))
                 }
             }
         }
@@ -85,7 +87,7 @@ fun DbTab(vm: DevConsoleViewModel) {
                         value = sqlQuery,
                         onValueChange = { sqlQuery = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("SQL Query", fontSize = 12.sp) },
+                        label = { Text(stringResource(R.string.dev_sql_query), fontSize = 12.sp) },
                         textStyle = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 12.sp
@@ -98,14 +100,14 @@ fun DbTab(vm: DevConsoleViewModel) {
                             onClick = { vm.runSql(sqlQuery) },
                             modifier = Modifier.height(36.dp)
                         ) {
-                            Text("Run", fontSize = 12.sp)
+                            Text(stringResource(R.string.dev_run), fontSize = 12.sp)
                         }
                         if (sqlResult != null) {
                             TextButton(
                                 onClick = { vm.clearSqlResult() },
                                 modifier = Modifier.height(36.dp)
                             ) {
-                                Text("Clear", fontSize = 12.sp)
+                                Text(stringResource(R.string.dev_clear), fontSize = 12.sp)
                             }
                         }
                     }
@@ -143,7 +145,7 @@ private fun TableStatRow(stat: DevConsoleViewModel.DbTableStat) {
             modifier = Modifier.weight(1f)
         )
         val (label, color) = when {
-            stat.rows < 0  -> "error" to Color(0xFFEF5350)
+            stat.rows < 0  -> stringResource(R.string.dev_error) to Color(0xFFEF5350)
             stat.rows == 0 -> "0"     to MaterialTheme.colorScheme.onSurfaceVariant
             else           -> stat.rows.toString() to MaterialTheme.colorScheme.primary
         }
@@ -163,14 +165,14 @@ private fun SqlResultView(result: DevConsoleViewModel.SqlResult) {
     Column(modifier = Modifier.fillMaxWidth()) {
         if (result.error != null) {
             Text(
-                text = "Error: ${result.error}",
+                text = stringResource(R.string.dev_sql_error, result.error),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFEF5350),
                 fontFamily = FontFamily.Monospace
             )
         } else {
             Text(
-                text = "${result.rows.size} rows  •  ${result.durationMs}ms",
+                text = stringResource(R.string.dev_sql_result, result.rows.size, result.durationMs),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

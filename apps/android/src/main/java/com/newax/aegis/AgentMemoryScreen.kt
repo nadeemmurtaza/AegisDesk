@@ -32,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,21 +42,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.db.entity.EpisodeOutcome
 import com.newax.aegis.memory.AgentMemory
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val Surface = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val Primary = NewaxLightColors.textPrimary
-private val TextPri = NewaxLightColors.textPrimary
-private val TextSec = NewaxLightColors.textSecondary
-private val TextTer = NewaxLightColors.textTertiary
-private val Border = NewaxLightColors.border
-private val AccentGreen = NewaxLightColors.success
-private val AccentRed = NewaxLightColors.error
-private val AccentAmber = NewaxLightColors.warning
-
-private val SECTIONS = listOf("Library", "Episodic", "Scratchpad", "Handoffs", "Work log")
+private val SECTIONS = listOf(
+    R.string.agentmem_tab_library,
+    R.string.agentmem_tab_episodic,
+    R.string.agentmem_tab_scratchpad,
+    R.string.agentmem_tab_handoffs,
+    R.string.agentmem_tab_work_log,
+)
 
 /**
  * The three-layer hierarchical agent memory (docs/MEMORY_DESIGN.md; R13 — the
@@ -89,101 +86,101 @@ fun AgentMemoryScreen(padding: PaddingValues) {
                     FilterChip(
                         selected = section == s,
                         onClick = { section = s },
-                        label = { Text(s, fontSize = 12.sp) }
+                        label = { Text(stringResource(s), fontSize = 12.sp) }
                     )
                 }
             }
         }
 
         when (section) {
-            "Library" -> {
-                item { SectionLabel("Global Library — read-only for agents") }
+            R.string.agentmem_tab_library -> {
+                item { SectionLabel(stringResource(R.string.agentmem_section_global_library)) }
                 item {
                     LibraryGateSection()
                 }
-                item { SectionLabel("Active knowledge") }
+                item { SectionLabel(stringResource(R.string.agentmem_section_active_knowledge)) }
                 val active = AgentMemory.library()
                 if (active.isEmpty()) {
-                    item { EmptyChip("No approved knowledge yet — submit below and approve it") }
+                    item { EmptyChip(stringResource(R.string.agentmem_empty_knowledge)) }
                 } else {
                     items(active) { entry ->
                         Card(
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Surface),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                            colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                             elevation = CardDefaults.cardElevation(0.dp)
                         ) {
                             Column(Modifier.padding(14.dp)) {
-                                Text("[${entry.category}] ${entry.title}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+                                Text("[${entry.category}] ${entry.title}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
                                 Spacer(Modifier.height(4.dp))
-                                Text(entry.content, fontSize = 13.sp, color = TextSec)
+                                Text(entry.content, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
                                 Spacer(Modifier.height(4.dp))
-                                Text("confidence ${entry.confidence} · source ${entry.source}", fontSize = 11.sp, color = TextTer)
+                                Text(stringResource(R.string.agentmem_confidence_source, entry.confidence, entry.source), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
                             }
                         }
                     }
                 }
             }
-            "Episodic" -> {
-                item { SectionLabel("Episodic memory — outcome + lesson") }
+            R.string.agentmem_tab_episodic -> {
+                item { SectionLabel(stringResource(R.string.agentmem_section_episodic)) }
                 item { RecordEpisodeBox() }
                 item { RecallBox() }
-                item { SectionLabel("Timeline (newest first)") }
+                item { SectionLabel(stringResource(R.string.agentmem_section_timeline)) }
                 val episodes = AgentMemory.recentEpisodes(40)
                 if (episodes.isEmpty()) {
-                    item { EmptyChip("No episodes yet — record one from any agent") }
+                    item { EmptyChip(stringResource(R.string.agentmem_empty_episodes)) }
                 } else {
                     items(episodes) { ep ->
                         EpisodeCard(ep.summary, ep.agentId, ep.category, ep.outcome, ep.lesson, ep.occurredAtMs)
                     }
                 }
                 item { Spacer(Modifier.height(4.dp)) }
-                item { SectionLabel("Lessons learned (FAILURE episodes)") }
+                item { SectionLabel(stringResource(R.string.agentmem_section_lessons)) }
                 val lessons = AgentMemory.lessonsLearned(20)
                 if (lessons.isEmpty()) {
-                    item { EmptyChip("No lessons yet — failures will show up here") }
+                    item { EmptyChip(stringResource(R.string.agentmem_empty_lessons)) }
                 } else {
                     items(lessons) { ep ->
                         EpisodeCard(ep.summary, ep.agentId, ep.category, ep.outcome, ep.lesson, ep.occurredAtMs)
                     }
                 }
             }
-            "Scratchpad" -> {
-                item { SectionLabel("Agent scratchpad — private, isolated, local-only") }
+            R.string.agentmem_tab_scratchpad -> {
+                item { SectionLabel(stringResource(R.string.agentmem_section_scratchpad)) }
                 item { ScratchpadSection() }
             }
-            "Handoffs" -> {
-                item { SectionLabel("Handoff inbox (L3 shared write)") }
+            R.string.agentmem_tab_handoffs -> {
+                item { SectionLabel(stringResource(R.string.agentmem_section_handoff_inbox)) }
                 item { HandoffInboxSection() }
-                item { SectionLabel("Send a handoff") }
+                item { SectionLabel(stringResource(R.string.agentmem_section_send_handoff)) }
                 item { CreateHandoffBox() }
-                item { SectionLabel("Handoff outbox") }
+                item { SectionLabel(stringResource(R.string.agentmem_section_handoff_outbox)) }
                 val outbox = AgentMemory.handoffOutbox("assistant")
                 if (outbox.isEmpty()) {
-                    item { EmptyChip("Nothing sent yet") }
+                    item { EmptyChip(stringResource(R.string.agentmem_empty_outbox)) }
                 } else {
                     items(outbox) { h ->
                         Card(
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Surface),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                            colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                             elevation = CardDefaults.cardElevation(0.dp)
                         ) {
                             Column(Modifier.padding(14.dp)) {
-                                Text("→ ${h.toAgent}: ${h.task}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+                                Text(stringResource(R.string.agentmem_outbox_to, h.toAgent, h.task), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
                                 Spacer(Modifier.height(4.dp))
-                                Text(h.summary, fontSize = 13.sp, color = TextSec, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Text(h.summary, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(4.dp))
                                 Text("${h.status} · ${java.text.DateFormat.getDateTimeInstance(
                                     java.text.DateFormat.SHORT, java.text.DateFormat.SHORT
-                                ).format(java.util.Date(h.createdAtMs))}", fontSize = 11.sp, color = TextTer)
+                                ).format(java.util.Date(h.createdAtMs))}", fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
                             }
                         }
                     }
                 }
             }
-            "Work log" -> {
-                item { SectionLabel("Work log — zero work duplication") }
+            R.string.agentmem_tab_work_log -> {
+                item { SectionLabel(stringResource(R.string.agentmem_section_work_log)) }
                 item { WorkLogSection() }
             }
         }
@@ -193,6 +190,7 @@ fun AgentMemoryScreen(padding: PaddingValues) {
 /** The human-in-the-loop gate: submit → PENDING → approve/reject/distill. */
 @Composable
 private fun LibraryGateSection() {
+    val context = LocalContext.current
     var category by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
@@ -201,60 +199,60 @@ private fun LibraryGateSection() {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Add knowledge (lands PENDING — agents can't see it until approved)", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.agentmem_add_knowledge_hint), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text(stringResource(R.string.field_category)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(stringResource(R.string.field_title)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = content, onValueChange = { content = it }, label = { Text("Content") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = content, onValueChange = { content = it }, label = { Text(stringResource(R.string.field_content)) }, minLines = 2, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     onClick = {
                         if (title.isBlank() || content.isBlank()) {
-                            message = "Title and content are required"
+                            message = context.getString(R.string.agentmem_err_title_content_required)
                         } else {
                             AgentMemory.submitKnowledge(category.ifBlank { "general" }, title.trim(), content.trim())
-                            message = "Submitted — waiting at the human gate"
+                            message = context.getString(R.string.agentmem_submitted_gate)
                             approvals = AgentMemory.pendingApprovals()
                             category = ""; title = ""; content = ""
                         }
                     }
-                ) { Text("Submit") }
+                ) { Text(stringResource(R.string.action_submit)) }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(
                     onClick = {
                         val resolved = AgentMemory.distill()
-                        message = "Background pass: $resolved touched (conflicts, consolidation, decay)"
+                        message = context.getString(R.string.agentmem_bg_pass, resolved)
                         approvals = AgentMemory.pendingApprovals()
                     }
-                ) { Text("Distill") }
+                ) { Text(stringResource(R.string.action_distill)) }
             }
-            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = TextSec) }
+            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary) }
         }
     }
 
     Spacer(Modifier.height(8.dp))
     if (approvals.isEmpty()) {
-        Text("No pending approvals", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.agentmem_no_pending_approvals), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
     } else {
         approvals.forEach { entry ->
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surfaceMuted),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(12.dp)) {
-                    Text("[${entry.category}] ${entry.title}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
+                    Text("[${entry.category}] ${entry.title}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text(entry.content, fontSize = 12.sp, color = TextSec)
+                    Text(entry.content, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
@@ -263,13 +261,13 @@ private fun LibraryGateSection() {
                                 approvals = AgentMemory.pendingApprovals()
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                        ) { Text("Approve", fontSize = 12.sp) }
+                        ) { Text(stringResource(R.string.action_approve), fontSize = 12.sp) }
                         TextButton(
                             onClick = {
                                 AgentMemory.rejectKnowledge(entry.entryId)
                                 approvals = AgentMemory.pendingApprovals()
                             }
-                        ) { Text("Reject", fontSize = 12.sp, color = AccentRed) }
+                        ) { Text(stringResource(R.string.action_reject), fontSize = 12.sp, color = NewaxTheme.colors.error) }
                     }
                 }
             }
@@ -281,6 +279,7 @@ private fun LibraryGateSection() {
 /** Record an episode (with outcome + lesson) — the producer surface. */
 @Composable
 private fun RecordEpisodeBox() {
+    val context = LocalContext.current
     var agent by remember { mutableStateOf("assistant") }
     var category by remember { mutableStateOf("task") }
     var summary by remember { mutableStateOf("") }
@@ -288,16 +287,16 @@ private fun RecordEpisodeBox() {
     var message by remember { mutableStateOf<String?>(null) }
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Record (FAILURE episodes carry a lesson the mesh inherits)", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.agentmem_record_hint), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = summary, onValueChange = { summary = it }, label = { Text("What happened") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = summary, onValueChange = { summary = it }, label = { Text(stringResource(R.string.field_what_happened)) }, minLines = 2, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = lesson, onValueChange = { lesson = it }, label = { Text("Lesson (empty = plain observation)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = lesson, onValueChange = { lesson = it }, label = { Text(stringResource(R.string.field_lesson)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
@@ -307,13 +306,13 @@ private fun RecordEpisodeBox() {
                             agent.trim().ifBlank { "assistant" }, category.trim().ifBlank { "task" }, summary.trim(),
                             if (lesson.isBlank()) EpisodeOutcome.OBSERVATION else EpisodeOutcome.FAILURE, lesson.trim()
                         )
-                        message = "Episode recorded + journaled into the mesh"
+                        message = context.getString(R.string.agentmem_episode_recorded)
                         summary = ""; lesson = ""
                     }
-                ) { Text("Record", fontSize = 13.sp) }
-                OutlinedTextField(value = agent, onValueChange = { agent = it }, label = { Text("Agent") }, singleLine = true, modifier = Modifier.weight(1f))
+                ) { Text(stringResource(R.string.action_record), fontSize = 13.sp) }
+                OutlinedTextField(value = agent, onValueChange = { agent = it }, label = { Text(stringResource(R.string.field_agent)) }, singleLine = true, modifier = Modifier.weight(1f))
             }
-            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = TextSec) }
+            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary) }
         }
     }
 }
@@ -325,19 +324,19 @@ private fun RecallBox() {
     var results by remember { mutableStateOf<List<String>>(emptyList()) }
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Recall (what an agent pulls — snippets, not chat histories)", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.agentmem_recall_hint), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Query") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text(stringResource(R.string.field_query)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            Button(onClick = { results = AgentMemory.recall(query.trim(), 5) }, enabled = query.isNotBlank()) { Text("Recall") }
+            Button(onClick = { results = AgentMemory.recall(query.trim(), 5) }, enabled = query.isNotBlank()) { Text(stringResource(R.string.action_recall)) }
             if (results.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                results.forEach { r -> Text(r, fontSize = 12.sp, color = TextSec, fontFamily = FontFamily.Monospace); Spacer(Modifier.height(4.dp)) }
+                results.forEach { r -> Text(r, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, fontFamily = FontFamily.Monospace); Spacer(Modifier.height(4.dp)) }
             }
         }
     }
@@ -346,31 +345,31 @@ private fun RecallBox() {
 @Composable
 private fun EpisodeCard(summary: String, agentId: String, category: String, outcome: String, lesson: String, atMs: Long) {
     val color = when (outcome) {
-        EpisodeOutcome.SUCCESS -> AccentGreen
-        EpisodeOutcome.FAILURE -> AccentRed
-        else -> AccentAmber
+        EpisodeOutcome.SUCCESS -> NewaxTheme.colors.success
+        EpisodeOutcome.FAILURE -> NewaxTheme.colors.error
+        else -> NewaxTheme.colors.warning
     }
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(RoundedCornerShape(999.dp)).background(color))
                 Spacer(Modifier.width(8.dp))
-                Text("$agentId · $category · $outcome", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
+                Text("$agentId · $category · $outcome", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
             }
             Spacer(Modifier.height(4.dp))
-            Text(summary, fontSize = 13.sp, color = TextSec)
+            Text(summary, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             if (lesson.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text("lesson: $lesson", fontSize = 12.sp, color = if (outcome == EpisodeOutcome.FAILURE) AccentRed else AccentGreen)
+                Text(stringResource(R.string.agentmem_lesson, lesson), fontSize = 12.sp, color = if (outcome == EpisodeOutcome.FAILURE) NewaxTheme.colors.error else NewaxTheme.colors.success)
             }
             Spacer(Modifier.height(4.dp))
             Text(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
-                .format(java.util.Date(atMs)), fontSize = 11.sp, color = TextTer)
+                .format(java.util.Date(atMs)), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
         }
     }
 }
@@ -386,20 +385,20 @@ private fun ScratchpadSection() {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Isolated per agent — never syncs, TTL expires it", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.agentmem_scratchpad_hint), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = agentId, onValueChange = { agentId = it }, label = { Text("Agent") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = agentId, onValueChange = { agentId = it }, label = { Text(stringResource(R.string.field_agent)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = key, onValueChange = { key = it }, label = { Text("Key") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = key, onValueChange = { key = it }, label = { Text(stringResource(R.string.field_key)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text("Value") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(stringResource(R.string.field_value)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = ttl, onValueChange = { ttl = it }, label = { Text("TTL ms (0 = forever)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = ttl, onValueChange = { ttl = it }, label = { Text(stringResource(R.string.field_ttl)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
@@ -409,34 +408,34 @@ private fun ScratchpadSection() {
                         key = ""; value = ""
                     },
                     enabled = key.isNotBlank()
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.action_save)) }
                 OutlinedButton(onClick = {
                     AgentMemory.scratchpadClear(agentId.trim().ifBlank { "assistant" })
                     entries = AgentMemory.scratchpadFor(agentId.trim().ifBlank { "assistant" })
-                }) { Text("Clear all", fontSize = 13.sp) }
+                }) { Text(stringResource(R.string.action_clear_all), fontSize = 13.sp) }
             }
         }
     }
     Spacer(Modifier.height(8.dp))
     if (entries.isEmpty()) {
-        Text("No scratchpad entries", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.agentmem_no_scratchpad), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
     } else {
         entries.forEach { e ->
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surfaceMuted),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(e.key, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri, fontFamily = FontFamily.Monospace)
-                        Text(e.value, fontSize = 12.sp, color = TextSec, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(e.key, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary, fontFamily = FontFamily.Monospace)
+                        Text(e.value, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     TextButton(onClick = {
                         AgentMemory.scratchpadDelete(e.agentId, e.key)
                         entries = AgentMemory.scratchpadFor(e.agentId)
-                    }) { Text("Delete", fontSize = 12.sp, color = AccentRed) }
+                    }) { Text(stringResource(R.string.action_delete), fontSize = 12.sp, color = NewaxTheme.colors.error) }
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -447,34 +446,35 @@ private fun ScratchpadSection() {
 /** L3 — the producer surface: write a clean artifact and pass the pointer. */
 @Composable
 private fun CreateHandoffBox() {
+    val context = LocalContext.current
     var to by remember { mutableStateOf("analyst") }
     var task by remember { mutableStateOf("") }
     var summary by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Clean summary + pointer — the consumer reads this, not your scratchpad", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.agentmem_handoff_hint), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = to, onValueChange = { to = it }, label = { Text("To agent") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = to, onValueChange = { to = it }, label = { Text(stringResource(R.string.field_to_agent)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = task, onValueChange = { task = it }, label = { Text("Task") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = task, onValueChange = { task = it }, label = { Text(stringResource(R.string.field_task)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = summary, onValueChange = { summary = it }, label = { Text("Summary artifact") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = summary, onValueChange = { summary = it }, label = { Text(stringResource(R.string.field_summary_artifact)) }, minLines = 2, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
                     if (task.isBlank() || summary.isBlank()) return@Button
                     AgentMemory.createHandoff("assistant", to.trim().ifBlank { "analyst" }, task.trim(), summary.trim())
-                    message = "Handoff written + journaled — ${to.trim()} sees it in its inbox"
+                    message = context.getString(R.string.agentmem_handoff_written, to.trim())
                     task = ""; summary = ""
                 }
-            ) { Text("Send handoff", fontSize = 13.sp) }
-            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = TextSec) }
+            ) { Text(stringResource(R.string.action_send_handoff), fontSize = 13.sp) }
+            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary) }
         }
     }
 }
@@ -482,55 +482,56 @@ private fun CreateHandoffBox() {
 /** L3 — shared-write handoffs: consumer acks the artifact. */
 @Composable
 private fun HandoffInboxSection() {
+    val context = LocalContext.current
     var agent by remember { mutableStateOf("assistant") }
     var inbox by remember { mutableStateOf(AgentMemory.handoffInbox("assistant")) }
     var message by remember { mutableStateOf<String?>(null) }
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = agent, onValueChange = { agent = it }, label = { Text("As agent") }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(value = agent, onValueChange = { agent = it }, label = { Text(stringResource(R.string.field_as_agent)) }, singleLine = true, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     inbox = AgentMemory.handoffInbox(agent.trim().ifBlank { "assistant" })
                     message = null
-                }) { Text("Refresh") }
+                }) { Text(stringResource(R.string.action_refresh)) }
             }
         }
     }
-    message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = TextSec) }
+    message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary) }
     Spacer(Modifier.height(8.dp))
     if (inbox.isEmpty()) {
-        Text("No pending handoffs for this agent", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.agentmem_no_handoffs), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
     } else {
         inbox.forEach { h ->
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    Text("from ${h.fromAgent}: ${h.task}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+                    Text(stringResource(R.string.agentmem_handoff_from, h.fromAgent, h.task), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(4.dp))
-                    Text(h.summary, fontSize = 13.sp, color = TextSec)
+                    Text(h.summary, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
                     if (h.refId.isNotBlank()) {
                         Spacer(Modifier.height(4.dp))
-                        Text("ref: ${h.refId}", fontSize = 12.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                        Text(stringResource(R.string.agentmem_handoff_ref, h.refId), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                     }
                     Spacer(Modifier.height(8.dp))
                     Button(
                         onClick = {
                             AgentMemory.ackHandoff(h.handoffId)
                             inbox = AgentMemory.handoffInbox(agent.trim().ifBlank { "assistant" })
-                            message = "Acked ${h.handoffId.take(8)} — the ack propagates to the sender"
+                            message = context.getString(R.string.agentmem_acked, h.handoffId.take(8))
                         }
-                    ) { Text("Ack & pick up", fontSize = 13.sp) }
+                    ) { Text(stringResource(R.string.action_ack_pickup), fontSize = 13.sp) }
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -541,6 +542,7 @@ private fun HandoffInboxSection() {
 /** Zero-work-duplication ledger. */
 @Composable
 private fun WorkLogSection() {
+    val context = LocalContext.current
     var action by remember { mutableStateOf("") }
     var resource by remember { mutableStateOf("") }
     var entries by remember { mutableStateOf(AgentMemory.recentWork(20)) }
@@ -548,55 +550,55 @@ private fun WorkLogSection() {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("One (action, resource) done once — the swarm skips finished work", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.agentmem_worklog_hint), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = action, onValueChange = { action = it }, label = { Text("Action (scrape, fix, import…)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = action, onValueChange = { action = it }, label = { Text(stringResource(R.string.field_action)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(value = resource, onValueChange = { resource = it }, label = { Text("Resource (URL, file, package…)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = resource, onValueChange = { resource = it }, label = { Text(stringResource(R.string.field_resource)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
                         val claimed = AgentMemory.claimWork(action.trim(), resource.trim(), "assistant")
-                        message = if (claimed) "Claimed — mark done when finished"
-                        else if (AgentMemory.isWorkDone(action.trim(), resource.trim())) "Already DONE — no duplication"
-                        else "Claimed previously"
+                        message = if (claimed) context.getString(R.string.agentmem_claimed)
+                        else if (AgentMemory.isWorkDone(action.trim(), resource.trim())) context.getString(R.string.agentmem_already_done)
+                        else context.getString(R.string.agentmem_claimed_previously)
                         entries = AgentMemory.recentWork(20)
                     },
                     enabled = action.isNotBlank() && resource.isNotBlank()
-                ) { Text("Claim") }
+                ) { Text(stringResource(R.string.action_claim)) }
                 OutlinedButton(onClick = {
                     AgentMemory.completeWork(action.trim(), resource.trim())
-                    message = "Marked done"
+                    message = context.getString(R.string.agentmem_marked_done)
                     entries = AgentMemory.recentWork(20)
-                }) { Text("Mark done") }
+                }) { Text(stringResource(R.string.action_mark_done)) }
             }
-            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = TextSec) }
+            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary) }
         }
     }
     Spacer(Modifier.height(8.dp))
     if (entries.isEmpty()) {
-        Text("Nothing logged yet", fontSize = 12.sp, color = TextTer)
+        Text(stringResource(R.string.agentmem_nothing_logged), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
     } else {
         entries.forEach { w ->
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceMuted),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surfaceMuted),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(6.dp).clip(RoundedCornerShape(999.dp))
-                        .background(if (w.status == "DONE") AccentGreen else AccentAmber))
+                        .background(if (w.status == "DONE") NewaxTheme.colors.success else NewaxTheme.colors.warning))
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("${w.action} · ${w.resource}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${w.status} · ${w.agentId}", fontSize = 11.sp, color = TextTer)
+                        Text("${w.action} · ${w.resource}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${w.status} · ${w.agentId}", fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
                     }
                 }
             }
@@ -607,7 +609,7 @@ private fun WorkLogSection() {
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer,
+    Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textTertiary,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
 }
 
@@ -617,9 +619,9 @@ private fun EmptyChip(text: String) {
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(999.dp))
-            .background(SurfaceMuted)
+            .background(NewaxTheme.colors.surfaceMuted)
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
-        Text(text, fontSize = 13.sp, color = TextTer)
+        Text(text, fontSize = 13.sp, color = NewaxTheme.colors.textTertiary)
     }
 }

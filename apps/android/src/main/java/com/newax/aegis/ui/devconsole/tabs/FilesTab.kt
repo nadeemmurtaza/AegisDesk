@@ -36,6 +36,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.newax.aegis.R
 import com.newax.aegis.db.entity.FileObject
 import com.newax.aegis.ui.devconsole.DevConsoleViewModel
 import java.text.SimpleDateFormat
@@ -46,6 +48,7 @@ private val SDF = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault())
 
 @Composable
 fun FilesTab(vm: DevConsoleViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val stats    by vm.fileStats.collectAsState()
     val recent   by vm.recentFiles.collectAsState()
     val status   by vm.indexStatus.collectAsState()
@@ -66,22 +69,22 @@ fun FilesTab(vm: DevConsoleViewModel) {
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "File Index  (${stats.total} files)",
+                        text = stringResource(R.string.dev_file_index_count, stats.total),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(10.dp))
 
-                    StatBar(label = "Total", value = stats.total, max = maxOf(stats.total, 1), color = MaterialTheme.colorScheme.primary)
-                    StatBar(label = "Duplicates", value = stats.duplicates, max = maxOf(stats.total, 1), color = Color(0xFFEF5350))
-                    StatBar(label = "Unindexed", value = stats.unindexed, max = maxOf(stats.total, 1), color = Color(0xFFFFA726))
-                    StatBar(label = "Needs text", value = stats.needsText, max = maxOf(stats.total, 1), color = Color(0xFF64B5F6))
-                    StatBar(label = "Needs entities", value = stats.needsEntities, max = maxOf(stats.total, 1), color = Color(0xFFBA68C8))
-                    StatBar(label = "Needs visual", value = stats.needsVisual, max = maxOf(stats.total, 1), color = Color(0xFF4DB6AC))
+                    StatBar(label = stringResource(R.string.dev_stat_total), value = stats.total, max = maxOf(stats.total, 1), color = MaterialTheme.colorScheme.primary)
+                    StatBar(label = stringResource(R.string.dev_stat_duplicates), value = stats.duplicates, max = maxOf(stats.total, 1), color = Color(0xFFEF5350))
+                    StatBar(label = stringResource(R.string.dev_stat_unindexed), value = stats.unindexed, max = maxOf(stats.total, 1), color = Color(0xFFFFA726))
+                    StatBar(label = stringResource(R.string.dev_stat_needs_text), value = stats.needsText, max = maxOf(stats.total, 1), color = Color(0xFF64B5F6))
+                    StatBar(label = stringResource(R.string.dev_stat_needs_entities), value = stats.needsEntities, max = maxOf(stats.total, 1), color = Color(0xFFBA68C8))
+                    StatBar(label = stringResource(R.string.dev_stat_needs_visual), value = stats.needsVisual, max = maxOf(stats.total, 1), color = Color(0xFF4DB6AC))
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        LabelValue("Text content rows", stats.textContent.toString())
-                        LabelValue("Entity link rows", stats.entityLinks.toString())
+                        LabelValue(stringResource(R.string.dev_label_text_rows), stats.textContent.toString())
+                        LabelValue(stringResource(R.string.dev_label_entity_rows), stats.entityLinks.toString())
                     }
                 }
             }
@@ -100,7 +103,7 @@ fun FilesTab(vm: DevConsoleViewModel) {
                 ) {
                     Text(text = msg, style = MaterialTheme.typography.bodySmall, color = Color(0xFF90CAF9))
                     TextButton(onClick = { vm.clearIndexStatus() }, modifier = Modifier.height(24.dp)) {
-                        Text("Dismiss", fontSize = 11.sp)
+                        Text(stringResource(R.string.dev_dismiss), fontSize = 11.sp)
                     }
                 }
             }
@@ -114,7 +117,7 @@ fun FilesTab(vm: DevConsoleViewModel) {
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Index Actions",
+                        text = stringResource(R.string.dev_index_actions),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -129,7 +132,7 @@ fun FilesTab(vm: DevConsoleViewModel) {
                                 .height(36.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
-                            Text("Scan All", fontSize = 11.sp)
+                            Text(stringResource(R.string.dev_scan_all), fontSize = 11.sp)
                         }
                         OutlinedButton(
                             onClick = { vm.refreshAll() },
@@ -137,16 +140,16 @@ fun FilesTab(vm: DevConsoleViewModel) {
                                 .weight(1f)
                                 .height(36.dp)
                         ) {
-                            Text("Refresh", fontSize = 11.sp)
+                            Text(stringResource(R.string.dev_refresh), fontSize = 11.sp)
                         }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        StageButton("Text", Color(0xFF64B5F6), Modifier.weight(1f)) { vm.runTextExtraction() }
-                        StageButton("Entities", Color(0xFFBA68C8), Modifier.weight(1f)) { vm.runEntityExtraction() }
-                        StageButton("Visual", Color(0xFF4DB6AC), Modifier.weight(1f)) { vm.runVisualIndexing() }
+                        StageButton(stringResource(R.string.dev_stage_text), Color(0xFF64B5F6), Modifier.weight(1f)) { vm.runTextExtraction() }
+                        StageButton(stringResource(R.string.dev_stage_entities), Color(0xFFBA68C8), Modifier.weight(1f)) { vm.runEntityExtraction() }
+                        StageButton(stringResource(R.string.dev_stage_visual), Color(0xFF4DB6AC), Modifier.weight(1f)) { vm.runVisualIndexing() }
                     }
                 }
             }
@@ -154,7 +157,7 @@ fun FilesTab(vm: DevConsoleViewModel) {
 
         item {
             Text(
-                text = "Recent files  (${recent.size})",
+                text = stringResource(R.string.dev_recent_files_count, recent.size),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 4.dp)
@@ -245,7 +248,7 @@ private fun FileObjectRow(fo: FileObject) {
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = humanSize(fo.sizeBytes),
+                    text = humanSize(context, fo.sizeBytes),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -281,8 +284,8 @@ private fun indexStateColor(state: Int) = when {
     else      -> Color(0xFF9E9E9E)
 }
 
-private fun humanSize(bytes: Long) = when {
-    bytes > 1_048_576 -> "${"%.1f".format(bytes / 1_048_576.0)} MB"
-    bytes > 1024      -> "${bytes / 1024} KB"
-    else              -> "$bytes B"
+private fun humanSize(context: android.content.Context, bytes: Long) = when {
+    bytes > 1_048_576 -> context.getString(R.string.dev_human_mb, "%.1f".format(bytes / 1_048_576.0))
+    bytes > 1024      -> context.getString(R.string.dev_human_kb, bytes / 1024)
+    else              -> context.getString(R.string.dev_human_b, bytes)
 }

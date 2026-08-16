@@ -41,6 +41,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.newax.aegis.R
 import com.newax.aegis.db.entity.TriggerRule
 import com.newax.aegis.ui.devconsole.DevConsoleViewModel
 import java.text.SimpleDateFormat
@@ -49,10 +51,10 @@ import java.util.Locale
 
 private val SDF_LONG = SimpleDateFormat("MMM dd HH:mm:ss", Locale.getDefault())
 
-private enum class EventType(val label: String) {
-    NOTIFICATION("Notification"),
-    WINDOW_CHANGED("Window Changed"),
-    SCREEN_CONTENT("Screen Content")
+private enum class EventType(val labelRes: Int) {
+    NOTIFICATION(R.string.dev_trigger_event_notification),
+    WINDOW_CHANGED(R.string.dev_trigger_event_window_changed),
+    SCREEN_CONTENT(R.string.dev_trigger_event_screen_content)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +85,7 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Trigger Rules  (${rules.size})",
+                    text = stringResource(R.string.dev_trigger_rules_count, rules.size),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -91,7 +93,7 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                     onClick = { showFireForm = !showFireForm },
                     modifier = Modifier.height(36.dp)
                 ) {
-                    Text(if (showFireForm) "Hide" else "Inject Event", fontSize = 12.sp)
+                    Text(if (showFireForm) stringResource(R.string.dev_trigger_hide) else stringResource(R.string.dev_trigger_inject), fontSize = 12.sp)
                 }
             }
         }
@@ -108,7 +110,7 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Event Injector",
+                            text = stringResource(R.string.dev_trigger_injector),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -118,10 +120,10 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                             onExpandedChange = { dropExpanded = it }
                         ) {
                             OutlinedTextField(
-                                value = eventType.label,
+                                value = stringResource(eventType.labelRes),
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Event type", fontSize = 11.sp) },
+                                label = { Text(stringResource(R.string.dev_trigger_event_type), fontSize = 11.sp) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(dropExpanded) },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -134,7 +136,7 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                             ) {
                                 EventType.entries.forEach { type ->
                                     DropdownMenuItem(
-                                        text = { Text(type.label, fontSize = 13.sp) },
+                                        text = { Text(stringResource(type.labelRes), fontSize = 13.sp) },
                                         onClick = { eventType = type; dropExpanded = false }
                                     )
                                 }
@@ -145,19 +147,19 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                             EventType.NOTIFICATION -> {
                                 OutlinedTextField(
                                     value = field1, onValueChange = { field1 = it },
-                                    label = { Text("Sender", fontSize = 11.sp) },
+                                    label = { Text(stringResource(R.string.dev_trigger_sender), fontSize = 11.sp) },
                                     modifier = Modifier.fillMaxWidth(),
                                     textStyle = MaterialTheme.typography.bodySmall
                                 )
                                 OutlinedTextField(
                                     value = field2, onValueChange = { field2 = it },
-                                    label = { Text("Text", fontSize = 11.sp) },
+                                    label = { Text(stringResource(R.string.dev_trigger_text), fontSize = 11.sp) },
                                     modifier = Modifier.fillMaxWidth(),
                                     textStyle = MaterialTheme.typography.bodySmall
                                 )
                                 OutlinedTextField(
                                     value = field3, onValueChange = { field3 = it },
-                                    label = { Text("Package", fontSize = 11.sp) },
+                                    label = { Text(stringResource(R.string.dev_trigger_package), fontSize = 11.sp) },
                                     modifier = Modifier.fillMaxWidth(),
                                     textStyle = MaterialTheme.typography.bodySmall
                                 )
@@ -165,7 +167,7 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                             EventType.WINDOW_CHANGED -> {
                                 OutlinedTextField(
                                     value = field1, onValueChange = { field1 = it },
-                                    label = { Text("Package name", fontSize = 11.sp) },
+                                    label = { Text(stringResource(R.string.dev_trigger_package_name), fontSize = 11.sp) },
                                     modifier = Modifier.fillMaxWidth(),
                                     textStyle = MaterialTheme.typography.bodySmall
                                 )
@@ -173,7 +175,7 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                             EventType.SCREEN_CONTENT -> {
                                 OutlinedTextField(
                                     value = field1, onValueChange = { field1 = it },
-                                    label = { Text("Visible text", fontSize = 11.sp) },
+                                    label = { Text(stringResource(R.string.dev_trigger_visible_text), fontSize = 11.sp) },
                                     modifier = Modifier.fillMaxWidth(),
                                     minLines = 3,
                                     textStyle = MaterialTheme.typography.bodySmall
@@ -192,12 +194,12 @@ fun TriggersTab(vm: DevConsoleViewModel) {
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Fire Event", fontSize = 13.sp, color = Color.White)
+                            Text(stringResource(R.string.dev_trigger_fire), fontSize = 13.sp, color = Color.White)
                         }
 
                         lastFired?.let {
                             Text(
-                                text = "Last fired: $it",
+                                text = stringResource(R.string.dev_trigger_last_fired, it),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFF81C784),
                                 fontFamily = FontFamily.Monospace
@@ -211,7 +213,7 @@ fun TriggersTab(vm: DevConsoleViewModel) {
         if (rules.isEmpty()) {
             item {
                 Text(
-                    text = "No trigger rules in DB.",
+                    text = stringResource(R.string.dev_trigger_none),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 12.dp)
@@ -273,7 +275,7 @@ private fun TriggerRuleCard(rule: TriggerRule, vm: DevConsoleViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("IF", style = MaterialTheme.typography.labelSmall, color = Color(0xFF64B5F6))
+                    Text(stringResource(R.string.dev_trigger_if), style = MaterialTheme.typography.labelSmall, color = Color(0xFF64B5F6))
                     Text(
                         text = rule.conditionParams.take(80),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
@@ -282,7 +284,7 @@ private fun TriggerRuleCard(rule: TriggerRule, vm: DevConsoleViewModel) {
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("THEN", style = MaterialTheme.typography.labelSmall, color = Color(0xFF81C784))
+                    Text(stringResource(R.string.dev_trigger_then), style = MaterialTheme.typography.labelSmall, color = Color(0xFF81C784))
                     Text(
                         text = rule.actionParams.take(80),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
@@ -298,10 +300,10 @@ private fun TriggerRuleCard(rule: TriggerRule, vm: DevConsoleViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val lastFired = if (rule.lastFiredMs > 0L)
-                    "fired ${SDF_LONG.format(Date(rule.lastFiredMs))}"
-                else "never fired"
+                    stringResource(R.string.dev_trigger_fired_at, SDF_LONG.format(Date(rule.lastFiredMs)))
+                else stringResource(R.string.dev_trigger_never_fired)
                 Text(
-                    text = "debounce ${rule.debounceMs}ms  •  $lastFired",
+                    text = stringResource(R.string.dev_trigger_debounce, rule.debounceMs, lastFired),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -309,7 +311,7 @@ private fun TriggerRuleCard(rule: TriggerRule, vm: DevConsoleViewModel) {
                     onClick = { vm.deleteRule(rule.id) },
                     modifier = Modifier.height(28.dp)
                 ) {
-                    Text("Delete", fontSize = 11.sp, color = Color(0xFFEF5350))
+                    Text(stringResource(R.string.dev_delete), fontSize = 11.sp, color = Color(0xFFEF5350))
                 }
             }
         }

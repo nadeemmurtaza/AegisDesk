@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -50,28 +52,15 @@ import com.newax.aegis.engine.intelligence.TaskFailureKind
 import com.newax.aegis.engine.intelligence.TaskGraph
 import com.newax.aegis.engine.intelligence.TaskStatus
 import com.newax.aegis.engine.state.GoalState
+import com.newax.aegis.ui.components.EmptyState
+import com.newax.aegis.ui.components.InfoTag
+import com.newax.aegis.ui.components.StatusChip
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.newax.aegis.ui.theme.NewaxLightColors
-
-// ── Design tokens — aliases onto shared:ui NewaxLightColors (docs/UI_DESIGN.md §4).
-// Light-theme only for now; per-screen migration to NewaxTheme.colors (which
-// carries dark mode) is a later slice. Values live in ONE place: NewaxColors.kt.
-
-private val Surface      = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val TextPri      = NewaxLightColors.textPrimary
-private val TextSec      = NewaxLightColors.textSecondary
-private val TextTer      = NewaxLightColors.textTertiary
-private val Border       = NewaxLightColors.border
-
-private val ReadyCol    = NewaxLightColors.success
-private val WarnCol     = NewaxLightColors.warning
-private val ErrorCol    = NewaxLightColors.error
-private val MutedCol    = NewaxLightColors.textTertiary
+import com.newax.aegis.ui.theme.NewaxTheme
 
 private data class GoalRow(
     val goal: Goal,
@@ -80,20 +69,20 @@ private data class GoalRow(
     val graph: TaskGraph?,
 )
 
-private fun GoalState.label(): String = when (this) {
-    GoalState.OPEN       -> "Open"
-    GoalState.ACTIVE     -> "Active"
-    GoalState.BLOCKED    -> "Blocked"
-    GoalState.COMPLETED  -> "Completed"
-    GoalState.ABANDONED  -> "Abandoned"
+private fun GoalState.labelRes(): Int = when (this) {
+    GoalState.OPEN       -> R.string.goals_state_open
+    GoalState.ACTIVE     -> R.string.goals_state_active
+    GoalState.BLOCKED    -> R.string.goals_state_blocked
+    GoalState.COMPLETED  -> R.string.goals_state_completed
+    GoalState.ABANDONED  -> R.string.goals_state_abandoned
 }
 
 private fun GoalState.dotColor(): Color = when (this) {
-    GoalState.OPEN       -> MutedCol
-    GoalState.ACTIVE     -> ReadyCol
-    GoalState.BLOCKED    -> ErrorCol
-    GoalState.COMPLETED  -> ReadyCol
-    GoalState.ABANDONED  -> MutedCol
+    GoalState.OPEN       -> NewaxTheme.colors.textTertiary
+    GoalState.ACTIVE     -> NewaxTheme.colors.success
+    GoalState.BLOCKED    -> NewaxTheme.colors.error
+    GoalState.COMPLETED  -> NewaxTheme.colors.success
+    GoalState.ABANDONED  -> NewaxTheme.colors.textTertiary
 }
 
 private fun readGoalSnapshot(): List<GoalRow> =
@@ -149,29 +138,29 @@ fun GoalsScreen(
         item {
             Card(
                 shape     = RoundedCornerShape(18.dp),
-                colors    = CardDefaults.cardColors(containerColor = Surface),
-                border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text(
-                        "New goal",
+                        stringResource(R.string.goals_header),
                         fontWeight = FontWeight.SemiBold,
                         fontSize   = 15.sp,
-                        color      = TextPri
+                        color      = NewaxTheme.colors.textPrimary
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value       = draft,
                         onValueChange = { draft = it },
-                        placeholder  = { Text("e.g. send a message to Ali tomorrow", fontSize = 14.sp, color = TextTer) },
+                        placeholder  = { Text(stringResource(R.string.goals_placeholder), fontSize = 14.sp, color = NewaxTheme.colors.textTertiary) },
                         singleLine   = true,
                         shape        = RoundedCornerShape(12.dp),
                         colors       = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = TextSec,
-                            unfocusedBorderColor = Border,
-                            focusedContainerColor = Surface,
-                            unfocusedContainerColor = Surface
+                            focusedBorderColor = NewaxTheme.colors.textSecondary,
+                            unfocusedBorderColor = NewaxTheme.colors.border,
+                            focusedContainerColor = NewaxTheme.colors.surface,
+                            unfocusedContainerColor = NewaxTheme.colors.surface
                         ),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions  = KeyboardActions(onDone = { addGoal(draft) { draft = ""; refreshKey++ } }),
@@ -182,8 +171,8 @@ fun GoalsScreen(
                             ) {
                                 Icon(
                                     Icons.Outlined.Add,
-                                    contentDescription = "Plan goal",
-                                    tint = if (draft.isNotBlank()) TextPri else TextTer
+                                    contentDescription = stringResource(R.string.cd_plan_goal),
+                                    tint = if (draft.isNotBlank()) NewaxTheme.colors.textPrimary else NewaxTheme.colors.textTertiary
                                 )
                             }
                         },
@@ -191,9 +180,9 @@ fun GoalsScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Newax decomposes the goal, then checks each skill's capabilities against the platform registry before calling it feasible.",
+                        stringResource(R.string.goals_decompose_hint),
                         fontSize = 12.sp,
-                        color    = TextTer,
+                        color    = NewaxTheme.colors.textTertiary,
                         lineHeight = 17.sp
                     )
                 }
@@ -204,8 +193,8 @@ fun GoalsScreen(
         if (rows.isNotEmpty()) item {
             Card(
                 shape     = RoundedCornerShape(18.dp),
-                colors    = CardDefaults.cardColors(containerColor = Surface),
-                border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -214,27 +203,25 @@ fun GoalsScreen(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "${rows.size} ${if (rows.size == 1) "goal" else "goals"}",
+                            pluralStringResource(R.plurals.goals_count, rows.size, rows.size),
                             fontWeight = FontWeight.SemiBold,
                             fontSize   = 15.sp,
-                            color      = TextPri
+                            color      = NewaxTheme.colors.textPrimary
                         )
                         Spacer(Modifier.height(2.dp))
                         val blocked = rows.count { it.plan != null && !it.plan.feasible }
                         Text(
-                            when {
-                                blocked == 0 -> "All plans feasible · nothing blocked"
-                                else -> "$blocked blocked by platform capabilities"
-                            },
+                            if (blocked == 0) stringResource(R.string.goals_all_feasible)
+                            else stringResource(R.string.goals_blocked_count, blocked),
                             fontSize = 13.sp,
-                            color    = if (blocked == 0) TextSec else WarnCol
+                            color    = if (blocked == 0) NewaxTheme.colors.textSecondary else NewaxTheme.colors.warning
                         )
                     }
                     IconButton(onClick = { refreshKey++ }) {
                         Icon(
                             Icons.Rounded.Refresh,
-                            contentDescription = "Refresh goals",
-                            tint = TextSec
+                            contentDescription = stringResource(R.string.cd_refresh_goals),
+                            tint = NewaxTheme.colors.textSecondary
                         )
                     }
                 }
@@ -243,23 +230,15 @@ fun GoalsScreen(
 
         // ── States ─────────────────────────────────────────────────────────
         if (rows.isEmpty()) item {
-            Box(
-                Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = TextTer, modifier = Modifier.size(44.dp))
-                    Spacer(Modifier.height(14.dp))
-                    Text("No goals yet", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextSec)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Type a goal above to see Newax's plan — and why it might be blocked.",
-                        fontSize = 13.sp,
-                        color    = TextTer,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
-                }
-            }
+            // T3.4: the shared empty surface.
+            EmptyState(
+                title   = stringResource(R.string.goals_empty),
+                message = stringResource(R.string.goals_empty_hint),
+                icon    = Icons.Rounded.CheckCircle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 48.dp)
+            )
         } else {
             items(rows, key = { it.goal.id }) { row -> GoalCard(row, onOpenPolicyModes) { refreshKey++ } }
         }
@@ -288,8 +267,8 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
 
     Card(
         shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, if (blocked) WarnCol.copy(alpha = 0.5f) else Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, if (blocked) NewaxTheme.colors.warning.copy(alpha = 0.5f) else NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -299,14 +278,14 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                     Modifier
                         .size(12.dp)
                         .clip(CircleShape)
-                        .background(row.state?.dotColor() ?: MutedCol)
+                        .background(row.state?.dotColor() ?: NewaxTheme.colors.textTertiary)
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     row.goal.description,
                     fontWeight = FontWeight.Medium,
                     fontSize   = 15.sp,
-                    color      = TextPri,
+                    color      = NewaxTheme.colors.textPrimary,
                     maxLines   = 2,
                     overflow   = TextOverflow.Ellipsis,
                     modifier   = Modifier.weight(1f)
@@ -318,9 +297,9 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
             // ── Meta: intent · priority · tasks ───────────────────────────
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tag(row.goal.intent, TextSec)
-                Tag("Priority ${row.goal.priority}", TextSec)
-                if (tasks.isNotEmpty()) Tag("${done}/${tasks.size} tasks done", if (done == tasks.size) ReadyCol else TextSec)
+                Tag(row.goal.intent, NewaxTheme.colors.textSecondary)
+                Tag(stringResource(R.string.goals_priority, row.goal.priority), NewaxTheme.colors.textSecondary)
+                if (tasks.isNotEmpty()) Tag(stringResource(R.string.goals_tasks_done, done, tasks.size), if (done == tasks.size) NewaxTheme.colors.success else NewaxTheme.colors.textSecondary)
             }
 
             // ── Feasibility / block reasons ────────────────────────────────
@@ -328,16 +307,16 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                 plan == null -> {
                     Spacer(Modifier.height(10.dp))
                     BlockBanner(
-                        iconColor = MutedCol,
-                        title     = "No plan yet",
-                        body      = "This goal has not been through the planner pre-flight."
+                        iconColor = NewaxTheme.colors.textTertiary,
+                        title     = stringResource(R.string.goals_no_plan_title),
+                        body      = stringResource(R.string.goals_no_plan_body)
                     )
                 }
                 plan != null && !plan.feasible -> {
                     Spacer(Modifier.height(10.dp))
                     BlockBanner(
-                        iconColor = WarnCol,
-                        title     = "Blocked — the platform can't run this yet",
+                        iconColor = NewaxTheme.colors.warning,
+                        title     = stringResource(R.string.goals_blocked_title),
                         body      = null
                     )
                     // The core ask: name the missing capabilities the user can fix.
@@ -350,7 +329,7 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                                         Modifier
                                             .size(6.dp)
                                             .clip(CircleShape)
-                                            .background(WarnCol)
+                                            .background(NewaxTheme.colors.warning)
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
@@ -358,31 +337,31 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                                         fontFamily = FontFamily.Monospace,
                                         fontSize   = 12.5.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color      = TextPri
+                                        color      = NewaxTheme.colors.textPrimary
                                     )
                                 }
                             }
                             Text(
-                                "Enable the matching capability on the Capabilities screen, then re-plan.",
+                                stringResource(R.string.goals_enable_capability),
                                 fontSize = 12.sp,
-                                color    = TextTer
+                                color    = NewaxTheme.colors.textTertiary
                             )
                         }
                     }
                     if (plan.missingSkills.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Missing skills", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSec)
+                            Text(stringResource(R.string.goals_missing_skills), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textSecondary)
                             plan.missingSkills.forEach { skill ->
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         Modifier
                                             .size(6.dp)
                                             .clip(CircleShape)
-                                            .background(ErrorCol)
+                                            .background(NewaxTheme.colors.error)
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text(skill, fontFamily = FontFamily.Monospace, fontSize = 12.5.sp, color = TextPri)
+                                    Text(skill, fontFamily = FontFamily.Monospace, fontSize = 12.5.sp, color = NewaxTheme.colors.textPrimary)
                                 }
                             }
                         }
@@ -394,7 +373,7 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                                 Text(
                                     "· $warning",
                                     fontSize   = 12.sp,
-                                    color      = TextTer,
+                                    color      = NewaxTheme.colors.textTertiary,
                                     lineHeight = 17.sp
                                 )
                             }
@@ -404,9 +383,9 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                 else -> {
                     Spacer(Modifier.height(10.dp))
                     BlockBanner(
-                        iconColor = ReadyCol,
-                        title     = "Plan ready · ${tasks.size} tasks",
-                        body      = "No platform blockers — every skill resolves through a ready capability."
+                        iconColor = NewaxTheme.colors.success,
+                        title     = stringResource(R.string.goals_plan_ready_title, tasks.size),
+                        body      = stringResource(R.string.goals_plan_ready_body)
                     )
                 }
             }
@@ -415,9 +394,9 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
             tasks.firstOrNull { it.status == TaskStatus.RUNNING }?.let { runningTask ->
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp, color = WarnCol)
+                    CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp, color = NewaxTheme.colors.warning)
                     Spacer(Modifier.width(8.dp))
-                    Text("Running: ${runningTask.description}", fontSize = 12.sp, color = TextSec)
+                    Text(stringResource(R.string.goals_running, runningTask.description), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                 }
             }
             // Policy-blocked tasks first, with distinct amber treatment: the refusal
@@ -432,21 +411,21 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                         Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(WarnCol)
+                            .background(NewaxTheme.colors.warning)
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(failed.description, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                            Text(failed.description, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary)
                             Spacer(Modifier.width(8.dp))
                             PolicyTag()
                         }
                         failed.result?.let { result ->
                             Spacer(Modifier.height(2.dp))
-                            Text(result, fontSize = 12.sp, color = TextTer, lineHeight = 16.sp)
+                            Text(result, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, lineHeight = 16.sp)
                         }
                         Spacer(Modifier.height(2.dp))
-                        ActionButton("Policy modes", WarnCol) {
+                        ActionButton(stringResource(R.string.goals_policy_modes), NewaxTheme.colors.warning) {
                             onOpenPolicyModes(policyActionClassFor(failed.skillId))
                         }
                     }
@@ -461,14 +440,14 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                         Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(ErrorCol)
+                            .background(NewaxTheme.colors.error)
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(failed.description, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                        Text(failed.description, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary)
                         failed.result?.let { result ->
                             Spacer(Modifier.height(2.dp))
-                            Text(result, fontSize = 12.sp, color = TextTer, lineHeight = 16.sp)
+                            Text(result, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, lineHeight = 16.sp)
                         }
                     }
                 }
@@ -481,14 +460,17 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val running = tasks.any { it.status == TaskStatus.RUNNING }
                     if ((state == GoalState.OPEN || state == GoalState.BLOCKED) && !running) {
-                        ActionButton(if (state == GoalState.BLOCKED) "Retry" else "Activate", ReadyCol) {
+                        ActionButton(
+                            if (state == GoalState.BLOCKED) stringResource(R.string.goals_retry) else stringResource(R.string.goals_activate),
+                            NewaxTheme.colors.success
+                        ) {
                             scope.launch {
                                 GoalExecutor.run(row.goal.id, context)
                                 onChanged()
                             }
                         }
                     }
-                    ActionButton("Abandon", TextTer) {
+                    ActionButton(stringResource(R.string.goals_abandon), NewaxTheme.colors.textTertiary) {
                         GoalPlanner.abandon(row.goal.id)
                         onChanged()
                     }
@@ -500,32 +482,18 @@ private fun GoalCard(row: GoalRow, onOpenPolicyModes: (String?) -> Unit, onChang
 
 @Composable
 private fun StateChip(state: GoalState?) {
-    val color = state?.dotColor() ?: MutedCol
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(
-            state?.label() ?: "Unknown",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = color
-        )
-    }
+    // T3.4: the shared status pill — word + colour, announced to screen
+    // readers so the colour is never the only signal (SC 1.4.1).
+    StatusChip(
+        label = stringResource(state?.labelRes() ?: R.string.goals_state_unknown),
+        color = state?.dotColor() ?: NewaxTheme.colors.textTertiary
+    )
 }
 
 @Composable
 private fun Tag(text: String, color: Color) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(SurfaceMuted)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = color)
-    }
+    // T3.4: the shared neutral tag.
+    InfoTag(text = text, color = color)
 }
 
 @Composable
@@ -546,10 +514,10 @@ private fun BlockBanner(iconColor: Color, title: String, body: String?) {
         )
         Spacer(Modifier.width(10.dp))
         Column {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPri)
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary)
             if (body != null) {
                 Spacer(Modifier.height(2.dp))
-                Text(body, fontSize = 12.sp, color = TextSec, lineHeight = 17.sp)
+                Text(body, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 17.sp)
             }
         }
     }
@@ -561,10 +529,10 @@ private fun RecentRunsSection(runs: List<ExecutionAuditEntry>) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Recent runs",
+                stringResource(R.string.goals_recent_runs),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
-                color = TextPri,
+                color = NewaxTheme.colors.textPrimary,
                 modifier = Modifier.weight(1f)
             )
             AuditExportControls()
@@ -626,14 +594,14 @@ private fun AuditExportControls() {
                     status = AuditExportStatus.Idle
                     exportLauncher.launch("audit-${auditCsvTimestamp()}.csv")
                 },
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
             ) {
                 Icon(Icons.Rounded.Download, contentDescription = null, Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("Export CSV", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.action_export_csv), fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
             }
             if (status is AuditExportStatus.Done && shareUri != null) {
                 Spacer(Modifier.width(6.dp))
@@ -643,22 +611,22 @@ private fun AuditExportControls() {
                         if (uri != null) {
                             val send = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/csv"
-                                putExtra(Intent.EXTRA_SUBJECT, "Newax execution audit CSV")
+                                putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.goals_share_subject))
                                 putExtra(Intent.EXTRA_STREAM, uri)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                clipData = ClipData.newRawUri("Newax execution audit CSV", uri)
+                                clipData = ClipData.newRawUri(context.getString(R.string.goals_share_subject), uri)
                             }
-                            context.startActivity(Intent.createChooser(send, "Share execution audit CSV"))
+                            context.startActivity(Intent.createChooser(send, context.getString(R.string.goals_share_chooser)))
                         }
                     },
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Icon(Icons.Rounded.Share, contentDescription = null, Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Share", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_share), fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -666,14 +634,14 @@ private fun AuditExportControls() {
             is AuditExportStatus.Idle -> Unit
             is AuditExportStatus.Done -> {
                 Spacer(Modifier.height(4.dp))
-                Text("Exported — email it with Share", fontSize = 11.sp, color = ReadyCol)
+                Text(stringResource(R.string.goals_exported), fontSize = 11.sp, color = NewaxTheme.colors.success)
             }
             is AuditExportStatus.Failed -> {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     s.message,
                     fontSize = 11.sp,
-                    color = ErrorCol,
+                    color = NewaxTheme.colors.error,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -685,11 +653,11 @@ private fun AuditExportControls() {
 @Composable
 private fun RunCard(run: ExecutionAuditEntry) {
     var expanded by remember { mutableStateOf(false) }
-    val outcomeColor = if (run.outcome == RunOutcome.COMPLETED) ReadyCol else ErrorCol
+    val outcomeColor = if (run.outcome == RunOutcome.COMPLETED) NewaxTheme.colors.success else NewaxTheme.colors.error
     Card(
         shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(
@@ -705,12 +673,12 @@ private fun RunCard(run: ExecutionAuditEntry) {
                     run.goalDescription,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = TextPri,
+                    color = NewaxTheme.colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Text(runTime(run.startedMs), fontSize = 11.sp, color = TextTer)
+                Text(runTime(run.startedMs), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
             }
             Spacer(Modifier.height(4.dp))
             Text(
@@ -723,7 +691,7 @@ private fun RunCard(run: ExecutionAuditEntry) {
                     run.durationMs?.let { append(" · ").append(it).append(" ms") }
                 },
                 fontSize = 11.sp,
-                color = TextTer
+                color = NewaxTheme.colors.textTertiary
             )
             if (expanded) {
                 Spacer(Modifier.height(8.dp))
@@ -736,15 +704,15 @@ private fun RunCard(run: ExecutionAuditEntry) {
                                 else -> "·"
                             },
                             fontSize = 11.sp,
-                            color = if (task.status == com.newax.aegis.engine.intelligence.TaskStatus.FAILED) ErrorCol else TextSec,
+                            color = if (task.status == com.newax.aegis.engine.intelligence.TaskStatus.FAILED) NewaxTheme.colors.error else NewaxTheme.colors.textSecondary,
                             modifier = Modifier.width(14.dp)
                         )
-                        Text(task.description, fontSize = 12.sp, color = TextSec, modifier = Modifier.weight(1f))
-                        Text(task.tier ?: "skill", fontSize = 10.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                        Text(task.description, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, modifier = Modifier.weight(1f))
+                        Text(task.tier ?: "skill", fontSize = 10.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                     }
                     task.result?.let { result ->
                         Spacer(Modifier.height(2.dp))
-                        Text(result, fontSize = 11.sp, color = TextTer, lineHeight = 15.sp)
+                        Text(result, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, lineHeight = 15.sp)
                     }
                 }
             }
@@ -760,14 +728,14 @@ private fun PolicyTag() {
     Box(
         Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(WarnCol.copy(alpha = 0.14f))
+            .background(NewaxTheme.colors.warning.copy(alpha = 0.14f))
             .padding(horizontal = 7.dp, vertical = 2.dp)
     ) {
         Text(
-            "policy",
+            stringResource(R.string.goals_policy_tag),
             fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
-            color = WarnCol,
+            color = NewaxTheme.colors.warning,
             letterSpacing = 0.4.sp
         )
     }

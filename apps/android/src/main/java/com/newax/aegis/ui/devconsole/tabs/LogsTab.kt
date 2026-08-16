@@ -34,9 +34,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.newax.aegis.R
 import com.newax.aegis.engine.dev.DevLogger
 import com.newax.aegis.ui.devconsole.DevConsoleViewModel
 
@@ -78,7 +80,7 @@ fun LogsTab(vm: DevConsoleViewModel) {
             FilterChip(
                 selected = levelFilter == null,
                 onClick = { levelFilter = null },
-                label = { Text("ALL", fontSize = 11.sp) },
+                label = { Text(stringResource(R.string.dev_logs_all), fontSize = 11.sp) },
                 colors = FilterChipDefaults.filterChipColors()
             )
             DevLogger.Level.entries.forEach { lvl ->
@@ -101,10 +103,10 @@ fun LogsTab(vm: DevConsoleViewModel) {
             }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { vm.copyLogs(context) }, modifier = Modifier.height(32.dp)) {
-                Text("Copy", fontSize = 11.sp)
+                Text(stringResource(R.string.dev_copy), fontSize = 11.sp)
             }
             OutlinedButton(onClick = { vm.clearLogs() }, modifier = Modifier.height(32.dp)) {
-                Text("Clear", fontSize = 11.sp)
+                Text(stringResource(R.string.dev_clear), fontSize = 11.sp)
             }
         }
 

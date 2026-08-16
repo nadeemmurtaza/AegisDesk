@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -57,19 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.sync.PairedPeer
 import org.json.JSONObject
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val Surface = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val Primary = NewaxLightColors.textPrimary
-private val TextPri = NewaxLightColors.textPrimary
-private val TextSec = NewaxLightColors.textSecondary
-private val TextTer = NewaxLightColors.textTertiary
-private val Border = NewaxLightColors.border
-private val AccentGreen = NewaxLightColors.success
-private val AccentRed = NewaxLightColors.error
-
 /**
  * The sync control surface (docs/SYNC_DESIGN.md §3, §9 — the wiring slice's
  * UI twin): automatic sync toggle + last-run status, this device's pairing
@@ -123,19 +114,19 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Automatic sync", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                            Text(stringResource(R.string.sync_automatic), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                if (autoOn) "Syncs memory to paired devices on the same network"
-                                else "Off — memory stays on this device",
-                                fontSize = 13.sp, color = TextSec
+                                if (autoOn) stringResource(R.string.sync_auto_on_desc)
+                                else stringResource(R.string.sync_auto_off_desc),
+                                fontSize = 13.sp, color = NewaxTheme.colors.textSecondary
                             )
                         }
                         Switch(
@@ -149,7 +140,7 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = Primary,
+                                checkedTrackColor = NewaxTheme.colors.textPrimary,
                                 uncheckedThumbColor = Color(0xFF8D8D87),
                                 uncheckedTrackColor = Color(0xFFE7E7E2)
                             )
@@ -161,10 +152,10 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                             Modifier
                                 .size(8.dp)
                                 .clip(RoundedCornerShape(999.dp))
-                                .background(if (autoOn) AccentGreen else TextTer)
+                                .background(if (autoOn) NewaxTheme.colors.success else NewaxTheme.colors.textTertiary)
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text(statusText, fontSize = 13.sp, color = TextSec, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(statusText, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -174,16 +165,16 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Internet relay (optional)", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Text(stringResource(R.string.sync_relay), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "Lets paired devices sync over the internet when they aren't on the same network.",
-                        fontSize = 13.sp, color = TextSec
+                        stringResource(R.string.sync_relay_desc),
+                        fontSize = 13.sp, color = NewaxTheme.colors.textSecondary
                     )
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
@@ -193,26 +184,26 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                             relayMessage = null
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Relay URL (ws://host:port or wss://…)", color = TextTer, fontSize = 12.sp) },
+                        label = { Text(stringResource(R.string.sync_relay_url_label), color = NewaxTheme.colors.textTertiary, fontSize = 12.sp) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Primary,
-                            unfocusedBorderColor = Border
+                            focusedBorderColor = NewaxTheme.colors.textPrimary,
+                            unfocusedBorderColor = NewaxTheme.colors.border
                         ),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = TextPri, fontFamily = FontFamily.Monospace),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = NewaxTheme.colors.textPrimary, fontFamily = FontFamily.Monospace),
                         singleLine = true
                     )
                     Spacer(Modifier.height(10.dp))
                     Button(
                         onClick = {
                             SyncRuntime.setRelayUrl(relayInput)
-                            relayMessage = if (relayInput.isBlank()) "Relay disabled — LAN only" else "Relay URL saved"
+                            relayMessage = if (relayInput.isBlank()) context.getString(R.string.sync_relay_disabled) else context.getString(R.string.sync_relay_saved)
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                    ) { Text("Save relay URL", fontSize = 13.sp) }
+                        colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                    ) { Text(stringResource(R.string.action_save_relay_url), fontSize = 13.sp) }
                     relayMessage?.let {
                         Spacer(Modifier.height(8.dp))
-                        Text(it, fontSize = 13.sp, color = TextSec)
+                        Text(it, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
                     }
                 }
             }
@@ -222,16 +213,16 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Sync categories", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Text(stringResource(R.string.sync_categories), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "What this device shares with — and accepts from — paired devices.",
-                        fontSize = 13.sp, color = TextSec
+                        stringResource(R.string.sync_categories_desc),
+                        fontSize = 13.sp, color = NewaxTheme.colors.textSecondary
                     )
                     Spacer(Modifier.height(6.dp))
                     SyncRuntime.CATEGORY_TABLES.forEach { (name, tables) ->
@@ -247,8 +238,8 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Device trust records always sync so revocations reach the mesh.",
-                        fontSize = 11.sp, color = TextTer
+                        stringResource(R.string.sync_trust_note),
+                        fontSize = 11.sp, color = NewaxTheme.colors.textTertiary
                     )
                 }
             }
@@ -258,29 +249,29 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("This device", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Text(stringResource(R.string.sync_this_device), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(6.dp))
-                    Text(SyncRuntime.displayName(), fontSize = 14.sp, color = TextPri)
-                    Text(SyncRuntime.deviceId(), fontSize = 12.sp, color = TextSec, fontFamily = FontFamily.Monospace)
+                    Text(SyncRuntime.displayName(), fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
+                    Text(SyncRuntime.deviceId(), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, fontFamily = FontFamily.Monospace)
                     Spacer(Modifier.height(10.dp))
-                    Text("Pairing code — copy it to the other device, and paste theirs below.", fontSize = 12.sp, color = TextTer)
+                    Text(stringResource(R.string.sync_pairing_hint), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
                     Spacer(Modifier.height(8.dp))
                     Box(
                         Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(SurfaceMuted)
+                            .background(NewaxTheme.colors.surfaceMuted)
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
                         Text(
                             pairingCode,
                             fontSize = 11.sp,
-                            color = TextSec,
+                            color = NewaxTheme.colors.textSecondary,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis
@@ -290,13 +281,13 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                     OutlinedButton(
                         onClick = {
                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            cm.setPrimaryClip(ClipData.newPlainText("Newax pairing code", pairingCode))
-                            pairMessage = "Pairing code copied"
+                            cm.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.sync_pairing_code_label), pairingCode))
+                            pairMessage = context.getString(R.string.sync_pairing_copied)
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec)
-                    ) { Text("Copy pairing code", fontSize = 13.sp) }
+                        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary)
+                    ) { Text(stringResource(R.string.action_copy_pairing_code), fontSize = 13.sp) }
                 }
             }
         }
@@ -305,12 +296,12 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Pair a device", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Text(stringResource(R.string.sync_pair_device), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
                         value = codeInput,
@@ -319,12 +310,12 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                             verifiedSas = null
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Their pairing code", color = TextTer, fontSize = 12.sp) },
+                        label = { Text(stringResource(R.string.sync_their_code), color = NewaxTheme.colors.textTertiary, fontSize = 12.sp) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Primary,
-                            unfocusedBorderColor = Border
+                            focusedBorderColor = NewaxTheme.colors.textPrimary,
+                            unfocusedBorderColor = NewaxTheme.colors.border
                         ),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = TextPri, fontFamily = FontFamily.Monospace),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = NewaxTheme.colors.textPrimary, fontFamily = FontFamily.Monospace),
                         maxLines = 4
                     )
                     Spacer(Modifier.height(8.dp))
@@ -332,12 +323,12 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                         value = addressInput,
                         onValueChange = { addressInput = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Optional address (host:port) — direct connect when mDNS is blocked", color = TextTer, fontSize = 12.sp) },
+                        label = { Text(stringResource(R.string.sync_optional_address), color = NewaxTheme.colors.textTertiary, fontSize = 12.sp) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Primary,
-                            unfocusedBorderColor = Border
+                            focusedBorderColor = NewaxTheme.colors.textPrimary,
+                            unfocusedBorderColor = NewaxTheme.colors.border
                         ),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = TextPri),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = NewaxTheme.colors.textPrimary),
                         singleLine = true
                     )
                     Spacer(Modifier.height(10.dp))
@@ -350,8 +341,7 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                                 .padding(12.dp)
                         ) {
                             Text(
-                                "Both devices should show the same code:  $sas\n" +
-                                    "Confirm it matches on the other device before pairing.",
+                                stringResource(R.string.sync_sas_confirm, sas),
                                 fontSize = 13.sp,
                                 color = Color(0xFF92400E)
                             )
@@ -364,25 +354,25 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                                 val sas = SyncRuntime.sasFor(pairingCode, codeInput)
                                 if (sas == null) {
                                     verifiedSas = null
-                                    pairMessage = "That doesn't look like a valid pairing code."
+                                    pairMessage = context.getString(R.string.sync_invalid_code)
                                 } else {
                                     verifiedSas = sas
                                     pairMessage = null
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSec)
-                        ) { Text("Verify code", fontSize = 13.sp) }
+                            border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary)
+                        ) { Text(stringResource(R.string.action_verify_code), fontSize = 13.sp) }
                         Button(
                             onClick = {
                                 val peer = SyncRuntime.pairWith(codeInput)
                                 if (peer == null) {
-                                    pairMessage = "Pairing failed — code invalid or it's this device."
+                                    pairMessage = context.getString(R.string.sync_pair_failed)
                                 } else {
                                     SyncRuntime.setPeerAddress(peer.deviceId, addressInput.trim())
                                     peers = SyncRuntime.peers()
-                                    pairMessage = "Paired with ${peer.displayName}"
+                                    pairMessage = context.getString(R.string.sync_paired_with, peer.displayName)
                                     codeInput = ""
                                     addressInput = ""
                                     verifiedSas = null
@@ -390,12 +380,12 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                             },
                             enabled = verifiedSas != null,
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                        ) { Text("Confirm & pair", fontSize = 13.sp) }
+                            colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                        ) { Text(stringResource(R.string.action_confirm_pair), fontSize = 13.sp) }
                     }
                     pairMessage?.let {
                         Spacer(Modifier.height(8.dp))
-                        Text(it, fontSize = 13.sp, color = TextSec)
+                        Text(it, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
                     }
                 }
             }
@@ -405,8 +395,8 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
         item { Spacer(Modifier.height(4.dp)) }
         item {
             Text(
-                "Paired devices",
-                fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer,
+                stringResource(R.string.sync_section_paired),
+                fontSize = 11.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textTertiary,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
             )
         }
@@ -416,10 +406,10 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(999.dp))
-                        .background(SurfaceMuted)
+                        .background(NewaxTheme.colors.surfaceMuted)
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Text("No devices paired yet — sync stays a no-op until you pair.", fontSize = 13.sp, color = TextTer)
+                    Text(stringResource(R.string.sync_no_devices), fontSize = 13.sp, color = NewaxTheme.colors.textTertiary)
                 }
             }
         } else {
@@ -438,7 +428,7 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                 item {
                     Text(
                         msg,
-                        fontSize = 12.sp, color = TextSec,
+                        fontSize = 12.sp, color = NewaxTheme.colors.textSecondary,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
@@ -449,8 +439,8 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
         item { Spacer(Modifier.height(4.dp)) }
         item {
             Text(
-                "Command history",
-                fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer,
+                stringResource(R.string.sync_section_command_history),
+                fontSize = 11.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textTertiary,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
             )
         }
@@ -460,12 +450,12 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(999.dp))
-                        .background(SurfaceMuted)
+                        .background(NewaxTheme.colors.surfaceMuted)
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        "No commands yet — use Send on a paired device row to ask it to perform an action.",
-                        fontSize = 13.sp, color = TextTer
+                        stringResource(R.string.sync_no_commands),
+                        fontSize = 13.sp, color = NewaxTheme.colors.textTertiary
                     )
                 }
             }
@@ -479,20 +469,20 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
                         Modifier
                             .size(6.dp)
                             .clip(RoundedCornerShape(999.dp))
-                            .background(if (h.sent) Primary else AccentGreen)
+                            .background(if (h.sent) NewaxTheme.colors.textPrimary else NewaxTheme.colors.success)
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            (if (h.sent) "Sent · " else "Received · ") + h.detail,
-                            fontSize = 13.sp, color = TextPri, maxLines = 1, overflow = TextOverflow.Ellipsis
+                            (if (h.sent) context.getString(R.string.sync_sent_prefix) else context.getString(R.string.sync_received_prefix)) + h.detail,
+                            fontSize = 13.sp, color = NewaxTheme.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             h.peerDeviceId.take(12) + " · " +
                                 java.text.DateFormat.getDateTimeInstance(
                                     java.text.DateFormat.SHORT, java.text.DateFormat.SHORT
                                 ).format(java.util.Date(h.atMs)),
-                            fontSize = 11.sp, color = TextTer
+                            fontSize = 11.sp, color = NewaxTheme.colors.textTertiary
                         )
                     }
                 }
@@ -518,7 +508,7 @@ fun SyncScreen(padding: androidx.compose.foundation.layout.PaddingValues) {
             onDismiss = { sendCmdPeer = null },
             onSend = { commandClass, args ->
                 SyncRuntime.sendCommand(peer.deviceId, commandClass, args)
-                commandMessage = "Command sent to ${peer.displayName} ($commandClass) — journaled, relayed to the target"
+                commandMessage = context.getString(R.string.sync_command_sent, peer.displayName, commandClass)
                 history = SyncRuntime.commandHistory()
                 sendCmdPeer = null
             }
@@ -539,20 +529,21 @@ private fun SendCommandDialog(
     onDismiss: () -> Unit,
     onSend: (String, Map<String, String>) -> Unit
 ) {
+    val context = LocalContext.current
     var selected by remember { mutableStateOf("open_app") }
     var argsText by remember { mutableStateOf("{}") }
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Send command to ${peer.displayName}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+        title = { Text(stringResource(R.string.sync_send_command_title, peer.displayName), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
         text = {
             Column {
                 Text(
-                    "The peer only processes this if you are allowlisted for its class (permissions dialog), and it runs through its policy spine as AGENT origin — it grants zero authority by itself.",
-                    fontSize = 12.sp, color = TextSec
+                    stringResource(R.string.sync_send_command_desc),
+                    fontSize = 12.sp, color = NewaxTheme.colors.textSecondary
                 )
                 Spacer(Modifier.height(10.dp))
-                Text("Command class", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                Text(stringResource(R.string.sync_command_class), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary)
                 Spacer(Modifier.height(6.dp))
                 SyncRuntime.COMMAND_CLASSES.forEach { cls ->
                     FilterChip(
@@ -566,13 +557,13 @@ private fun SendCommandDialog(
                 OutlinedTextField(
                     value = argsText,
                     onValueChange = { argsText = it },
-                    label = { Text("Args (JSON)") },
+                    label = { Text(stringResource(R.string.sync_args_label)) },
                     textStyle = TextStyle(fontSize = 13.sp, fontFamily = FontFamily.Monospace),
                     modifier = Modifier.fillMaxWidth()
                 )
                 error?.let {
                     Spacer(Modifier.height(4.dp))
-                    Text(it, fontSize = 12.sp, color = AccentRed)
+                    Text(it, fontSize = 12.sp, color = NewaxTheme.colors.error)
                 }
             }
         },
@@ -582,14 +573,14 @@ private fun SendCommandDialog(
                     val o = JSONObject(if (argsText.isBlank()) "{}" else argsText)
                     buildMap { o.keys().forEach { k -> put(k, o.optString(k)) } }
                 }.getOrElse {
-                    error = "Invalid JSON: ${it.message}"
+                    error = context.getString(R.string.sync_invalid_json, it.message)
                     return@TextButton
                 }
                 onSend(selected, args)
-            }) { Text("Send") }
+            }) { Text(stringResource(R.string.action_send)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         }
     )
 }
@@ -602,13 +593,13 @@ private fun CategoryToggleRow(name: String, enabled: Boolean, onToggle: () -> Un
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(name, fontSize = 14.sp, color = TextPri, modifier = Modifier.weight(1f))
+        Text(name, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary, modifier = Modifier.weight(1f))
         Switch(
             checked = enabled,
             onCheckedChange = { onToggle() },
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = Primary,
+                checkedTrackColor = NewaxTheme.colors.textPrimary,
                 uncheckedThumbColor = Color(0xFF8D8D87),
                 uncheckedTrackColor = Color(0xFFE7E7E2)
             )
@@ -626,12 +617,12 @@ private fun PeerPermissionsDialog(
     var selected by remember { mutableStateOf(allowed) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Permissions for ${peer.displayName}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+        title = { Text(stringResource(R.string.sync_permissions_title, peer.displayName), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
         text = {
             Column {
                 Text(
-                    "Which command classes may this device send you? Unchecked means blocked.",
-                    fontSize = 13.sp, color = TextSec
+                    stringResource(R.string.sync_permissions_desc),
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary
                 )
                 Spacer(Modifier.height(8.dp))
                 SyncRuntime.COMMAND_CLASSES.forEach { cls ->
@@ -647,24 +638,24 @@ private fun PeerPermissionsDialog(
                                 selected = if (it) selected + cls else selected - cls
                             }
                         )
-                        Text(cls, fontSize = 13.sp, color = TextPri, fontFamily = FontFamily.Monospace)
+                        Text(cls, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary, fontFamily = FontFamily.Monospace)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (selected.isEmpty()) "Nothing allowed — the peer can only sync data, not send commands."
-                    else "Restrictions apply to commands; data sync always follows the categories above.",
-                    fontSize = 11.sp, color = TextTer
+                    if (selected.isEmpty()) stringResource(R.string.sync_permissions_none)
+                    else stringResource(R.string.sync_permissions_restricted),
+                    fontSize = 11.sp, color = NewaxTheme.colors.textTertiary
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(selected) }) { Text("Save", color = Primary) }
+            TextButton(onClick = { onSave(selected) }) { Text(stringResource(R.string.action_save), color = NewaxTheme.colors.textPrimary) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSec) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = NewaxTheme.colors.textSecondary) }
         },
-        containerColor = Surface
+        containerColor = NewaxTheme.colors.surface
     )
 }
 
@@ -677,8 +668,8 @@ private fun PairedPeerRow(
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(
@@ -687,20 +678,20 @@ private fun PairedPeerRow(
                 .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Outlined.Sync, contentDescription = null, tint = TextSec, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Sync, contentDescription = null, tint = NewaxTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(peer.displayName, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPri)
-                Text(peer.deviceId, fontSize = 12.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                Text(peer.displayName, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
+                Text(peer.deviceId, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
             }
             IconButton(onClick = onPermissions) {
-                Icon(Icons.Outlined.Sync, contentDescription = "Permissions", tint = TextSec, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Sync, contentDescription = stringResource(R.string.cd_permissions), tint = NewaxTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onSendCommand) {
-                Icon(Icons.Outlined.Send, contentDescription = "Send command", tint = TextSec, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Send, contentDescription = stringResource(R.string.cd_send_command), tint = NewaxTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onUnpair) {
-                Icon(Icons.Rounded.Delete, contentDescription = "Unpair", tint = AccentRed, modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.cd_unpair), tint = NewaxTheme.colors.error, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -721,7 +712,7 @@ private fun SyncUnavailable(
     Box(
         Modifier
             .fillMaxSize()
-            .background(NewaxLightColors.bg)
+            .background(NewaxTheme.colors.bg)
             .padding(padding)
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center,
@@ -730,30 +721,29 @@ private fun SyncUnavailable(
             Icon(
                 Icons.Outlined.Sync,
                 contentDescription = null,
-                tint = TextTer,
+                tint = NewaxTheme.colors.textTertiary,
                 modifier = Modifier.size(44.dp),
             )
             Spacer(Modifier.height(14.dp))
             Text(
-                "Device sync isn't available here",
+                stringResource(R.string.sync_unavailable_title),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = TextPri,
+                color = NewaxTheme.colors.textPrimary,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                reason ?: "This device can't set up the secure keys sync needs.",
+                reason ?: stringResource(R.string.sync_unavailable_reason),
                 fontSize = 14.sp,
-                color = TextSec,
+                color = NewaxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "Nothing else is affected — memory, tasks and the assistant all " +
-                    "work normally, and everything stays on this device.",
+                stringResource(R.string.sync_unavailable_body),
                 fontSize = 13.sp,
-                color = TextTer,
+                color = NewaxTheme.colors.textTertiary,
                 textAlign = TextAlign.Center,
             )
         }

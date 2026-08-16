@@ -1825,15 +1825,25 @@ consumer today renders `takeLast(5)`. Expanded, a step shows its typed target,
 risk class, the policy rule that matched, which rung of the capability ladder
 executed it, and the result.
 
-### 7.3 · Two corrections to the current chat surface
+### 7.3 · Two corrections to the current chat surface — landed (T3.0)
 
-- **Bubble roles are inverted.** `MainActivity.kt:507` renders the *assistant*
-  as light text on near-black and the *user* as dark text on light. Both
-  reference products do the opposite, and so does this spec: assistant on
-  `surface`, user on `surfaceSelected`.
-- **Streaming is specified but unused.** `ModelProvider.stream()` exists in
-  `shared/model-api`; `MainViewModel.kt:594` calls `complete()`, so replies
-  arrive all at once and there is no stop button. Phase 3 wires the stream.
+Both corrections shipped in T3.0 (the slice that wired Track 2's chat
+handovers). Recorded here so the history is not lost:
+
+- **Bubble roles were inverted.** `MainActivity.kt` rendered the *assistant* as
+  light text on near-black and the *user* as dark text on light. Now the spec
+  is implemented: assistant on `surface` with a hairline border, user on
+  `surfaceSelected`, both carrying `textPrimary`.
+- **Streaming is specified and wired.** `MainViewModel` collects
+  `ModelProvider.stream()` directly — `complete()` *is* the collected stream
+  (T2.5), so this is the same single inference path rendered incrementally —
+  into a streaming bubble with a Stop button. Stopping cancels the collecting
+  coroutine: the UI stops updating, but the model call itself cannot be
+  interrupted (`ModelProvider.cancel()` is a documented no-op on both real
+  providers), so generation is **abandoned, not aborted** — the thread states
+  that plainly when Stop is pressed. A real cancellation path
+  (thread-interrupt or session-abort in the native bindings) is Track 4's to
+  build; do not write "streaming is cancellable".
 
 ---
 
@@ -1841,6 +1851,76 @@ executed it, and the result.
 
 Built once in `commonMain`, used by all four bodies. Every component ships
 semantics, focus behaviour, and a 44 dp minimum target from its first commit.
+
+**Landed (T3.4a):** `EmptyState`, `ErrorState`, `LoadingState`,
+`ConfirmDialog`, `TypeToConfirmDialog`, `SectionHeader`, `ChevronRow`,
+`StatusChip`, `InfoTag`, `TimelineItem`, `SearchBar`, `ChatBubble`,
+`TypingIndicator`, `StreamingText`, `CopyButton`, `CodeBlock`, `StepBlock`
+— in `shared/ui` `commonMain`, wired into the Android screens in the same
+change (wiring map + the components awaiting their routes in the T3.4a status
+block of the T3 brief). The rest of the list below is the full spec; the
+remaining components land with their routes in T3.5.
+
+**Landed (T3.4b): the Blocks and Chat families completed.** `ApprovalCard`
+(the approval surface — assertive live region, Approve is never default
+focus), `BlockedCard` (policy refusal — the "why" line, no approve path),
+`FailureCard`, `CopyableTextBox`, `ImageBlock` (caller-supplied image slot,
+so `commonMain` stays loader-free), `ImageGenBlock` (+ `ImageGenPhase`),
+`DocumentsContainer` (+ `DocumentRow`, one focus stop per row),
+`McqCard` (+ `mcqOptions` — custom option always last), `ThoughtContainer`
+(collapsible thinking; polite live region only while streaming),
+`ArtifactChip` (+ `artifactAccessibleName`), `ArtifactPanel`, and the chat
+chrome — `Composer` (busy spinner replaces the send control, described),
+`SuggestionGrid` (44 dp chips), `ConversationRow` (unread as
+`stateDescription`), `AttachmentChip`, `ModelStatusLine`, `DegradedBanner`.
+Wired into the Android app in the same change: `Composer` / `SuggestionGrid`
+/ `ApprovalCard` replace the chat surface's hand-rolled composer, suggestion
+chips, and approval card in `ChatScreen.kt`. Library-only until their T3.5
+routes land (named so nothing looks finished that is not): `ConversationRow`
+(1.11), `AttachmentChip` (1.2), `ModelStatusLine` (model sheet),
+`DegradedBanner` (1.4), `ImageBlock` (1.7), `ImageGenBlock`,
+`DocumentsContainer`, `McqCard`, `ThoughtContainer` (1.9), `ArtifactChip` /
+`ArtifactPanel` (1.3), `BlockedCard` / `FailureCard` (1.9 approval/failure
+states), `CopyableTextBox` (1.3). Pure-logic coverage grew with
+`BlocksLogicTest` (`mcqOptions`, `clampProgress`, `artifactAccessibleName`,
+`documentRowAccessibleName`).
+
+**Landed (T3.4c): the remaining families.** **Shell** — `NavDrawer`,
+`Sidebar`, `NavRail`, `TopBar`, `MenuBar`, `CommandPalette`, `RouteScaffold`
+over a shared `NavItem` model (badges are text on an accent disc, announced
+as part of the item label, never colour alone). **Lists & data** —
+`AmberTaskCard`, `AgentCard`, `SkillRow`, `PersonRow`, `SwipeActionRow`
+(`SwipeToDismissBox`, always paired with `OverflowActions` so every swipe
+action stays reachable without gestures), `GraphCanvas` + `GraphListFallback`
+with pure `graphNodePositions`/`graphAccessibleSummary`. **Settings** —
+`SettingsGroup`, `SettingsRow`, `ChoiceChips`, `TagEditor` (+ pure
+`tagsAfterAdd`), `EditValueSheet` (built on `Sheet`), `ProfileHeader`,
+`DeviceCard`, `PairedDeviceRow`. **Pairing** — `PairRoleCard`, `PairQrCard`
+(caller-supplied QR slot, like `ImageBlock`), `SasConfirmCard`, `NearbyDeviceRow`,
+`PairSuccessCard` (+ pure `sasGrouped`/`sasCodesMatch`). **Voice** —
+`VoiceEnrollSheet` (built on `Sheet`), `ListeningIndicator` (reduced-motion
+static label, polite live region), `TranscriptPreview` (+ pure
+`clampAmplitude`). **Overlays** — `Sheet` (scrim + grab handle + optional
+close; back-dismiss stays the platform `SystemBackHandler` seam) and
+`BiometricGate` (+ `BiometricGatePhase`; renders the gate UX — status, retry,
+cancel — the platform `BiometricPrompt` remains the §9 seam in the caller).
+Wired into the Android app in the same change: `TopBar` (the `MainActivity`
+shell top bar + the people-detail back header), `PersonRow` (people list),
+`AgentCard` (agents list), `SkillRow` (skills list), `SettingsRow` /
+`SettingsGroup` (permissions group + the people/sync/backup rows),
+`ChoiceChips` (ambient-mode picker). Library-only until their T3.5 routes
+land (named so nothing looks finished that is not): `NavDrawer`, `Sidebar`,
+`NavRail`, `MenuBar`, `CommandPalette`, `RouteScaffold` (shell 11/14),
+`SwipeActionRow`/`OverflowActions` (list surfaces), `AmberTaskCard` (2.x),
+`GraphCanvas`/`GraphListFallback` (2.3), `TagEditor` (5.1.3.x),
+`EditValueSheet` (5.1.x), `ProfileHeader`/`DeviceCard`/`PairedDeviceRow`
+(5.2.1), the pairing family (0.3/5.2), the voice family (1.2/5.3),
+`BiometricGate` (1.2 approval). Pure-logic coverage grew with
+`DataRowsLogicTest`, `GraphLogicTest`, `SettingsLogicTest`, `PairingLogicTest`,
+`VoiceLogicTest`. Icons stay within the `material-icons-core` set (Menu,
+ArrowBack, MoreVert, Delete, Check, CheckCircle, Edit, Add, Lock, Star,
+List, Search, KeyboardArrowRight).
+
 
 **Shell** — `NavDrawer` · `Sidebar` (expanded) · `NavRail` (medium) ·
 `TopBar` · `MenuBar` (desktop) · `CommandPalette` · `RouteScaffold` (title,

@@ -18,17 +18,27 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.engine.apps.AppPermissionManager
 import com.newax.aegis.engine.apps.AppPermissionState
+import com.newax.aegis.ui.theme.NewaxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 data class AppItem(val packageName: String, val appName: String, var state: AppPermissionState)
+
+/** Display labels for the permission states (T3.2b) — the enum name is the
+ *  storage key (shared/core), the user sees a localized label. */
+@Composable
+private fun permissionLabel(state: AppPermissionState): String = when (state) {
+    AppPermissionState.ALLOWED -> stringResource(R.string.app_perm_allowed)
+    AppPermissionState.DENIED -> stringResource(R.string.app_perm_denied)
+    AppPermissionState.ASK_EVERY_TIME -> stringResource(R.string.app_perm_ask_every_time)
+}
 
 @Composable
 fun AppPermissionScreen(padding: PaddingValues) {
@@ -72,8 +82,11 @@ fun AppPermissionScreen(padding: PaddingValues) {
         items(apps, key = { it.packageName }) { app ->
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8D8D3)),
+                // T3.5e — token fix: this screen still carried the pre-theme
+                // hardcoded palette (a T3.3 miss); it now follows the design
+                // tokens like every other surface.
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -81,13 +94,13 @@ fun AppPermissionScreen(padding: PaddingValues) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(app.appName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1B1B1A))
-                        Text(app.packageName, fontSize = 12.sp, color = Color(0xFF8D8D87))
+                        Text(app.appName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                        Text(app.packageName, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
                     }
                     var expanded by remember { mutableStateOf(false) }
                     Box {
                         TextButton(onClick = { expanded = true }) {
-                            Text(app.state.name)
+                            Text(permissionLabel(app.state))
                         }
                         DropdownMenu(
                             expanded = expanded,
@@ -95,7 +108,7 @@ fun AppPermissionScreen(padding: PaddingValues) {
                         ) {
                             AppPermissionState.values().forEach { state ->
                                 DropdownMenuItem(
-                                    text = { Text(state.name) },
+                                    text = { Text(permissionLabel(state)) },
                                     onClick = {
                                         AppPermissionManager.setPermission(app.packageName, state)
                                         app.state = state

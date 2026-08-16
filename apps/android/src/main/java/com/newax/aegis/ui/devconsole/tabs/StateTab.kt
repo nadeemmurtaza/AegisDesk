@@ -31,6 +31,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.newax.aegis.R
 import com.newax.aegis.ui.devconsole.DevConsoleViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -53,34 +55,34 @@ fun StateTab(vm: DevConsoleViewModel) {
 
         item {
             SectionCard(title = "ResourceGovernor") {
-                StatRow("Heavy job running", if (engine.heavyRunning) "YES" else "no",
+                StatRow(stringResource(R.string.dev_state_heavy), if (engine.heavyRunning) stringResource(R.string.dev_yes) else stringResource(R.string.dev_no),
                     if (engine.heavyRunning) Color(0xFFFFA726) else Color(0xFF66BB6A))
-                StatRow("Critical running", if (engine.critRunning) "YES" else "no",
+                StatRow(stringResource(R.string.dev_state_critical), if (engine.critRunning) stringResource(R.string.dev_yes) else stringResource(R.string.dev_no),
                     if (engine.critRunning) Color(0xFFEF5350) else Color(0xFF66BB6A))
-                StatRow("Queue depth", engine.queued.toString())
-                StatRow("Memory pressure", "${engine.pressure} / 5",
+                StatRow(stringResource(R.string.dev_state_queue), engine.queued.toString())
+                StatRow(stringResource(R.string.dev_state_pressure), "${engine.pressure} / 5",
                     pressureColor(engine.pressure))
-                StatRow("Jobs completed", engine.completed.toString())
-                StatRow("Jobs failed", engine.failed.toString(),
+                StatRow(stringResource(R.string.dev_state_completed), engine.completed.toString())
+                StatRow(stringResource(R.string.dev_state_failed), engine.failed.toString(),
                     if (engine.failed > 0) Color(0xFFEF5350) else MaterialTheme.colorScheme.onSurface)
             }
         }
 
         item {
             SectionCard(title = "OpportunisticScheduler") {
-                StatRow("Registered tasks", engine.schedulerRegistered.toString())
-                StatRow("Run count", engine.schedulerRunCount.toString())
+                StatRow(stringResource(R.string.dev_state_registered), engine.schedulerRegistered.toString())
+                StatRow(stringResource(R.string.dev_state_run_count), engine.schedulerRunCount.toString())
                 val lastRun = if (engine.schedulerLastRunMs > 0L)
-                    SDF.format(Date(engine.schedulerLastRunMs)) else "never"
-                StatRow("Last run", lastRun)
+                    SDF.format(Date(engine.schedulerLastRunMs)) else stringResource(R.string.dev_state_never)
+                StatRow(stringResource(R.string.dev_state_last_run), lastRun)
             }
         }
 
         item {
-            SectionCard(title = "EncryptedMemory  (${memEntries.size} keys)") {
+            SectionCard(title = stringResource(R.string.dev_state_mem_keys, memEntries.size)) {
                 if (memEntries.isEmpty()) {
                     Text(
-                        text = "no entries",
+                        text = stringResource(R.string.dev_state_no_entries),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 6.dp)
@@ -134,7 +136,7 @@ private fun MemoryEntryRow(entry: DevConsoleViewModel.MemoryEntry) {
             modifier = Modifier.padding(top = 2.dp)
         )
         Text(
-            text = "${entry.sizeBytes} bytes",
+            text = stringResource(R.string.dev_state_bytes, entry.sizeBytes),
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

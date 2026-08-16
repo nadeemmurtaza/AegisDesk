@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -32,23 +33,9 @@ import com.newax.aegis.engine.learning.ScanProgress
 import com.newax.aegis.engine.learning.ScanSource
 import java.text.SimpleDateFormat
 import java.util.*
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-private val LS_Surface      = NewaxLightColors.surface
-private val LS_SurfaceMuted = NewaxLightColors.surfaceMuted
-private val LS_SurfaceStr   = NewaxLightColors.surfaceStrong
-private val LS_Primary      = NewaxLightColors.textPrimary
-private val LS_TextPri      = NewaxLightColors.textPrimary
-private val LS_TextSec      = NewaxLightColors.textSecondary
-private val LS_TextTer      = NewaxLightColors.textTertiary
-private val LS_Border       = NewaxLightColors.border
-private val LS_Green        = NewaxLightColors.success
-private val LS_GreenBg      = NewaxLightColors.successFill
-private val LS_Amber        = NewaxLightColors.warning
-private val LS_AmberBg      = NewaxLightColors.warningFill
-private val LS_Red          = NewaxLightColors.error
-
 private val SOURCE_ICONS: Map<ScanSource, ImageVector> = mapOf(
     ScanSource.CONTACTS    to Icons.Outlined.Contacts,
     ScanSource.SMS_INBOX   to Icons.Outlined.Inbox,
@@ -86,15 +73,15 @@ fun LearningSettingsSection(vm: MainViewModel) {
     }
 
     // Section label
-    LearnLabel("Self-Learning Engine")
+    LearnLabel(stringResource(R.string.learn_section_title))
 
     // ── Master ON/OFF card ───────────────────────────────────────────────────
     Card(
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = LS_Surface),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
         border    = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (isEnabled && isScheduled) Color(0xFF86EFAC) else LS_Border
+            if (isEnabled && isScheduled) Color(0xFF86EFAC) else NewaxTheme.colors.border
         ),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
@@ -102,7 +89,7 @@ fun LearningSettingsSection(vm: MainViewModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Status dot
                 val dotColor by animateColorAsState(
-                    if (isEnabled && isScheduled) LS_Green else LS_TextTer,
+                    if (isEnabled && isScheduled) NewaxTheme.colors.success else NewaxTheme.colors.textTertiary,
                     animationSpec = tween(300), label = "dot"
                 )
                 Box(Modifier.size(10.dp).clip(CircleShape).background(dotColor))
@@ -110,19 +97,19 @@ fun LearningSettingsSection(vm: MainViewModel) {
 
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (isEnabled && isScheduled) "Self-Learning Active" else "Self-Learning Off",
-                        fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = LS_TextPri
+                        if (isEnabled && isScheduled) stringResource(R.string.learn_status_active) else stringResource(R.string.learn_status_off),
+                        fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary
                     )
                     Spacer(Modifier.height(2.dp))
                     AnimatedContent(
                         targetState = if (isEnabled && isScheduled)
-                            "Runs every ${currentInterval}min  •  battery-safe"
+                            stringResource(R.string.learn_runs_every, currentInterval)
                         else
-                            "Scan contacts, messages, call logs, gallery, files",
+                            stringResource(R.string.learn_scan_sources_desc),
                         transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
                         label = "status"
                     ) { txt ->
-                        Text(txt, fontSize = 12.sp, color = LS_TextSec, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(txt, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
@@ -139,23 +126,23 @@ fun LearningSettingsSection(vm: MainViewModel) {
                     },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor  = Color.White,
-                        checkedTrackColor  = LS_Green,
+                        checkedTrackColor  = NewaxTheme.colors.success,
                         uncheckedThumbColor = Color(0xFF8D8D87),
-                        uncheckedTrackColor = LS_SurfaceStr
+                        uncheckedTrackColor = NewaxTheme.colors.surfaceStrong
                     )
                 )
             }
 
             if (isEnabled && isScheduled) {
                 Spacer(Modifier.height(14.dp))
-                HorizontalDivider(color = LS_Border)
+                HorizontalDivider(color = NewaxTheme.colors.border)
                 Spacer(Modifier.height(12.dp))
 
                 // Last run + next run
-                val lastRunText = if (lastRunMs == 0L) "Never run yet"
-                else "Last: ${relativeTime(lastRunMs)}"
-                val nextRunText = if (lastRunMs == 0L) "Running soon (2 min delay)"
-                else "Next: ~${relativeTime(lastRunMs + currentInterval * 60_000L)} from now"
+                val lastRunText = if (lastRunMs == 0L) stringResource(R.string.learn_never_run)
+                else stringResource(R.string.learn_last, relativeTime(context, lastRunMs))
+                val nextRunText = if (lastRunMs == 0L) stringResource(R.string.learn_running_soon)
+                else stringResource(R.string.learn_next, relativeTime(context, lastRunMs + currentInterval * 60_000L))
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TimeChip(Icons.Outlined.History, lastRunText)
@@ -169,24 +156,24 @@ fun LearningSettingsSection(vm: MainViewModel) {
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(LS_SurfaceMuted)
+                        .background(NewaxTheme.colors.surfaceMuted)
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         SOURCE_ICONS[currentSource] ?: Icons.Outlined.Radar,
                         contentDescription = null,
-                        tint = LS_TextSec,
+                        tint = NewaxTheme.colors.textSecondary,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Next batch:", fontSize = 12.sp, color = LS_TextSec)
+                    Text(stringResource(R.string.learn_next_batch), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                     Spacer(Modifier.width(4.dp))
-                    Text(currentSource.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = LS_TextPri)
+                    Text(currentSource.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.weight(1f))
                     Text(
-                        "offset ${ScanProgress.getOffset(currentSource)}",
-                        fontSize = 11.sp, color = LS_TextTer
+                        stringResource(R.string.learn_offset, ScanProgress.getOffset(currentSource)),
+                        fontSize = 11.sp, color = NewaxTheme.colors.textTertiary
                     )
                 }
 
@@ -199,13 +186,13 @@ fun LearningSettingsSection(vm: MainViewModel) {
                         vm.refreshDrafts()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LS_Border),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LS_TextSec),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary),
                     shape  = RoundedCornerShape(10.dp)
                 ) {
                     Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Run one batch now", fontSize = 14.sp)
+                    Text(stringResource(R.string.learn_run_batch), fontSize = 14.sp)
                 }
             }
         }
@@ -214,19 +201,19 @@ fun LearningSettingsSection(vm: MainViewModel) {
     Spacer(Modifier.height(8.dp))
 
     // ── Statistics card ───────────────────────────────────────────────────────
-    LearnLabel("Statistics")
+    LearnLabel(stringResource(R.string.learn_section_stats))
     Card(
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = LS_Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, LS_Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBox("Created", "$totalCreated", Icons.Outlined.AutoAwesome, Color(0xFF6366F1), Modifier.weight(1f))
-                StatBox("Pending", "${draftStats.pending}", Icons.Outlined.Pending, LS_Amber, Modifier.weight(1f))
-                StatBox("Saved", "${draftStats.approved}", Icons.Outlined.CheckCircle, LS_Green, Modifier.weight(1f))
-                StatBox("Skipped", "${draftStats.rejected}", Icons.Outlined.Cancel, LS_TextTer, Modifier.weight(1f))
+                StatBox(stringResource(R.string.learn_stat_created), "$totalCreated", Icons.Outlined.AutoAwesome, Color(0xFF6366F1), Modifier.weight(1f))
+                StatBox(stringResource(R.string.learn_stat_pending), "${draftStats.pending}", Icons.Outlined.Pending, NewaxTheme.colors.warning, Modifier.weight(1f))
+                StatBox(stringResource(R.string.learn_stat_saved), "${draftStats.approved}", Icons.Outlined.CheckCircle, NewaxTheme.colors.success, Modifier.weight(1f))
+                StatBox(stringResource(R.string.learn_stat_skipped), "${draftStats.rejected}", Icons.Outlined.Cancel, NewaxTheme.colors.textTertiary, Modifier.weight(1f))
             }
         }
     }
@@ -234,17 +221,17 @@ fun LearningSettingsSection(vm: MainViewModel) {
     Spacer(Modifier.height(8.dp))
 
     // ── Scan interval ─────────────────────────────────────────────────────────
-    LearnLabel("Scan Interval")
+    LearnLabel(stringResource(R.string.learn_section_interval))
     Card(
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = LS_Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, LS_Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                "How often to run one scan batch. Lower = more frequent but more battery.",
-                fontSize = 13.sp, color = LS_TextSec, lineHeight = 19.sp
+                stringResource(R.string.learn_interval_desc),
+                fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
             )
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -261,15 +248,15 @@ fun LearningSettingsSection(vm: MainViewModel) {
                                 refresh()
                             }
                         },
-                        label  = { Text("${min}m", fontSize = 13.sp) },
+                        label  = { Text(stringResource(R.string.learn_interval_min, min), fontSize = 13.sp) },
                         modifier = Modifier.weight(1f),
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = LS_Primary,
+                            selectedContainerColor = NewaxTheme.colors.textPrimary,
                             selectedLabelColor     = Color.White
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true, selected = selected,
-                            borderColor = LS_Border, selectedBorderColor = Color.Transparent
+                            borderColor = NewaxTheme.colors.border, selectedBorderColor = Color.Transparent
                         )
                     )
                 }
@@ -280,11 +267,11 @@ fun LearningSettingsSection(vm: MainViewModel) {
     Spacer(Modifier.height(8.dp))
 
     // ── Data sources ──────────────────────────────────────────────────────────
-    LearnLabel("Data Sources")
+    LearnLabel(stringResource(R.string.learn_section_sources))
     Card(
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = LS_Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, LS_Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column {
@@ -310,13 +297,13 @@ fun LearningSettingsSection(vm: MainViewModel) {
                         Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (srcEnabled) LS_SurfaceMuted else LS_SurfaceStr),
+                            .background(if (srcEnabled) NewaxTheme.colors.surfaceMuted else NewaxTheme.colors.surfaceStrong),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             SOURCE_ICONS[source] ?: Icons.Outlined.Storage,
                             contentDescription = null,
-                            tint     = if (srcEnabled) LS_TextSec else LS_TextTer,
+                            tint     = if (srcEnabled) NewaxTheme.colors.textSecondary else NewaxTheme.colors.textTertiary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -328,31 +315,31 @@ fun LearningSettingsSection(vm: MainViewModel) {
                                 source.label,
                                 fontSize   = 14.sp,
                                 fontWeight = FontWeight.Medium,
-                                color      = if (srcEnabled) LS_TextPri else LS_TextTer
+                                color      = if (srcEnabled) NewaxTheme.colors.textPrimary else NewaxTheme.colors.textTertiary
                             )
                             if (isCurrent && srcEnabled) {
                                 Spacer(Modifier.width(6.dp))
                                 Box(
                                     Modifier
                                         .clip(RoundedCornerShape(999.dp))
-                                        .background(LS_GreenBg)
+                                        .background(NewaxTheme.colors.successFill)
                                         .padding(horizontal = 6.dp, vertical = 1.dp)
                                 ) {
-                                    Text("next", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = LS_Green)
+                                    Text(stringResource(R.string.learn_next_badge), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.success)
                                 }
                             }
                         }
                         Spacer(Modifier.height(2.dp))
                         Text(
                             buildString {
-                                if (!srcEnabled) { append("Disabled"); return@buildString }
-                                if (lastSeenMs > 0L) append("Last: ${relativeTime(lastSeenMs)}")
-                                else append("Not scanned yet")
-                                if (offset > 0) append("  •  ${offset} scanned")
-                                append("  •  batch ${source.batchSize}")
+                                if (!srcEnabled) { append(context.getString(R.string.learn_source_disabled)); return@buildString }
+                                if (lastSeenMs > 0L) append(context.getString(R.string.learn_last_seen, relativeTime(context, lastSeenMs)))
+                                else append(context.getString(R.string.learn_not_scanned))
+                                if (offset > 0) append(context.getString(R.string.learn_scanned_count, offset))
+                                append(context.getString(R.string.learn_batch_size, source.batchSize))
                             },
                             fontSize = 11.sp,
-                            color    = LS_TextTer,
+                            color    = NewaxTheme.colors.textTertiary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -367,15 +354,15 @@ fun LearningSettingsSection(vm: MainViewModel) {
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor   = Color.White,
-                            checkedTrackColor   = LS_Primary,
+                            checkedTrackColor   = NewaxTheme.colors.textPrimary,
                             uncheckedThumbColor = Color(0xFF8D8D87),
-                            uncheckedTrackColor = LS_SurfaceStr
+                            uncheckedTrackColor = NewaxTheme.colors.surfaceStrong
                         ),
                         modifier = Modifier.size(height = 24.dp, width = 44.dp)
                     )
                 }
                 if (i < ScanSource.entries.lastIndex) {
-                    HorizontalDivider(color = LS_Border, modifier = Modifier.padding(horizontal = 16.dp))
+                    HorizontalDivider(color = NewaxTheme.colors.border, modifier = Modifier.padding(horizontal = 16.dp))
                 }
             }
         }
@@ -384,11 +371,11 @@ fun LearningSettingsSection(vm: MainViewModel) {
     Spacer(Modifier.height(8.dp))
 
     // ── Danger zone ───────────────────────────────────────────────────────────
-    LearnLabel("Reset & Maintenance")
+    LearnLabel(stringResource(R.string.learn_section_maintenance))
     Card(
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = LS_Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, LS_Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column {
@@ -400,17 +387,17 @@ fun LearningSettingsSection(vm: MainViewModel) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Outlined.RestartAlt, contentDescription = null, tint = LS_Amber, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.RestartAlt, contentDescription = null, tint = NewaxTheme.colors.warning, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Reset Scan Progress", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = LS_TextPri)
+                    Text(stringResource(R.string.learn_reset_title), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text("Re-scan all sources from the beginning", fontSize = 12.sp, color = LS_TextSec)
+                    Text(stringResource(R.string.learn_reset_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                 }
-                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = LS_TextTer, modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = NewaxTheme.colors.textTertiary, modifier = Modifier.size(18.dp))
             }
 
-            HorizontalDivider(color = LS_Border, modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(color = NewaxTheme.colors.border, modifier = Modifier.padding(horizontal = 16.dp))
 
             // Clear all drafts
             Row(
@@ -420,14 +407,14 @@ fun LearningSettingsSection(vm: MainViewModel) {
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Outlined.DeleteSweep, contentDescription = null, tint = LS_Red, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.DeleteSweep, contentDescription = null, tint = NewaxTheme.colors.error, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Clear All Drafts", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = LS_TextPri)
+                    Text(stringResource(R.string.learn_clear_title), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text("Remove all pending, approved, and rejected drafts", fontSize = 12.sp, color = LS_TextSec)
+                    Text(stringResource(R.string.learn_clear_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                 }
-                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = LS_TextTer, modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = NewaxTheme.colors.textTertiary, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -436,13 +423,13 @@ fun LearningSettingsSection(vm: MainViewModel) {
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            containerColor   = LS_Surface,
+            containerColor   = NewaxTheme.colors.surface,
             shape            = RoundedCornerShape(20.dp),
-            title  = { Text("Reset scan progress?", fontWeight = FontWeight.SemiBold, color = LS_TextPri) },
+            title  = { Text(stringResource(R.string.learn_reset_dialog_title), fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary) },
             text   = {
                 Text(
-                    "All scan offsets and timestamps will be cleared. Newax will re-scan everything from scratch. Existing drafts and memory are unaffected.",
-                    color = LS_TextSec, lineHeight = 20.sp
+                    stringResource(R.string.learn_reset_dialog_body),
+                    color = NewaxTheme.colors.textSecondary, lineHeight = 20.sp
                 )
             },
             confirmButton = {
@@ -452,11 +439,11 @@ fun LearningSettingsSection(vm: MainViewModel) {
                         refresh()
                         showResetDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = LS_Amber)
-                ) { Text("Reset", color = Color.White) }
+                    colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.warning)
+                ) { Text(stringResource(R.string.action_reset), color = Color.White) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("Cancel", color = LS_TextSec) }
+                TextButton(onClick = { showResetDialog = false }) { Text(stringResource(R.string.action_cancel), color = NewaxTheme.colors.textSecondary) }
             }
         )
     }
@@ -464,13 +451,13 @@ fun LearningSettingsSection(vm: MainViewModel) {
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            containerColor   = LS_Surface,
+            containerColor   = NewaxTheme.colors.surface,
             shape            = RoundedCornerShape(20.dp),
-            title  = { Text("Clear all drafts?", fontWeight = FontWeight.SemiBold, color = LS_TextPri) },
+            title  = { Text(stringResource(R.string.learn_clear_dialog_title), fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary) },
             text   = {
                 Text(
-                    "All ${draftStats.total} drafts will be permanently deleted. Facts already approved into memory are unaffected.",
-                    color = LS_TextSec, lineHeight = 20.sp
+                    stringResource(R.string.learn_clear_dialog_body, draftStats.total),
+                    color = NewaxTheme.colors.textSecondary, lineHeight = 20.sp
                 )
             },
             confirmButton = {
@@ -481,11 +468,11 @@ fun LearningSettingsSection(vm: MainViewModel) {
                         refresh()
                         showClearDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = LS_Red)
-                ) { Text("Clear all", color = Color.White) }
+                    colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.error)
+                ) { Text(stringResource(R.string.action_clear_all), color = Color.White) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("Cancel", color = LS_TextSec) }
+                TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.action_cancel), color = NewaxTheme.colors.textSecondary) }
             }
         )
     }
@@ -499,7 +486,7 @@ private fun LearnLabel(text: String) {
         text,
         fontSize   = 11.sp,
         fontWeight = FontWeight.Medium,
-        color      = LS_TextTer,
+        color      = NewaxTheme.colors.textTertiary,
         modifier   = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
     )
 }
@@ -509,14 +496,14 @@ private fun StatBox(label: String, value: String, icon: ImageVector, color: Colo
     Column(
         modifier            = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(LS_SurfaceMuted)
+            .background(NewaxTheme.colors.surfaceMuted)
             .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = LS_TextPri)
-        Text(label, fontSize = 10.sp, color = LS_TextTer)
+        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = NewaxTheme.colors.textPrimary)
+        Text(label, fontSize = 10.sp, color = NewaxTheme.colors.textTertiary)
     }
 }
 
@@ -525,26 +512,26 @@ private fun TimeChip(icon: ImageVector, text: String) {
     Row(
         Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(LS_SurfaceMuted)
+            .background(NewaxTheme.colors.surfaceMuted)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = LS_TextSec, modifier = Modifier.size(12.dp))
+        Icon(icon, contentDescription = null, tint = NewaxTheme.colors.textSecondary, modifier = Modifier.size(12.dp))
         Spacer(Modifier.width(5.dp))
-        Text(text, fontSize = 11.sp, color = LS_TextSec, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, fontSize = 11.sp, color = NewaxTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 
-private fun relativeTime(ms: Long): String {
-    if (ms <= 0L) return "never"
+private fun relativeTime(context: android.content.Context, ms: Long): String {
+    if (ms <= 0L) return context.getString(R.string.learn_relative_never)
     val diff = System.currentTimeMillis() - ms
     return when {
-        diff < 0              -> "just now"
-        diff < 60_000         -> "${diff / 1000}s ago"
-        diff < 3_600_000      -> "${diff / 60_000}m ago"
-        diff < 86_400_000     -> "${diff / 3_600_000}h ago"
+        diff < 0              -> context.getString(R.string.learn_relative_just_now)
+        diff < 60_000         -> context.getString(R.string.learn_relative_s_ago, diff / 1000)
+        diff < 3_600_000      -> context.getString(R.string.learn_relative_m_ago, diff / 60_000)
+        diff < 86_400_000     -> context.getString(R.string.learn_relative_h_ago, diff / 3_600_000)
         else                  -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(ms))
     }
 }

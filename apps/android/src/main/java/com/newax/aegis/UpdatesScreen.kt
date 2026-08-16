@@ -25,6 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,40 +35,27 @@ import androidx.compose.ui.unit.sp
 import com.newax.aegis.agents.LearningEngine
 import com.newax.aegis.db.entity.RiskLevel
 import com.newax.aegis.db.entity.StagingRecord
+import com.newax.aegis.ui.components.EmptyState
+import com.newax.aegis.ui.components.SectionHeader
+import com.newax.aegis.ui.components.StatusChip
 import com.newax.aegis.db.entity.StagingStatus
 import kotlinx.coroutines.delay
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val U_Surface      = NewaxLightColors.surface
-private val U_SurfaceMuted = NewaxLightColors.surfaceMuted
-private val U_Primary      = NewaxLightColors.textPrimary
-private val U_TextPri      = NewaxLightColors.textPrimary
-private val U_TextSec      = NewaxLightColors.textSecondary
-private val U_TextTer      = NewaxLightColors.textTertiary
-private val U_Border       = NewaxLightColors.border
-private val U_Green        = NewaxLightColors.success
-private val U_GreenBg      = NewaxLightColors.successFill
-private val U_Red          = NewaxLightColors.error
-private val U_RedBg        = NewaxLightColors.errorFill
-private val U_Amber        = NewaxLightColors.warning
-private val U_AmberBg      = NewaxLightColors.warningFill
-private val U_Blue         = NewaxLightColors.info
-private val U_BlueBg       = NewaxLightColors.infoFill
-
 private val RISK_ORDER = listOf(RiskLevel.CRITICAL, RiskLevel.HIGH, RiskLevel.MEDIUM, RiskLevel.LOW)
 
 private fun riskColor(risk: String): Pair<Color, Color> = when (risk) {
-    RiskLevel.CRITICAL -> U_Red to U_RedBg
-    RiskLevel.HIGH -> U_Amber to U_AmberBg
-    RiskLevel.LOW -> U_Green to U_GreenBg
-    else -> U_Blue to U_BlueBg
+    RiskLevel.CRITICAL -> NewaxTheme.colors.error to NewaxTheme.colors.errorFill
+    RiskLevel.HIGH -> NewaxTheme.colors.warning to NewaxTheme.colors.warningFill
+    RiskLevel.LOW -> NewaxTheme.colors.success to NewaxTheme.colors.successFill
+    else -> NewaxTheme.colors.info to NewaxTheme.colors.infoFill
 }
 
 private fun protocolColor(protocol: String): Color = when (protocol) {
-    "CRITIC" -> U_Amber
-    "CROSS_AGENT" -> U_Blue
-    else -> U_Green
+    "CRITIC" -> NewaxTheme.colors.warning
+    "CROSS_AGENT" -> NewaxTheme.colors.info
+    else -> NewaxTheme.colors.success
 }
 
 private fun relativeTime(ms: Long): String {
@@ -114,9 +104,9 @@ fun UpdatesScreen(padding: PaddingValues) {
     ) {
         item { EvolutionControlsCard() }
         item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel3("Pending system updates — grouped by urgency") }
+        item { SectionLabel3(stringResource(R.string.updates_section_pending)) }
         if (pending.isEmpty()) {
-            item { EmptyUpdateCard("No pending updates — the system only changes with your approval.") }
+            item { EmptyUpdateCard(stringResource(R.string.updates_empty_pending)) }
         } else {
             RISK_ORDER.forEach { risk ->
                 val group = pending.filter { it.riskLevel == risk }
@@ -134,30 +124,30 @@ fun UpdatesScreen(padding: PaddingValues) {
             }
         }
         item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel3("Recent decisions") }
+        item { SectionLabel3(stringResource(R.string.updates_section_decisions)) }
         if (decisions.isEmpty()) {
-            item { EmptyUpdateCard("No decisions yet — approvals and denials land here.") }
+            item { EmptyUpdateCard(stringResource(R.string.updates_empty_decisions)) }
         } else {
             decisions.take(8).forEach { d ->
                 item {
                     Text(
                         "${if (d.status == StagingStatus.DEPLOYED) "✓ approved" else "✗ denied"} · ${d.skillId} · ${d.title.take(60)} · ${relativeTime(d.decidedAtMs)}",
-                        fontSize = 11.sp, color = U_TextSec, fontFamily = FontFamily.Monospace
+                        fontSize = 11.sp, color = NewaxTheme.colors.textSecondary, fontFamily = FontFamily.Monospace
                     )
                 }
             }
         }
         item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel3("Reward signals (RLAIF-E feed)") }
+        item { SectionLabel3(stringResource(R.string.updates_section_signals)) }
         if (signals.isEmpty()) {
-            item { EmptyUpdateCard("No learning signals yet — they appear as skills run and you give feedback.") }
+            item { EmptyUpdateCard(stringResource(R.string.updates_empty_signals)) }
         } else {
             signals.forEach { s ->
                 item {
                     Text(
                         "[${if (s.reward > 0) "+" else ""}${s.reward}] ${s.summary.take(90)}",
                         fontSize = 11.sp,
-                        color = if (s.reward < 0) U_Red else U_TextSec,
+                        color = if (s.reward < 0) NewaxTheme.colors.error else NewaxTheme.colors.textSecondary,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -169,8 +159,8 @@ fun UpdatesScreen(padding: PaddingValues) {
             val signals = stats["signals"] ?: 0
             val pending = stats["pending"] ?: 0
             Text(
-                "$methods ledger methods · $signals signals · $pending pending — all learning is device-local",
-                fontSize = 11.sp, color = U_TextTer
+                stringResource(R.string.updates_stats_footer, methods, signals, pending),
+                fontSize = 11.sp, color = NewaxTheme.colors.textTertiary
             )
         }
     }
@@ -182,18 +172,19 @@ private fun EvolutionControlsCard() {
     var fuzzOn by remember { mutableStateOf(LearningEngine.fuzzEnabled()) }
     var lastFuzz by remember { mutableStateOf(LearningEngine.lastFuzzAtMs()) }
     var message by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = U_Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, U_Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Evolution engine — RLAIF-E", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = U_TextPri)
-                    Text("Exploitation uses the best-known method; exploration tests variations. Every change waits for your approval here.", fontSize = 12.sp, color = U_TextSec)
+                    Text(stringResource(R.string.updates_engine_title), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                    Text(stringResource(R.string.updates_engine_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                 }
                 Switch(
                     checked = fuzzOn,
@@ -202,14 +193,14 @@ private fun EvolutionControlsCard() {
                         fuzzOn = on
                     },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White, checkedTrackColor = U_Primary,
-                        uncheckedThumbColor = Color.White, uncheckedTrackColor = U_TextTer
+                        checkedThumbColor = Color.White, checkedTrackColor = NewaxTheme.colors.textPrimary,
+                        uncheckedThumbColor = Color.White, uncheckedTrackColor = NewaxTheme.colors.textTertiary
                     )
                 )
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Exploration rate: ${(exploration * 100).toInt()}%", fontSize = 12.sp, color = U_TextSec, modifier = Modifier.width(140.dp))
+                Text(stringResource(R.string.updates_exploration_rate, (exploration * 100).toInt()), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, modifier = Modifier.width(140.dp))
                 Slider(
                     value = exploration,
                     onValueChange = { exploration = it },
@@ -221,13 +212,14 @@ private fun EvolutionControlsCard() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(onClick = {
                     val staged = LearningEngine.fuzzPass()
-                    message = if (staged > 0) "Fuzz pass: $staged candidate(s) staged for approval." else "Fuzz pass: nothing new to propose (fuzzer off, or candidates already pending)."
+                    message = if (staged > 0) context.getString(R.string.updates_fuzz_staged, staged)
+                    else context.getString(R.string.updates_fuzz_nothing)
                     lastFuzz = System.currentTimeMillis()
-                }) { Text("Run fuzz pass now", fontSize = 13.sp) }
+                }) { Text(stringResource(R.string.action_run_fuzz), fontSize = 13.sp) }
                 Spacer(Modifier.width(10.dp))
-                Text("last fuzz: ${relativeTime(lastFuzz)}", fontSize = 11.sp, color = U_TextTer)
+                Text(stringResource(R.string.updates_last_fuzz, relativeTime(lastFuzz)), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
             }
-            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = U_Green) }
+            message?.let { Spacer(Modifier.height(6.dp)); Text(it, fontSize = 12.sp, color = NewaxTheme.colors.success) }
         }
     }
 }
@@ -239,43 +231,42 @@ private fun PendingUpdateCard(record: StagingRecord) {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if (record.changeType == "MEMORY_RULE") U_BlueBg.copy(alpha = 0.35f) else U_Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, U_Border),
+        colors = CardDefaults.cardColors(containerColor = if (record.changeType == "MEMORY_RULE") NewaxTheme.colors.infoFill.copy(alpha = 0.35f) else NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(riskBg)
-                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                ) { Text(record.riskLevel, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = riskFg) }
+                StatusChip(
+                    label = record.riskLevel,
+                    color = riskFg,
+                    fill  = riskBg
+                )
                 Spacer(Modifier.width(6.dp))
-                Text(record.changeType, fontSize = 10.sp, color = U_TextTer, fontFamily = FontFamily.Monospace)
+                Text(record.changeType, fontSize = 10.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                 Spacer(Modifier.width(6.dp))
                 Text(record.protocol, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = protocolColor(record.protocol))
                 Spacer(Modifier.weight(1f))
-                Text(relativeTime(record.createdAtMs), fontSize = 10.sp, color = U_TextTer)
+                Text(relativeTime(record.createdAtMs), fontSize = 10.sp, color = NewaxTheme.colors.textTertiary)
             }
             Spacer(Modifier.height(8.dp))
-            Text(record.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = U_TextPri)
+            Text(record.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text(record.summary, fontSize = 13.sp, color = U_TextSec, lineHeight = 19.sp)
+            Text(record.summary, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
             if (record.agentId.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text("authored by ${record.agentId}", fontSize = 11.sp, color = U_TextTer)
+                Text(stringResource(R.string.updates_authored_by, record.agentId), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
             }
             if (record.diffBefore.isNotBlank() || record.diffAfter.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))
                 TextButton(onClick = { showDiff = !showDiff }, contentPadding = PaddingValues(0.dp)) {
-                    Text(if (showDiff) "Hide diff" else "Show diff", fontSize = 12.sp, color = U_Blue)
+                    Text(if (showDiff) stringResource(R.string.updates_hide_diff) else stringResource(R.string.updates_show_diff), fontSize = 12.sp, color = NewaxTheme.colors.info)
                 }
                 if (showDiff) {
                     Column(Modifier.fillMaxWidth()) {
-                        DiffLine("before", record.diffBefore, U_Red, U_RedBg)
+                        DiffLine(stringResource(R.string.updates_diff_before), record.diffBefore, NewaxTheme.colors.error, NewaxTheme.colors.errorFill)
                         Spacer(Modifier.height(4.dp))
-                        DiffLine("after", record.diffAfter, U_Green, U_GreenBg)
+                        DiffLine(stringResource(R.string.updates_diff_after), record.diffAfter, NewaxTheme.colors.success, NewaxTheme.colors.successFill)
                     }
                 }
             }
@@ -284,10 +275,10 @@ private fun PendingUpdateCard(record: StagingRecord) {
                 Button(
                     onClick = { LearningEngine.approve(record.stagingId) },
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = U_Primary)
-                ) { Text("Approve", fontSize = 13.sp) }
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                ) { Text(stringResource(R.string.action_approve), fontSize = 13.sp) }
                 TextButton(onClick = { LearningEngine.deny(record.stagingId) }) {
-                    Text("Deny", fontSize = 13.sp, color = U_Red)
+                    Text(stringResource(R.string.action_deny), fontSize = 13.sp, color = NewaxTheme.colors.error)
                 }
             }
         }
@@ -300,7 +291,7 @@ private fun DiffLine(label: String, text: String, color: Color, bg: Color) {
         Text("$label ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = color)
         Text(
             text.take(400),
-            fontSize = 11.sp, color = U_TextPri, fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp, color = NewaxTheme.colors.textPrimary, fontFamily = FontFamily.Monospace,
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(8.dp))
@@ -312,22 +303,21 @@ private fun DiffLine(label: String, text: String, color: Color, bg: Color) {
 
 @Composable
 private fun EmptyUpdateCard(text: String) {
-    Box(
-        Modifier
+    // T3.4: the shared empty surface — one look for every screen's "nothing
+    // here yet".
+    EmptyState(
+        title = text,
+        modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(U_SurfaceMuted)
-            .padding(14.dp)
-    ) { Text(text, fontSize = 12.sp, color = U_TextTer) }
+            .padding(vertical = 16.dp)
+    )
 }
 
 @Composable
 private fun SectionLabel3(text: String) {
-    Text(
-        text,
-        fontSize = 11.sp, fontWeight = FontWeight.Medium, color = U_TextTer,
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
-    )
+    // T3.4: the shared section header — `heading()` semantics so screen readers
+    // can navigate by heading instead of reading linearly.
+    SectionHeader(title = text)
 }
 
 // ── Live notification banner (shown the minute a patch is ready) ────────────
@@ -347,7 +337,7 @@ fun PendingUpdatesBanner(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = U_Primary),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.textPrimary),
         elevation = CardDefaults.cardElevation(6.dp)
     ) {
         Row(
@@ -358,13 +348,13 @@ fun PendingUpdatesBanner(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "$count learning update${if (count == 1) "" else "s"} ready for review",
+                    pluralStringResource(R.plurals.updates_banner_count, count, count),
                     fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White
                 )
-                Text("A skill method or knowledge rule was staged — approve or deny it.", fontSize = 11.sp, color = Color(0xFFD4D4CF))
+                Text(stringResource(R.string.updates_banner_desc), fontSize = 11.sp, color = Color(0xFFD4D4CF))
             }
             Spacer(Modifier.width(10.dp))
-            Text("Review", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(stringResource(R.string.action_review), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             Spacer(Modifier.width(6.dp))
             Text("✕", fontSize = 14.sp, color = Color(0xFFD4D4CF), modifier = Modifier.clickable(onClick = onDismiss))
         }

@@ -24,8 +24,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,23 +50,13 @@ import com.newax.aegis.agents.AgentResult
 import com.newax.aegis.agents.AgentRouter
 import com.newax.aegis.agents.AgentRuntimeEngine
 import com.newax.aegis.agents.AgentStream
-import com.newax.aegis.db.entity.AgentEntity
 import com.newax.aegis.db.entity.AgentHealthStatus
 import com.newax.aegis.db.entity.SessionPhase
 import com.newax.aegis.db.entity.SessionStatus
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.components.AgentCard
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens — same palette as the rest of the app ─────────────────────
-private val Surface = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val Primary = NewaxLightColors.textPrimary
-private val TextPri = NewaxLightColors.textPrimary
-private val TextSec = NewaxLightColors.textSecondary
-private val TextTer = NewaxLightColors.textTertiary
-private val Border = NewaxLightColors.border
-private val AccentGreen = NewaxLightColors.success
-private val AccentRed = NewaxLightColors.error
-
 /**
  * The multi-agent management surface (docs/AGENTS_DESIGN.md; R13): installed
  * agents with enable/disable + uninstall (imported only), zip import/upgrade
@@ -100,79 +89,84 @@ fun AgentsScreen(padding: PaddingValues, onContinueTask: (String) -> Unit = {}) 
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("${agents.size} agents", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri)
+                    Text(stringResource(R.string.agents_count_header, agents.size), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        "Disabled agents never route. Import a zip (agent.json + skills) to install or upgrade.",
-                        fontSize = 13.sp, color = TextSec
-                    )
+                    Text(stringResource(R.string.agents_disabled_note), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Button(onClick = { picker.launch(arrayOf("application/zip", "application/x-zip-compressed", "*/*")) }) {
-                            Text("Import agent (.zip)")
+                            Text(stringResource(R.string.action_import_agent_zip))
                         }
                         Spacer(Modifier.width(10.dp))
-                        TextButton(onClick = { agents = AgentRegistry.agents() }) { Text("Refresh") }
+                        TextButton(onClick = { agents = AgentRegistry.agents() }) { Text(stringResource(R.string.action_refresh)) }
                     }
                     message?.let {
                         Spacer(Modifier.height(8.dp))
-                        Text(it, fontSize = 13.sp, color = if (it.startsWith("Import failed")) AccentRed else AccentGreen)
+                        Text(it, fontSize = 13.sp, color = if (it.startsWith("Import failed")) NewaxTheme.colors.error else NewaxTheme.colors.success)
                     }
                 }
             }
         }
 
         item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel2("Installed agents") }
+        item { SectionLabel2(stringResource(R.string.agents_section_installed)) }
 
         items(agents, key = { it.agentId }) { agent ->
+            // T3.4c: the shared agent card (docs/UI_DESIGN.md §8 — AgentCard).
             AgentCard(
-                agent = agent,
-                onToggle = { on ->
+                title       = stringResource(R.string.agents_name_version, agent.name, agent.version),
+                metaLabel   = "${agent.category} · ${agent.source}",
+                description = agent.description,
+                enabled     = agent.enabled,
+                onToggle    = { on ->
                     AgentRegistry.setEnabled(agent.agentId, on)
                     agents = AgentRegistry.agents()
                 },
-                onUninstall = {
-                    AgentRegistry.uninstall(agent.agentId)
-                    agents = AgentRegistry.agents()
-                }
+                tagsLabel = agent.keywords.split(',').joinToString(" · ") { it.trim() }.ifBlank { null },
+                uninstallLabel = if (agent.source != "builtin") stringResource(R.string.action_uninstall) else null,
+                onUninstall = if (agent.source != "builtin") {
+                    {
+                        AgentRegistry.uninstall(agent.agentId)
+                        agents = AgentRegistry.agents()
+                    }
+                } else null
             )
         }
 
         item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel2("Routing preview — who dominates what") }
+        item { SectionLabel2(stringResource(R.string.agents_section_routing)) }
         item { RoutingPreview() }
 
         item { Spacer(Modifier.height(4.dp)) }
-        item { SectionLabel2("Agent runtime — PRAM controller (run / abort / get_status / health_check)") }
+        item { SectionLabel2(stringResource(R.string.agents_section_runtime)) }
         item { AgentRuntimePanel(onContinueTask) }
     }
 }
 
-private val AccentBlue = NewaxLightColors.info
-private val AccentAmber = NewaxLightColors.warning
-
-private fun elapsed(ms: Long): String {
+private fun elapsed(context: android.content.Context, ms: Long): String {
     val s = (System.currentTimeMillis() - ms) / 1000
-    return if (s < 60) "${s}s" else "${s / 60}m ${s % 60}s"
+    return if (s < 60) context.getString(R.string.agents_elapsed_seconds, s)
+    else context.getString(R.string.agents_elapsed_min_sec, s / 60, s % 60)
 }
 
+@Composable
 private fun phaseColor(phase: String): Color = when (phase) {
-    SessionPhase.RUNNING_TOOL -> AccentAmber
-    SessionPhase.RESTORED -> AccentBlue
-    SessionPhase.DONE -> AccentGreen
-    else -> TextTer
+    SessionPhase.RUNNING_TOOL -> NewaxTheme.colors.warning
+    SessionPhase.RESTORED -> NewaxTheme.colors.info
+    SessionPhase.DONE -> NewaxTheme.colors.success
+    else -> NewaxTheme.colors.textTertiary
 }
 
+@Composable
 private fun healthColor(status: String?): Color = when (status) {
-    AgentHealthStatus.FAULTED -> AccentRed
-    AgentHealthStatus.DEGRADED -> AccentAmber
-    else -> AccentGreen
+    AgentHealthStatus.FAULTED -> NewaxTheme.colors.error
+    AgentHealthStatus.DEGRADED -> NewaxTheme.colors.warning
+    else -> NewaxTheme.colors.success
 }
 
 /**
@@ -184,6 +178,7 @@ private fun healthColor(status: String?): Color = when (status) {
  */
 @Composable
 private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
+    val context = LocalContext.current
     // Observe the stream properly. The previous version collected into a `tick`
     // counter to force recomposition — but nothing ever *read* `tick`, so Compose
     // tracked no dependency on it and the panel never refreshed. A hand-rolled
@@ -199,17 +194,17 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
     // ── live sessions ───────────────────────────────────────────────────────
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Live sessions", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Text(stringResource(R.string.agents_live_sessions), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Every agent runs through the same controller — run(), abort(), get_status(), health_check().", fontSize = 12.sp, color = TextSec)
+            Text(stringResource(R.string.agents_controller_note), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
             if (sessions.isEmpty()) {
                 Spacer(Modifier.height(6.dp))
-                Text("No sessions running.", fontSize = 12.sp, color = TextTer)
+                Text(stringResource(R.string.agents_no_sessions), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
             }
             sessions.forEach { s ->
                 Spacer(Modifier.height(8.dp))
@@ -222,14 +217,14 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("${name(s.agentId)} — ${s.phase}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
-                        Text("${s.taskPrompt.take(70)} · ${elapsed(s.startedAtMs)}", fontSize = 11.sp, color = TextTer, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${name(s.agentId)} — ${s.phase}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
+                        Text("${s.taskPrompt.take(70)} · ${elapsed(context, s.startedAtMs)}", fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     TextButton(onClick = { AgentRuntimeEngine.controllerFor(s.agentId).abort() }) {
-                        Text("Abort", fontSize = 12.sp, color = AccentRed)
+                        Text(stringResource(R.string.action_abort), fontSize = 12.sp, color = NewaxTheme.colors.error)
                     }
                     TextButton(onClick = { AgentRuntimeEngine.freeze(s.sessionId) }) {
-                        Text("Freeze", fontSize = 12.sp)
+                        Text(stringResource(R.string.action_freeze), fontSize = 12.sp)
                     }
                 }
                 if (s.phase == SessionPhase.RESTORED) {
@@ -237,7 +232,7 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
                     TextButton(
                         onClick = { onContinueTask(s.taskPrompt) },
                         modifier = Modifier.align(Alignment.End)
-                    ) { Text("Continue in chat", fontSize = 12.sp, color = AccentBlue) }
+                    ) { Text(stringResource(R.string.action_continue_in_chat), fontSize = 12.sp, color = NewaxTheme.colors.info) }
                 }
             }
         }
@@ -248,14 +243,14 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
     // ── health audit ────────────────────────────────────────────────────────
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Health audit — skill.sys.health_audit", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Text(stringResource(R.string.agents_health_audit), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("A FAULTED agent is quarantined (auto-disabled) until you restore it. Soft issues are DEGRADED and monitored.", fontSize = 12.sp, color = TextSec)
+            Text(stringResource(R.string.agents_health_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
             AgentRegistry.agents().forEach { agent ->
                 val h = healthRows[agent.agentId]
                 val status = h?.status
@@ -269,24 +264,25 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(agent.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
+                        Text(agent.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
                         val detail = h?.detail
                         Text(
-                            if (detail.isNullOrBlank()) "${status ?: "not audited yet"} · faults: ${h?.faultCount ?: 0}" else "$status · ${detail.take(60)}",
-                            fontSize = 11.sp, color = TextTer, maxLines = 1, overflow = TextOverflow.Ellipsis
+                            if (detail.isNullOrBlank()) context.getString(R.string.agents_health_detail_empty, status ?: context.getString(R.string.agents_not_audited), h?.faultCount ?: 0)
+                            else context.getString(R.string.agents_health_detail, status, detail.take(60)),
+                            fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                     }
                     TextButton(onClick = { AgentRuntimeEngine.controllerFor(agent.agentId).healthCheck() }) {
-                        Text("Check", fontSize = 12.sp)
+                        Text(stringResource(R.string.action_check), fontSize = 12.sp)
                     }
                     if (status == AgentHealthStatus.FAULTED) {
                         TextButton(onClick = { AgentRuntimeEngine.recover(agent.agentId) }) {
-                            Text("Restore", fontSize = 12.sp, color = AccentGreen)
+                            Text(stringResource(R.string.action_restore), fontSize = 12.sp, color = NewaxTheme.colors.success)
                         }
                     }
                     if (frozen.any { it.agentId == agent.agentId }) {
                         TextButton(onClick = { AgentRuntimeEngine.thaw(agent.agentId) }) {
-                            Text("Thaw", fontSize = 12.sp, color = AccentBlue)
+                            Text(stringResource(R.string.action_thaw), fontSize = 12.sp, color = NewaxTheme.colors.info)
                         }
                     }
                 }
@@ -299,21 +295,21 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
     // ── stream feed ─────────────────────────────────────────────────────────
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Stream feed — skill.sys.mcp_stream", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Text(stringResource(R.string.agents_stream_feed), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Agents stream their progress here in real time — structured events, never raw chatter.", fontSize = 12.sp, color = TextSec)
+            Text(stringResource(R.string.agents_stream_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
             if (feed.isEmpty()) {
                 Spacer(Modifier.height(6.dp))
-                Text("No stream events yet.", fontSize = 12.sp, color = TextTer)
+                Text(stringResource(R.string.agents_no_stream), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
             }
             feed.forEach { e ->
                 Spacer(Modifier.height(4.dp))
-                Text("[${e.type}] ${name(e.agentId)} ${e.phase}: ${e.text.take(80)}", fontSize = 11.sp, color = TextSec, fontFamily = FontFamily.Monospace)
+                Text("[${e.type}] ${name(e.agentId)} ${e.phase}: ${e.text.take(80)}", fontSize = 11.sp, color = NewaxTheme.colors.textSecondary, fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -323,18 +319,18 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
     // ── recent runs (strict result/error blocks, read by the core app) ──────
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Recent runs — structured blocks", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
+            Text(stringResource(R.string.agents_recent_runs), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("The app reads these strict blocks ({\"status\":…}) to render results and errors cleanly.", fontSize = 12.sp, color = TextSec)
+            Text(stringResource(R.string.agents_blocks_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
             val recent = AgentRuntimeEngine.recentSessions(4)
             if (recent.isEmpty()) {
                 Spacer(Modifier.height(6.dp))
-                Text("No completed runs yet.", fontSize = 12.sp, color = TextTer)
+                Text(stringResource(R.string.agents_no_runs), fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
             }
             recent.forEach { r ->
                 Spacer(Modifier.height(8.dp))
@@ -346,67 +342,23 @@ private fun AgentRuntimePanel(onContinueTask: (String) -> Unit) {
                             .clip(RoundedCornerShape(999.dp))
                             .background(
                                 when (parsed?.status) {
-                                    "success" -> AccentGreen
-                                    "error" -> AccentRed
-                                    else -> TextTer
+                                    "success" -> NewaxTheme.colors.success
+                                    "error" -> NewaxTheme.colors.error
+                                    else -> NewaxTheme.colors.textTertiary
                                 }
                             )
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("${name(r.agentId)} — ${r.status}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPri)
+                        Text("${name(r.agentId)} — ${r.status}", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = NewaxTheme.colors.textPrimary)
                         val line = when {
                             parsed == null -> r.taskPrompt.take(60)
                             parsed.status == "success" -> parsed.summary
                             else -> "[${parsed.errorType}] ${parsed.message}"
                         }
-                        Text(line.take(90), fontSize = 11.sp, color = if (parsed?.status == "error") AccentRed else TextTer, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(line.take(90), fontSize = 11.sp, color = if (parsed?.status == "error") NewaxTheme.colors.error else NewaxTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AgentCard(agent: AgentEntity, onToggle: (Boolean) -> Unit, onUninstall: () -> Unit) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if (agent.enabled) Surface else SurfaceMuted),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(if (agent.enabled) AccentGreen else TextTer)
-                )
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("${agent.name} — v${agent.version}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPri)
-                    Text("${agent.category} · ${agent.source}", fontSize = 11.sp, color = TextTer)
-                }
-                Switch(
-                    checked = agent.enabled,
-                    onCheckedChange = onToggle,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White, checkedTrackColor = Primary,
-                        uncheckedThumbColor = Color.White, uncheckedTrackColor = TextTer
-                    )
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(agent.description, fontSize = 13.sp, color = TextSec)
-            if (agent.keywords.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(agent.keywords.split(',').joinToString(" · ") { it.trim() }, fontSize = 11.sp, color = TextTer, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            if (agent.source != "builtin") {
-                Spacer(Modifier.height(6.dp))
-                TextButton(onClick = onUninstall) { Text("Uninstall", fontSize = 12.sp, color = AccentRed) }
             }
         }
     }
@@ -419,28 +371,31 @@ private fun RoutingPreview() {
     var plan by remember { mutableStateOf(emptyList<AgentRouter.StepPlan>()) }
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Multi-step tasks route per step — step 1 planning → Planning Agent, step 2 coding → Coding Agent.", fontSize = 13.sp, color = TextSec)
+            Text(stringResource(R.string.agents_route_desc), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = input, onValueChange = { input = it }, label = { Text("Try: plan a feature then write the code") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = input, onValueChange = { input = it }, label = { Text(stringResource(R.string.agents_route_placeholder)) }, minLines = 2, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { plan = AgentRouter.planFor(input) },
                 enabled = input.isNotBlank()
-            ) { Text("Route") }
+            ) { Text(stringResource(R.string.action_route)) }
             if (plan.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 plan.forEachIndexed { index, step ->
                     val dominant = step.route?.dominant
+                    val dominantLabel = dominant?.let { stringResource(R.string.agents_step_dominant, it.name) }
+                        ?: stringResource(R.string.agents_step_no_match)
+                    val supportLabel = step.route?.supporters?.takeIf { it.isNotEmpty() }?.let {
+                        stringResource(R.string.agents_step_support, it.joinToString(", ") { s -> s.name })
+                    } ?: ""
                     Text(
-                        "Step ${index + 1}: \"${step.text.take(60)}\" → " +
-                            (dominant?.let { "${it.name} (dominant)" } ?: "assistant (no agent matched)") +
-                            (step.route?.supporters?.takeIf { it.isNotEmpty() }?.let { " + ${it.joinToString(", ") { s -> s.name }} (support)" } ?: ""),
-                        fontSize = 12.sp, color = TextPri, fontFamily = FontFamily.Monospace
+                        stringResource(R.string.agents_step_line, index + 1, step.text.take(60), dominantLabel + supportLabel),
+                        fontSize = 12.sp, color = NewaxTheme.colors.textPrimary, fontFamily = FontFamily.Monospace
                     )
                     Spacer(Modifier.height(4.dp))
                 }
@@ -451,6 +406,6 @@ private fun RoutingPreview() {
 
 @Composable
 private fun SectionLabel2(text: String) {
-    Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextTer,
+    Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textTertiary,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
 }

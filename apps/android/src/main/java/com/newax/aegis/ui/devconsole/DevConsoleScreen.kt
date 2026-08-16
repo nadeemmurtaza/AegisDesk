@@ -21,13 +21,21 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.newax.aegis.R
 import com.newax.aegis.ui.devconsole.tabs.DbTab
 import com.newax.aegis.ui.devconsole.tabs.FilesTab
 import com.newax.aegis.ui.devconsole.tabs.LogsTab
 import com.newax.aegis.ui.devconsole.tabs.StateTab
 import com.newax.aegis.ui.devconsole.tabs.TriggersTab
 
-private val TABS = listOf("State", "Logs", "DB", "Triggers", "Files")
+private val TABS = listOf(
+    R.string.dev_tab_state,
+    R.string.dev_tab_logs,
+    R.string.dev_tab_db,
+    R.string.dev_tab_triggers,
+    R.string.dev_tab_files,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,14 +47,14 @@ fun DevConsoleScreen(vm: DevConsoleViewModel, onClose: () -> Unit) {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Newax Dev Console",
+                        text = stringResource(R.string.dev_title),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 actions = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Close")
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.dev_cd_close))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -65,7 +73,7 @@ fun DevConsoleScreen(vm: DevConsoleViewModel, onClose: () -> Unit) {
                     Tab(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        text = { Text(text = title, style = MaterialTheme.typography.labelMedium) }
+                        text = { Text(text = stringResource(title), style = MaterialTheme.typography.labelMedium) }
                     )
                 }
             }

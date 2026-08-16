@@ -49,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -68,20 +69,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens — same palette as MainActivity's screens ──────────────────
-private val Surface = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val SurfaceSel = NewaxLightColors.surfaceSelected
-private val Primary = NewaxLightColors.textPrimary
-private val TextPri = NewaxLightColors.textPrimary
-private val TextSec = NewaxLightColors.textSecondary
-private val TextTer = NewaxLightColors.textTertiary
-private val Border = NewaxLightColors.border
-private val AccentGreen = NewaxLightColors.success
-private val AccentAmber = NewaxLightColors.warning
-
 /** Runtime permissions the Nearby flow needs, by API level. */
 private fun nearbyPermissions(): List<String> {
     val perms = mutableListOf<String>()
@@ -241,8 +231,8 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border)
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -250,25 +240,25 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                             Modifier
                                 .size(38.dp)
                                 .clip(RoundedCornerShape(11.dp))
-                                .background(if (sharing) Color(0xFFDCFCE7) else SurfaceMuted),
+                                .background(if (sharing) Color(0xFFDCFCE7) else NewaxTheme.colors.surfaceMuted),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Outlined.NearMe,
                                 contentDescription = null,
-                                tint = if (sharing) AccentGreen else TextSec,
+                                tint = if (sharing) NewaxTheme.colors.success else NewaxTheme.colors.textSecondary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("Nearby sharing", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextPri)
+                            Text(stringResource(R.string.nearby_title), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary)
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 if (sharing) "Advertising + receiving — E2E encrypted, relay never involved"
                                 else "Quick Share, but every byte sealed",
                                 fontSize = 12.sp,
-                                color = TextSec
+                                color = NewaxTheme.colors.textSecondary
                             )
                         }
                         Switch(
@@ -288,33 +278,33 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                                     lastResult = null
                                 }
                             },
-                            colors = SwitchDefaults.colors(checkedTrackColor = Primary)
+                            colors = SwitchDefaults.colors(checkedTrackColor = NewaxTheme.colors.textPrimary)
                         )
                     }
                     if (status.isNotBlank()) {
                         Spacer(Modifier.height(10.dp))
-                        Text(status, fontSize = 12.sp, color = TextSec)
+                        Text(status, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                     }
                     error?.let {
                         Spacer(Modifier.height(10.dp))
-                        Text(it, fontSize = 12.sp, color = AccentAmber, fontWeight = FontWeight.Medium)
+                        Text(it, fontSize = 12.sp, color = NewaxTheme.colors.warning, fontWeight = FontWeight.Medium)
                     }
                 }
             }
         }
 
-        item { SectionLabel("Nearby devices") }
+        item { SectionLabel(stringResource(R.string.nearby_section_devices)) }
         if (!sharing) {
             item {
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(SurfaceMuted)
+                        .background(NewaxTheme.colors.surfaceMuted)
                         .padding(18.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Turn on Nearby sharing to see Newax devices around you.", fontSize = 13.sp, color = TextTer)
+                    Text(stringResource(R.string.nearby_off_desc), fontSize = 13.sp, color = NewaxTheme.colors.textTertiary)
                 }
             }
         } else if (nearby.isEmpty()) {
@@ -323,14 +313,14 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(SurfaceMuted)
+                        .background(NewaxTheme.colors.surfaceMuted)
                         .padding(18.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = TextTer)
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = NewaxTheme.colors.textTertiary)
                         Spacer(Modifier.height(8.dp))
-                        Text("Scanning for nearby devices…", fontSize = 13.sp, color = TextSec)
+                        Text(stringResource(R.string.nearby_scanning), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary)
                     }
                 }
             }
@@ -344,36 +334,36 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                             filePicker.launch(arrayOf("*/*"))
                         },
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+                    colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border)
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier
                                 .size(34.dp)
                                 .clip(CircleShape)
-                                .background(SurfaceSel),
+                                .background(NewaxTheme.colors.surfaceSelected),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 endpoint.displayName.take(1).uppercase(Locale.US),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp,
-                                color = TextPri
+                                color = NewaxTheme.colors.textPrimary
                             )
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(endpoint.displayName, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPri, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(endpoint.displayName, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 endpoint.deviceId,
                                 fontSize = 11.sp,
-                                color = TextTer,
+                                color = NewaxTheme.colors.textTertiary,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
-                        Text("Send →", fontSize = 12.sp, color = TextSec, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.nearby_send_cta), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -383,20 +373,20 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+                    colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border)
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Encrypting + sending…", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                        Text(stringResource(R.string.nearby_sending), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary)
                         Spacer(Modifier.height(8.dp))
                         LinearProgressIndicator(
                             progress = { chunk.toFloat() / total },
                             modifier = Modifier.fillMaxWidth(),
-                            color = Primary,
-                            trackColor = SurfaceMuted
+                            color = NewaxTheme.colors.textPrimary,
+                            trackColor = NewaxTheme.colors.surfaceMuted
                         )
                         Spacer(Modifier.height(6.dp))
-                        Text("chunk $chunk of $total", fontSize = 11.sp, color = TextTer)
+                        Text(stringResource(R.string.nearby_chunk_progress, chunk, total), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
                     }
                 }
             }
@@ -406,14 +396,14 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+                    colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border)
                 ) {
                     Text(
                         it,
                         Modifier.padding(14.dp),
                         fontSize = 12.sp,
-                        color = if (it.startsWith("Send failed")) AccentAmber else TextSec
+                        color = if (it.startsWith("Send failed")) NewaxTheme.colors.warning else NewaxTheme.colors.textSecondary
                     )
                 }
             }
@@ -423,14 +413,14 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
             item {
                 Card(
                     shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+                    colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border)
                 ) {
                     Text(
                         it,
                         Modifier.padding(14.dp),
                         fontSize = 12.sp,
-                        color = TextSec,
+                        color = NewaxTheme.colors.textSecondary,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -446,16 +436,16 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                 request.answer(false)
                 incoming = null
             },
-            containerColor = Surface,
+            containerColor = NewaxTheme.colors.surface,
             shape = RoundedCornerShape(20.dp),
-            title = { Text("Incoming transfer", fontWeight = FontWeight.SemiBold, color = TextPri) },
+            title = { Text(stringResource(R.string.nearby_incoming_title), fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary) },
             text = {
                 Column {
-                    Text(request.peerDeviceId, fontSize = 12.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                    Text(request.peerDeviceId, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                     Spacer(Modifier.height(10.dp))
-                    Text(request.fileName, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextPri)
+                    Text(request.fileName, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(4.dp))
-                    Text("${formatSize(request.sizeBytes)} · SHA-256 ${request.sha256Hex.take(12)}…", fontSize = 12.sp, color = TextSec)
+                    Text("${formatSize(request.sizeBytes)} · SHA-256 ${request.sha256Hex.take(12)}…", fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                 }
             },
             confirmButton = {
@@ -464,14 +454,14 @@ fun NearbyShareScreen(padding: androidx.compose.foundation.layout.PaddingValues)
                         request.answer(true)
                         incoming = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("Accept") }
+                    colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                ) { Text(stringResource(R.string.action_accept)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     request.answer(false)
                     incoming = null
-                }) { Text("Decline", color = TextSec) }
+                }) { Text(stringResource(R.string.action_decline), color = NewaxTheme.colors.textSecondary) }
             }
         )
     }
@@ -483,7 +473,7 @@ private fun SectionLabel(text: String) {
         text,
         fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
-        color = TextTer,
+        color = NewaxTheme.colors.textTertiary,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
     )
 }

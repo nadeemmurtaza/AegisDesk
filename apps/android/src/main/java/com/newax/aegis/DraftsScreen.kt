@@ -28,6 +28,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -39,20 +41,11 @@ import com.newax.aegis.assistant.ProposedAction
 import com.newax.aegis.engine.learning.LearningDraft
 import com.newax.aegis.engine.learning.LearningWorker
 import com.newax.aegis.engine.learning.ScanProgress
+import com.newax.aegis.ui.components.ConfirmDialog
 import kotlinx.coroutines.launch
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens (matches MainActivity palette) ──────────────────────────────
-private val BG_D           = NewaxLightColors.bg
-private val Surface_D      = NewaxLightColors.surface
-private val SurfaceMuted_D = NewaxLightColors.surfaceMuted
-private val SurfaceStr_D   = NewaxLightColors.surfaceStrong
-private val Primary_D      = NewaxLightColors.textPrimary
-private val TextPri_D      = NewaxLightColors.textPrimary
-private val TextSec_D      = NewaxLightColors.textSecondary
-private val TextTer_D      = NewaxLightColors.textTertiary
-private val Border_D       = NewaxLightColors.border
-
 private fun categoryColor(cat: String): Color = when (cat.lowercase()) {
     "personal"  -> Color(0xFF3B82F6)
     "family"    -> Color(0xFFF97316)
@@ -101,8 +94,8 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
         item {
             Card(
                 shape     = RoundedCornerShape(18.dp),
-                colors    = CardDefaults.cardColors(containerColor = Surface_D),
-                border    = androidx.compose.foundation.BorderStroke(1.dp, Border_D),
+                colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -111,20 +104,20 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "${drafts.size} pending draft${if (drafts.size != 1) "s" else ""}",
-                            fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPri_D
+                            pluralStringResource(R.plurals.drafts_pending_count, drafts.size, drafts.size),
+                            fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary
                         )
                         Spacer(Modifier.height(2.dp))
                         val statusText = if (learnerRunning.value)
-                            "Scanning every 20 min  •  ${ScanProgress.statusSummary()}"
+                            stringResource(R.string.drafts_scanning_20, ScanProgress.statusSummary())
                         else
-                            "Self-learning is off"
-                        Text(statusText, fontSize = 12.sp, color = TextSec_D, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            stringResource(R.string.drafts_learning_off)
+                        Text(statusText, fontSize = 12.sp, color = NewaxTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(Modifier.width(8.dp))
                     // Toggle learning on/off
                     val toggleColor by animateColorAsState(
-                        if (learnerRunning.value) Color(0xFF22C55E) else SurfaceStr_D, label = "toggle"
+                        if (learnerRunning.value) Color(0xFF22C55E) else NewaxTheme.colors.surfaceStrong, label = "toggle"
                     )
                     Box(
                         Modifier
@@ -147,8 +140,8 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                         ) {
                             Icon(
                                 if (learnerRunning.value) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                                contentDescription = if (learnerRunning.value) "Pause learning" else "Start learning",
-                                tint = if (learnerRunning.value) Color.White else TextSec_D,
+                                contentDescription = if (learnerRunning.value) stringResource(R.string.drafts_cd_pause_learning) else stringResource(R.string.drafts_cd_start_learning),
+                                tint = if (learnerRunning.value) Color.White else NewaxTheme.colors.textSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -158,7 +151,7 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(999.dp))
-                            .background(SurfaceMuted_D),
+                            .background(NewaxTheme.colors.surfaceMuted),
                         contentAlignment = Alignment.Center
                     ) {
                         IconButton(
@@ -167,8 +160,8 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                         ) {
                             Icon(
                                 Icons.Outlined.Refresh,
-                                contentDescription = "Scan now",
-                                tint = TextSec_D,
+                                contentDescription = stringResource(R.string.drafts_cd_scan_now),
+                                tint = NewaxTheme.colors.textSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -184,23 +177,23 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                     Button(
                         onClick  = { showApproveAll = true },
                         modifier = Modifier.weight(1f),
-                        colors   = ButtonDefaults.buttonColors(containerColor = Primary_D),
+                        colors   = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary),
                         shape    = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Approve all", fontSize = 14.sp)
+                        Text(stringResource(R.string.action_approve_all), fontSize = 14.sp)
                     }
                     OutlinedButton(
                         onClick  = { showRejectAll = true },
                         modifier = Modifier.weight(1f),
-                        border   = androidx.compose.foundation.BorderStroke(1.dp, Border_D),
-                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = TextSec_D),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary),
                         shape    = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Outlined.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Reject all", fontSize = 14.sp)
+                        Text(stringResource(R.string.action_reject_all), fontSize = 14.sp)
                     }
                 }
             }
@@ -225,7 +218,7 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
                                     enabled = true, selected = sel,
-                                    borderColor = Border_D, selectedBorderColor = Color.Transparent
+                                    borderColor = NewaxTheme.colors.border, selectedBorderColor = Color.Transparent
                                 )
                             )
                         }
@@ -266,24 +259,22 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
                         Icon(
                             Icons.Outlined.Lightbulb,
                             contentDescription = null,
-                            tint     = TextTer_D,
+                            tint     = NewaxTheme.colors.textTertiary,
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "No pending drafts",
+                            stringResource(R.string.drafts_empty_title),
                             fontSize   = 16.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color      = TextSec_D
+                            color      = NewaxTheme.colors.textSecondary
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            if (learnerRunning.value)
-                                "Newax is scanning in the background.\nNew facts will appear here for your review."
-                            else
-                                "Press ▶ to start self-learning.\nNewax will scan your data and extract facts for approval.",
+                            if (learnerRunning.value) stringResource(R.string.drafts_empty_scanning)
+                            else stringResource(R.string.drafts_empty_start),
                             fontSize  = 13.sp,
-                            color     = TextTer_D,
+                            color     = NewaxTheme.colors.textTertiary,
                             lineHeight = 20.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier  = Modifier.padding(horizontal = 24.dp)
@@ -294,48 +285,34 @@ fun DraftsScreen(vm: MainViewModel, padding: PaddingValues) {
         }
     }
 
-    // ── Confirm dialogs ───────────────────────────────────────────────────────
+    // ── Confirm dialogs (T3.4: the shared confirm dialog — destructive
+    // actions are confirmed before they run, SC 3.3.4/3.3.6) ────────────────
     if (showApproveAll) {
-        AlertDialog(
-            onDismissRequest = { showApproveAll = false },
-            containerColor   = Surface_D,
-            shape            = RoundedCornerShape(20.dp),
-            title  = { Text("Approve all ${drafts.size} drafts?", fontWeight = FontWeight.SemiBold, color = TextPri_D) },
-            text   = { Text("All facts will be saved to your encrypted memory.", color = TextSec_D) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        scope.launch { vm.submit("approve all drafts") }
-                        showApproveAll = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary_D)
-                ) { Text("Approve all") }
+        ConfirmDialog(
+            title        = stringResource(R.string.drafts_approve_all_title, drafts.size),
+            body         = stringResource(R.string.drafts_approve_all_body),
+            confirmLabel = stringResource(R.string.action_approve_all),
+            dismissLabel = stringResource(R.string.action_cancel),
+            onConfirm    = {
+                scope.launch { vm.submit("approve all drafts") }
+                showApproveAll = false
             },
-            dismissButton = {
-                TextButton(onClick = { showApproveAll = false }) { Text("Cancel", color = TextSec_D) }
-            }
+            onDismiss    = { showApproveAll = false }
         )
     }
 
     if (showRejectAll) {
-        AlertDialog(
-            onDismissRequest = { showRejectAll = false },
-            containerColor   = Surface_D,
-            shape            = RoundedCornerShape(20.dp),
-            title  = { Text("Reject all ${drafts.size} drafts?", fontWeight = FontWeight.SemiBold, color = TextPri_D) },
-            text   = { Text("All pending drafts will be discarded. Nothing will be saved.", color = TextSec_D) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        scope.launch { vm.submit("reject all drafts") }
-                        showRejectAll = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                ) { Text("Reject all", color = Color.White) }
+        ConfirmDialog(
+            title        = stringResource(R.string.drafts_reject_all_title, drafts.size),
+            body         = stringResource(R.string.drafts_reject_all_body),
+            confirmLabel = stringResource(R.string.action_reject_all),
+            dismissLabel = stringResource(R.string.action_cancel),
+            onConfirm    = {
+                scope.launch { vm.submit("reject all drafts") }
+                showRejectAll = false
             },
-            dismissButton = {
-                TextButton(onClick = { showRejectAll = false }) { Text("Cancel", color = TextSec_D) }
-            }
+            onDismiss    = { showRejectAll = false },
+            destructive  = true
         )
     }
 }
@@ -351,8 +328,8 @@ private fun DraftCard(
 
     Card(
         shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = Surface_D),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, Border_D),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier  = Modifier.fillMaxWidth()
     ) {
@@ -387,7 +364,7 @@ private fun DraftCard(
                 val confColor = when {
                     confPct >= 80 -> Color(0xFF22C55E)
                     confPct >= 60 -> Color(0xFFF59E0B)
-                    else          -> TextTer_D
+                    else          -> NewaxTheme.colors.textTertiary
                 }
                 Box(
                     Modifier
@@ -410,7 +387,7 @@ private fun DraftCard(
                     draft.fact,
                     fontSize   = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    color      = TextPri_D,
+                    color      = NewaxTheme.colors.textPrimary,
                     lineHeight = 22.sp
                 )
 
@@ -419,7 +396,7 @@ private fun DraftCard(
                 Text(
                     draft.source,
                     fontSize = 12.sp,
-                    color    = TextSec_D
+                    color    = NewaxTheme.colors.textSecondary
                 )
 
                 // Snippet (context excerpt)
@@ -428,7 +405,7 @@ private fun DraftCard(
                     Text(
                         "\"${draft.sourceSnippet}\"",
                         fontSize   = 11.sp,
-                        color      = TextTer_D,
+                        color      = NewaxTheme.colors.textTertiary,
                         fontStyle  = FontStyle.Italic,
                         maxLines   = 2,
                         overflow   = TextOverflow.Ellipsis
@@ -437,7 +414,7 @@ private fun DraftCard(
             }
 
             // ── Action buttons ────────────────────────────────────────────────
-            HorizontalDivider(color = Border_D)
+            HorizontalDivider(color = NewaxTheme.colors.border)
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -445,12 +422,12 @@ private fun DraftCard(
                 // Reject
                 TextButton(
                     onClick = onReject,
-                    colors  = ButtonDefaults.textButtonColors(contentColor = TextSec_D),
+                    colors  = ButtonDefaults.textButtonColors(contentColor = NewaxTheme.colors.textSecondary),
                     modifier = Modifier.padding(end = 4.dp)
                 ) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Reject", modifier = Modifier.size(15.dp))
+                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cd_reject), modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Reject", fontSize = 13.sp)
+                    Text(stringResource(R.string.action_reject), fontSize = 13.sp)
                 }
                 // Approve
                 TextButton(
@@ -458,9 +435,9 @@ private fun DraftCard(
                     colors  = ButtonDefaults.textButtonColors(contentColor = Color(0xFF16A34A)),
                     modifier = Modifier.padding(end = 6.dp)
                 ) {
-                    Icon(Icons.Rounded.CheckCircle, contentDescription = "Approve", modifier = Modifier.size(15.dp))
+                    Icon(Icons.Rounded.CheckCircle, contentDescription = stringResource(R.string.cd_approve), modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Approve", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.action_approve), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

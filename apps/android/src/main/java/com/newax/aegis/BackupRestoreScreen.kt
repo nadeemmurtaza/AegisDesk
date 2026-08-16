@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -30,25 +31,9 @@ import com.newax.aegis.backup.BackupManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-private val BR_Surface      = NewaxLightColors.surface
-private val BR_SurfaceMuted = NewaxLightColors.surfaceMuted
-private val BR_TextPri      = NewaxLightColors.textPrimary
-private val BR_TextSec      = NewaxLightColors.textSecondary
-private val BR_TextTer      = NewaxLightColors.textTertiary
-private val BR_Border       = NewaxLightColors.border
-private val BR_Green        = NewaxLightColors.success
-private val BR_GreenBg      = NewaxLightColors.successFill
-private val BR_Red          = NewaxLightColors.error
-private val BR_RedBg        = NewaxLightColors.errorFill
-private val BR_Amber        = NewaxLightColors.warning
-private val BR_AmberBg      = NewaxLightColors.warningFill
-private val BR_Blue         = NewaxLightColors.info
-private val BR_BlueBg       = NewaxLightColors.infoFill
-private val BR_Primary      = NewaxLightColors.textPrimary
-
 private sealed class BackupStatus {
     data object Idle    : BackupStatus()
     data object Working : BackupStatus()
@@ -83,11 +68,11 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
                     )
                     BackupManager.writeToUri(context, uri, encrypted)
                 }.onSuccess {
-                    status = BackupStatus.Success("Backup exported. Save the password — it cannot be recovered.")
+                    status = BackupStatus.Success(context.getString(R.string.backup_exported))
                     password        = ""
                     confirmPassword = ""
                 }.onFailure { e ->
-                    status = BackupStatus.Error(e.message ?: "Export failed")
+                    status = BackupStatus.Error(e.message ?: context.getString(R.string.backup_export_failed))
                 }
             }
         }
@@ -105,19 +90,19 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
     if (showRestoreDialog) {
         AlertDialog(
             onDismissRequest = { showRestoreDialog = false; pendingRestoreUri = null },
-            containerColor = BR_Surface,
+            containerColor = NewaxTheme.colors.surface,
             shape = RoundedCornerShape(20.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Warning, contentDescription = null, tint = BR_Red, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Outlined.Warning, contentDescription = null, tint = NewaxTheme.colors.error, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Replace all data?", fontWeight = FontWeight.SemiBold, color = BR_TextPri)
+                    Text(stringResource(R.string.backup_replace_title), fontWeight = FontWeight.SemiBold, color = NewaxTheme.colors.textPrimary)
                 }
             },
             text = {
                 Text(
-                    "This will erase your current memory, settings, and drafts and replace them with the backup. This cannot be undone. Make sure you have the correct password before continuing.",
-                    color = BR_TextSec, lineHeight = 20.sp
+                    stringResource(R.string.backup_replace_body),
+                    color = NewaxTheme.colors.textSecondary, lineHeight = 20.sp
                 )
             },
             confirmButton = {
@@ -134,25 +119,25 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
                                     BackupManager.decryptAndRestore(context, vm.memory, fileBytes, password.toCharArray())
                                 }.onSuccess {
                                     vm.refreshDrafts()
-                                    status = BackupStatus.Success("Backup restored successfully.")
+                                    status = BackupStatus.Success(context.getString(R.string.backup_restored))
                                     password = ""
                                 }.onFailure { e ->
                                     val msg = when (e) {
-                                        is SecurityException -> "Wrong password or corrupted file."
-                                        is IllegalArgumentException -> "Invalid backup file."
-                                        else -> e.message ?: "Restore failed"
+                                        is SecurityException -> context.getString(R.string.backup_wrong_password)
+                                        is IllegalArgumentException -> context.getString(R.string.backup_invalid_file)
+                                        else -> e.message ?: context.getString(R.string.backup_restore_failed)
                                     }
                                     status = BackupStatus.Error(msg)
                                 }
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = BR_Red)
-                ) { Text("Restore", color = Color.White) }
+                    colors = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.error)
+                ) { Text(stringResource(R.string.action_restore), color = Color.White) }
             },
             dismissButton = {
                 TextButton(onClick = { showRestoreDialog = false; pendingRestoreUri = null }) {
-                    Text("Cancel", color = BR_TextSec)
+                    Text(stringResource(R.string.action_cancel), color = NewaxTheme.colors.textSecondary)
                 }
             }
         )
@@ -171,19 +156,18 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
         // Encryption info card
         Card(
             shape     = RoundedCornerShape(18.dp),
-            colors    = CardDefaults.cardColors(containerColor = BR_BlueBg),
+            colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.infoFill),
             border    = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBFDBFE)),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Row(Modifier.padding(14.dp)) {
-                Icon(Icons.Outlined.Shield, contentDescription = null, tint = BR_Blue, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.Shield, contentDescription = null, tint = NewaxTheme.colors.info, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text("Military-grade encryption", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = BR_Blue)
+                    Text(stringResource(R.string.backup_encryption_title), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = NewaxTheme.colors.info)
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "AES-256-GCM · PBKDF2-SHA256 (310,000 iterations) · 32-byte random salt\n" +
-                        "Your password is never stored anywhere. Without it, the backup is unreadable.",
+                        stringResource(R.string.backup_encryption_body),
                         fontSize = 12.sp, color = Color(0xFF1D4ED8), lineHeight = 18.sp
                     )
                 }
@@ -191,26 +175,26 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
         }
 
         // ── Password fields ───────────────────────────────────────────────────
-        BrSectionLabel("Backup Password")
+        BrSectionLabel(stringResource(R.string.backup_section_password))
 
         Card(
             shape     = RoundedCornerShape(18.dp),
-            colors    = CardDefaults.cardColors(containerColor = BR_Surface),
-            border    = androidx.compose.foundation.BorderStroke(1.dp, BR_Border),
+            colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+            border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value         = password,
                     onValueChange = { password = it },
-                    label         = { Text("Password") },
+                    label         = { Text(stringResource(R.string.backup_field_password)) },
                     visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon  = {
                         IconButton(onClick = { showPw = !showPw }) {
                             Icon(
                                 if (showPw) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                contentDescription = if (showPw) "Hide" else "Show",
-                                tint = BR_TextTer
+                                contentDescription = if (showPw) stringResource(R.string.backup_cd_hide) else stringResource(R.string.backup_cd_show),
+                                tint = NewaxTheme.colors.textTertiary
                             )
                         }
                     },
@@ -219,22 +203,22 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
                     shape         = RoundedCornerShape(12.dp),
                     singleLine    = true,
                     colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = BR_Primary,
-                        unfocusedBorderColor = BR_Border
+                        focusedBorderColor   = NewaxTheme.colors.textPrimary,
+                        unfocusedBorderColor = NewaxTheme.colors.border
                     )
                 )
 
                 OutlinedTextField(
                     value         = confirmPassword,
                     onValueChange = { confirmPassword = it },
-                    label         = { Text("Confirm password (for export)") },
+                    label         = { Text(stringResource(R.string.backup_field_confirm_password)) },
                     visualTransformation = if (showConfirmPw) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon  = {
                         IconButton(onClick = { showConfirmPw = !showConfirmPw }) {
                             Icon(
                                 if (showConfirmPw) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
                                 contentDescription = null,
-                                tint = BR_TextTer
+                                tint = NewaxTheme.colors.textTertiary
                             )
                         }
                     },
@@ -243,13 +227,13 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
                     shape         = RoundedCornerShape(12.dp),
                     singleLine    = true,
                     colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = BR_Primary,
-                        unfocusedBorderColor = BR_Border
+                        focusedBorderColor   = NewaxTheme.colors.textPrimary,
+                        unfocusedBorderColor = NewaxTheme.colors.border
                     ),
                     isError = confirmPassword.isNotEmpty() && confirmPassword != password,
                     supportingText = {
                         if (confirmPassword.isNotEmpty() && confirmPassword != password) {
-                            Text("Passwords do not match", color = BR_Red, fontSize = 12.sp)
+                            Text(stringResource(R.string.backup_passwords_mismatch), color = NewaxTheme.colors.error, fontSize = 12.sp)
                         }
                     }
                 )
@@ -259,27 +243,27 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
         }
 
         // ── Export ────────────────────────────────────────────────────────────
-        BrSectionLabel("Export")
+        BrSectionLabel(stringResource(R.string.backup_section_export))
 
         Card(
             shape     = RoundedCornerShape(18.dp),
-            colors    = CardDefaults.cardColors(containerColor = BR_Surface),
-            border    = androidx.compose.foundation.BorderStroke(1.dp, BR_Border),
+            colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+            border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(40.dp).background(BR_SurfaceMuted, RoundedCornerShape(12.dp)),
+                        Modifier.size(40.dp).background(NewaxTheme.colors.surfaceMuted, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Outlined.CloudUpload, null, tint = BR_TextSec, modifier = Modifier.size(20.dp)) }
+                    ) { Icon(Icons.Outlined.CloudUpload, null, tint = NewaxTheme.colors.textSecondary, modifier = Modifier.size(20.dp)) }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Save encrypted backup", fontWeight = FontWeight.Medium, fontSize = 14.sp, color = BR_TextPri)
+                        Text(stringResource(R.string.backup_save_encrypted), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "Save to Google Drive, device storage, or any location",
-                            fontSize = 12.sp, color = BR_TextSec
+                            stringResource(R.string.backup_save_hint),
+                            fontSize = 12.sp, color = NewaxTheme.colors.textSecondary
                         )
                     }
                 }
@@ -287,54 +271,54 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
                 Button(
                     onClick = {
                         if (password.length < 8) {
-                            status = BackupStatus.Error("Password must be at least 8 characters")
+                            status = BackupStatus.Error(context.getString(R.string.backup_password_too_short))
                             return@Button
                         }
                         if (password != confirmPassword) {
-                            status = BackupStatus.Error("Passwords do not match")
+                            status = BackupStatus.Error(context.getString(R.string.backup_passwords_mismatch))
                             return@Button
                         }
                         exportLauncher.launch(BackupManager.suggestedFilename())
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape    = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = BR_Primary),
+                    colors   = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary),
                     enabled  = status !is BackupStatus.Working
                 ) {
                     Icon(Icons.Outlined.FileDownload, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Export backup (.aeb)", fontSize = 14.sp)
+                    Text(stringResource(R.string.backup_export_button), fontSize = 14.sp)
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Tip: Save to Google Drive for cross-device restore. The file opens only with your password.",
-                    fontSize = 11.sp, color = BR_TextTer, lineHeight = 16.sp
+                    stringResource(R.string.backup_export_tip),
+                    fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, lineHeight = 16.sp
                 )
             }
         }
 
         // ── Import ────────────────────────────────────────────────────────────
-        BrSectionLabel("Restore")
+        BrSectionLabel(stringResource(R.string.backup_section_restore))
 
         Card(
             shape     = RoundedCornerShape(18.dp),
-            colors    = CardDefaults.cardColors(containerColor = BR_Surface),
-            border    = androidx.compose.foundation.BorderStroke(1.dp, BR_Border),
+            colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+            border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(40.dp).background(BR_SurfaceMuted, RoundedCornerShape(12.dp)),
+                        Modifier.size(40.dp).background(NewaxTheme.colors.surfaceMuted, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Outlined.CloudDownload, null, tint = BR_TextSec, modifier = Modifier.size(20.dp)) }
+                    ) { Icon(Icons.Outlined.CloudDownload, null, tint = NewaxTheme.colors.textSecondary, modifier = Modifier.size(20.dp)) }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Restore from backup", fontWeight = FontWeight.Medium, fontSize = 14.sp, color = BR_TextPri)
+                        Text(stringResource(R.string.backup_restore_from), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "Pick a .aeb file from Google Drive or your device",
-                            fontSize = 12.sp, color = BR_TextSec
+                            stringResource(R.string.backup_restore_hint),
+                            fontSize = 12.sp, color = NewaxTheme.colors.textSecondary
                         )
                     }
                 }
@@ -342,32 +326,32 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .background(BR_AmberBg, RoundedCornerShape(10.dp))
+                        .background(NewaxTheme.colors.warningFill, RoundedCornerShape(10.dp))
                         .padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Outlined.Warning, null, tint = BR_Amber, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Outlined.Warning, null, tint = NewaxTheme.colors.warning, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("All current data will be replaced and cannot be recovered", fontSize = 12.sp, color = BR_Amber, lineHeight = 16.sp)
+                    Text(stringResource(R.string.backup_replace_warning), fontSize = 12.sp, color = NewaxTheme.colors.warning, lineHeight = 16.sp)
                 }
                 Spacer(Modifier.height(14.dp))
                 OutlinedButton(
                     onClick = {
                         if (password.isEmpty()) {
-                            status = BackupStatus.Error("Enter the backup password first")
+                            status = BackupStatus.Error(context.getString(R.string.backup_password_first))
                             return@OutlinedButton
                         }
                         importLauncher.launch(arrayOf("application/octet-stream", "*/*"))
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape    = RoundedCornerShape(12.dp),
-                    border   = androidx.compose.foundation.BorderStroke(1.dp, BR_Border),
-                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = BR_TextPri),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textPrimary),
                     enabled  = status !is BackupStatus.Working
                 ) {
                     Icon(Icons.Outlined.FileUpload, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Pick backup file", fontSize = 14.sp)
+                    Text(stringResource(R.string.backup_pick_file), fontSize = 14.sp)
                 }
             }
         }
@@ -391,10 +375,10 @@ fun BackupRestoreScreen(vm: MainViewModel, padding: PaddingValues) {
                 CircularProgressIndicator(
                     modifier    = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
-                    color       = BR_Primary
+                    color       = NewaxTheme.colors.textPrimary
                 )
                 Spacer(Modifier.width(10.dp))
-                Text("Working… (key derivation may take a few seconds)", fontSize = 12.sp, color = BR_TextSec)
+                Text(stringResource(R.string.backup_working), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
             }
         }
 
@@ -410,7 +394,7 @@ private fun BrSectionLabel(text: String) {
         text,
         fontSize   = 11.sp,
         fontWeight = FontWeight.Medium,
-        color      = BR_TextTer,
+        color      = NewaxTheme.colors.textTertiary,
         modifier   = Modifier.padding(start = 4.dp, bottom = 2.dp)
     )
 }
@@ -420,14 +404,14 @@ private fun PasswordStrengthBar(password: String) {
     if (password.isEmpty()) return
     val score = calcStrength(password)
     val (label, color, fraction) = when {
-        score < 2 -> Triple("Weak",   BR_Red,   0.25f)
-        score < 3 -> Triple("Fair",   BR_Amber, 0.5f)
-        score < 4 -> Triple("Good",   Color(0xFF65A30D), 0.75f)
-        else      -> Triple("Strong", BR_Green, 1f)
+        score < 2 -> Triple(stringResource(R.string.backup_strength_weak),   NewaxTheme.colors.error,   0.25f)
+        score < 3 -> Triple(stringResource(R.string.backup_strength_fair),   NewaxTheme.colors.warning, 0.5f)
+        score < 4 -> Triple(stringResource(R.string.backup_strength_good),   Color(0xFF65A30D), 0.75f)
+        else      -> Triple(stringResource(R.string.backup_strength_strong), NewaxTheme.colors.success, 1f)
     }
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Password strength", fontSize = 11.sp, color = BR_TextTer)
+            Text(stringResource(R.string.backup_strength_label), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
             Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
         }
         Spacer(Modifier.height(4.dp))
@@ -435,7 +419,7 @@ private fun PasswordStrengthBar(password: String) {
             progress  = { fraction },
             modifier  = Modifier.fillMaxWidth().height(4.dp),
             color     = color,
-            trackColor = BR_SurfaceMuted
+            trackColor = NewaxTheme.colors.surfaceMuted
         )
     }
 }
@@ -452,8 +436,8 @@ private fun calcStrength(pw: String): Int {
 @Composable
 private fun StatusCard(status: BackupStatus, onDismiss: () -> Unit) {
     val style = when (status) {
-        is BackupStatus.Success -> StatusStyle(BR_GreenBg, Color(0xFF86EFAC), Icons.Outlined.CheckCircle, BR_Green, status.msg)
-        is BackupStatus.Error   -> StatusStyle(BR_RedBg, Color(0xFFFCA5A5), Icons.Outlined.Error, BR_Red, status.msg)
+        is BackupStatus.Success -> StatusStyle(NewaxTheme.colors.successFill, Color(0xFF86EFAC), Icons.Outlined.CheckCircle, NewaxTheme.colors.success, status.msg)
+        is BackupStatus.Error   -> StatusStyle(NewaxTheme.colors.errorFill, Color(0xFFFCA5A5), Icons.Outlined.Error, NewaxTheme.colors.error, status.msg)
         else                    -> return
     }
     val (bg, border, icon, textColor, text) = style

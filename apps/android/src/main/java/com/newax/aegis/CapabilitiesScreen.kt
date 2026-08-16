@@ -1,6 +1,7 @@
 package com.newax.aegis
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,6 +9,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
@@ -16,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,26 +32,13 @@ import com.newax.aegis.platform.CapabilityId
 import com.newax.aegis.platform.CapabilityStatus
 import com.newax.aegis.platform.PlatformCapability
 import com.newax.aegis.platform.PrivilegeLevel
+import com.newax.aegis.ui.a11y.statusSemantics
+import com.newax.aegis.ui.components.EmptyState
+import com.newax.aegis.ui.components.ErrorState
+import com.newax.aegis.ui.components.InfoTag
+import com.newax.aegis.ui.components.StatusChip as NewaxStatusChip
+import com.newax.aegis.ui.theme.NewaxTheme
 import kotlinx.coroutines.delay
-import com.newax.aegis.ui.theme.NewaxLightColors
-
-// ── Design tokens — aliases onto shared:ui NewaxLightColors (docs/UI_DESIGN.md §4).
-// Light-theme only for now; per-screen migration to NewaxTheme.colors (which
-// carries dark mode) is a later slice. Values live in ONE place: NewaxColors.kt.
-
-private val Surface      = NewaxLightColors.surface
-private val SurfaceMuted = NewaxLightColors.surfaceMuted
-private val TextPri      = NewaxLightColors.textPrimary
-private val TextSec      = NewaxLightColors.textSecondary
-private val TextTer      = NewaxLightColors.textTertiary
-private val Border       = NewaxLightColors.border
-
-private val ReadyColor      = NewaxLightColors.success
-private val MissingPermCol  = NewaxLightColors.warning
-private val MissingCredCol  = NewaxLightColors.warning
-private val DisabledCol     = NewaxLightColors.textTertiary
-private val UnavailableCol  = NewaxLightColors.error
-private val NotSupportedCol = NewaxLightColors.textTertiary
 
 private data class CapabilityRow(
     val id: CapabilityId,
@@ -59,23 +51,24 @@ private data class CapabilityRow(
     val offline: Boolean,
 )
 
+@Composable
 private fun statusColor(status: CapabilityStatus): Color = when (status) {
-    CapabilityStatus.READY              -> ReadyColor
-    CapabilityStatus.MISSING_PERMISSION -> MissingPermCol
-    CapabilityStatus.MISSING_CREDENTIAL -> MissingCredCol
-    CapabilityStatus.DISABLED           -> DisabledCol
-    CapabilityStatus.UNAVAILABLE        -> UnavailableCol
-    CapabilityStatus.NOT_SUPPORTED      -> NotSupportedCol
+    CapabilityStatus.READY              -> NewaxTheme.colors.success
+    CapabilityStatus.MISSING_PERMISSION -> NewaxTheme.colors.warning
+    CapabilityStatus.MISSING_CREDENTIAL -> NewaxTheme.colors.warning
+    CapabilityStatus.DISABLED           -> NewaxTheme.colors.textTertiary
+    CapabilityStatus.UNAVAILABLE        -> NewaxTheme.colors.error
+    CapabilityStatus.NOT_SUPPORTED      -> NewaxTheme.colors.textTertiary
 }
 
 private fun CapabilityStatus.label(): String =
     name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
 
-private fun PrivilegeLevel.label(): String = when (this) {
-    PrivilegeLevel.READ_ONLY          -> "Read-only"
-    PrivilegeLevel.STANDARD           -> "Standard"
-    PrivilegeLevel.HIGH_IMPACT_SYSTEM -> "High-impact"
-    PrivilegeLevel.CRITICAL           -> "Critical"
+private fun PrivilegeLevel.labelRes(): Int = when (this) {
+    PrivilegeLevel.READ_ONLY          -> R.string.privilege_read_only
+    PrivilegeLevel.STANDARD           -> R.string.privilege_standard
+    PrivilegeLevel.HIGH_IMPACT_SYSTEM -> R.string.privilege_high_impact
+    PrivilegeLevel.CRITICAL           -> R.string.privilege_critical
 }
 
 private fun PlatformCapability.toRow(): CapabilityRow {
@@ -119,7 +112,13 @@ fun CapabilitiesScreen(
      * consumes the signal (a small delay keeps the highlight visible).
      */
     policyScrollTarget: String? = null,
-    onTargetHandled: () -> Unit = {}
+    onTargetHandled: () -> Unit = {},
+    /** Route 4.1 item 3 — the Apps index (4.3) opens from here. */
+    onOpenAppsIndex: () -> Unit = {},
+    /** Route 4.2 remedies — the app's Permissions screen (5.6.1). */
+    onOpenAppPermissions: () -> Unit = {},
+    /** Route 4.2 remedies — the Settings page (5). */
+    onOpenSettings: () -> Unit = {}
 ) {
     var refreshKey by remember { mutableStateOf(0) }
     var policyVersion by remember { mutableIntStateOf(0) }
@@ -163,8 +162,8 @@ fun CapabilitiesScreen(
         item {
             Card(
                 shape     = RoundedCornerShape(18.dp),
-                colors    = CardDefaults.cardColors(containerColor = Surface),
-                border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -173,28 +172,29 @@ fun CapabilitiesScreen(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            if (rows == null) "Capabilities" else "${rows.size} capabilities",
+                            if (rows == null) stringResource(R.string.nav_capabilities)
+                            else stringResource(R.string.capabilities_count, rows.size),
                             fontWeight = FontWeight.SemiBold,
                             fontSize   = 15.sp,
-                            color      = TextPri
+                            color      = NewaxTheme.colors.textPrimary
                         )
                         Spacer(Modifier.height(2.dp))
                         val ready = rows?.count { it.status == CapabilityStatus.READY } ?: 0
                         Text(
                             when {
-                                rows == null -> "Not initialized"
-                                ready == rows.size -> "All ready · runs on this device"
-                                else -> "$ready ready · ${rows.size - ready} need attention"
+                                rows == null -> stringResource(R.string.capabilities_not_initialized_status)
+                                ready == rows.size -> stringResource(R.string.capabilities_all_ready)
+                                else -> stringResource(R.string.capabilities_ready_status, ready, rows.size - ready)
                             },
                             fontSize = 13.sp,
-                            color    = TextSec
+                            color    = NewaxTheme.colors.textSecondary
                         )
                     }
                     IconButton(onClick = { refreshKey++ }) {
                         Icon(
                             Icons.Rounded.Refresh,
-                            contentDescription = "Refresh status",
-                            tint = TextSec
+                            contentDescription = stringResource(R.string.cd_refresh_status),
+                            tint = NewaxTheme.colors.textSecondary
                         )
                     }
                 }
@@ -204,35 +204,64 @@ fun CapabilitiesScreen(
         // ── Model provider (shared/model-api contract, Phase 5b) ────────────
         item { ModelProviderCard() }
 
+        // ── Route 4.3 — Apps index ─────────────────────────────────────────
+        item {
+            Card(
+                shape     = RoundedCornerShape(16.dp),
+                colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenAppsIndex)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.capabilities_apps_row), fontWeight = FontWeight.Medium, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                        Text(stringResource(R.string.capabilities_apps_desc), fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
+                    }
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = NewaxTheme.colors.textSecondary)
+                }
+            }
+        }
+
         // ── States ─────────────────────────────────────────────────────────
         when {
+            // T3.4: the shared error surface — a registry that never
+            // initialized is a failure state, announced assertively.
             rows == null -> item {
-                Box(
-                    Modifier.fillMaxWidth().padding(vertical = 56.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.Shield, contentDescription = null, tint = TextTer, modifier = Modifier.size(44.dp))
-                        Spacer(Modifier.height(14.dp))
-                        Text("Capabilities not initialized", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextSec)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Restart the app to register the platform surface", fontSize = 13.sp, color = TextTer)
-                    }
-                }
+                ErrorState(
+                    title   = stringResource(R.string.capabilities_not_initialized),
+                    message = stringResource(R.string.capabilities_restart),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 56.dp)
+                )
             }
             rows.isEmpty() -> item {
-                Box(
-                    Modifier.fillMaxWidth().padding(vertical = 56.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.Shield, contentDescription = null, tint = TextTer, modifier = Modifier.size(44.dp))
-                        Spacer(Modifier.height(14.dp))
-                        Text("No capabilities registered", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextSec)
-                    }
-                }
+                EmptyState(
+                    title   = stringResource(R.string.capabilities_empty),
+                    icon    = Icons.Rounded.Shield,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 56.dp)
+                )
             }
-            else -> items(rows, key = { it.id.name }) { CapabilityCard(it) }
+            else -> items(rows, key = { it.id.name }) {
+                // Route 4.2 — each capability card expands into its detail:
+                // what it enables (the description), the backing adapter, the
+                // remedy for a non-operational status, and a retry that
+                // re-reads the registry snapshot.
+                CapabilityCard(
+                    row = it,
+                    onRetry = { refreshKey++ },
+                    onOpenAppPermissions = onOpenAppPermissions,
+                    onOpenSettings = onOpenSettings
+                )
+            }
         }
 
         // ── Policy settings — authority spine (Track A2) ────────────────────
@@ -246,15 +275,30 @@ fun CapabilitiesScreen(
 }
 
 @Composable
-private fun CapabilityCard(row: CapabilityRow) {
+private fun CapabilityCard(
+    row: CapabilityRow,
+    onRetry: () -> Unit,
+    onOpenAppPermissions: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    var expanded by remember(row.id) { mutableStateOf(false) }
     Card(
         shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    // SC 4.1.2: the expand/collapse state lives on the control,
+                    // never only in the chevron glyph (same pattern as the
+                    // memory category cards).
+                    .statusSemantics(if (expanded) stringResource(R.string.a11y_expanded) else stringResource(R.string.a11y_collapsed)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     Modifier
                         .size(12.dp)
@@ -263,27 +307,73 @@ private fun CapabilityCard(row: CapabilityRow) {
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(row.displayName, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPri)
-                    Text(row.id.name, fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                    Text(row.displayName, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                    Text(row.id.name, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                 }
                 StatusChip(row.status)
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = null,
+                    tint = NewaxTheme.colors.textSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
 
             Spacer(Modifier.height(8.dp))
-            Text(row.description, fontSize = 13.sp, color = TextSec, lineHeight = 19.sp)
+            Text(row.description, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
 
             if (row.requiredPermission != null || row.requiredCredentialKey != null) {
                 Spacer(Modifier.height(10.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    row.requiredPermission?.let { MetaRow("Permission", it) }
-                    row.requiredCredentialKey?.let { MetaRow("Credential", it) }
+                    row.requiredPermission?.let { MetaRow(stringResource(R.string.capabilities_meta_permission), it) }
+                    row.requiredCredentialKey?.let { MetaRow(stringResource(R.string.capabilities_meta_credential), it) }
                 }
             }
 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tag("Privilege · ${row.privilegeLevel.label()}", TextSec)
-                if (row.offline) Tag("Offline", ReadyColor)
+                Tag(stringResource(R.string.capabilities_tag_privilege, stringResource(row.privilegeLevel.labelRes())), NewaxTheme.colors.textSecondary)
+                if (row.offline) Tag(stringResource(R.string.capabilities_tag_offline), NewaxTheme.colors.success)
+            }
+
+            if (expanded) {
+                // Route 4.2 — the expanded detail: what it enables (above),
+                // the remedy for a non-operational status, and a retry that
+                // re-reads the registry snapshot. Remedies point at real
+                // destinations — the Permissions screen for a missing platform
+                // grant, the Settings page for a missing credential.
+                HorizontalDivider(color = NewaxTheme.colors.border, modifier = Modifier.padding(top = 12.dp, bottom = 10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.capabilities_remedy_title), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textTertiary)
+                    when (row.status) {
+                        CapabilityStatus.MISSING_PERMISSION -> {
+                            Text(stringResource(R.string.capabilities_remedy_permission_body), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
+                            Button(
+                                onClick  = onOpenAppPermissions,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors   = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                            ) { Text(stringResource(R.string.capabilities_remedy_permission), fontSize = 14.sp) }
+                        }
+                        CapabilityStatus.MISSING_CREDENTIAL -> {
+                            Text(stringResource(R.string.capabilities_remedy_credential_body), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
+                            Button(
+                                onClick  = onOpenSettings,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors   = ButtonDefaults.buttonColors(containerColor = NewaxTheme.colors.textPrimary)
+                            ) { Text(stringResource(R.string.capabilities_remedy_credential), fontSize = 14.sp) }
+                        }
+                        else -> {
+                            Text(stringResource(R.string.capabilities_remedy_operational), fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = onRetry,
+                        modifier = Modifier.fillMaxWidth(),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = NewaxTheme.colors.textSecondary)
+                    ) { Text(stringResource(R.string.capabilities_retry), fontSize = 14.sp) }
+                }
             }
         }
     }
@@ -291,26 +381,27 @@ private fun CapabilityCard(row: CapabilityRow) {
 
 // ── Model provider card ────────────────────────────────────────────────────
 
+@Composable
 private fun modelStateColor(state: ModelState): Color = when (state) {
-    ModelState.READY         -> ReadyColor
-    ModelState.LOADING       -> MissingPermCol
-    ModelState.ERROR         -> UnavailableCol
-    ModelState.NOT_INSTALLED -> NotSupportedCol
-    ModelState.CLOSED        -> NotSupportedCol
+    ModelState.READY         -> NewaxTheme.colors.success
+    ModelState.LOADING       -> NewaxTheme.colors.warning
+    ModelState.ERROR         -> NewaxTheme.colors.error
+    ModelState.NOT_INSTALLED -> NewaxTheme.colors.textTertiary
+    ModelState.CLOSED        -> NewaxTheme.colors.textTertiary
 }
 
-private fun ModelState.label(): String = when (this) {
-    ModelState.NOT_INSTALLED -> "Not installed"
-    ModelState.LOADING       -> "Loading"
-    ModelState.READY         -> "Ready"
-    ModelState.ERROR         -> "Error"
-    ModelState.CLOSED        -> "Closed"
+private fun ModelState.labelRes(): Int = when (this) {
+    ModelState.NOT_INSTALLED -> R.string.capabilities_state_not_installed
+    ModelState.LOADING       -> R.string.capabilities_state_loading
+    ModelState.READY         -> R.string.capabilities_state_ready
+    ModelState.ERROR         -> R.string.capabilities_state_error
+    ModelState.CLOSED        -> R.string.capabilities_state_closed
 }
 
-private fun ModelFormat.label(): String = when (this) {
-    ModelFormat.LITERTLM -> "LiteRT-LM"
-    ModelFormat.GGUF     -> "GGUF"
-    ModelFormat.UNKNOWN  -> "Format unknown"
+private fun ModelFormat.labelRes(): Int = when (this) {
+    ModelFormat.LITERTLM -> R.string.capabilities_format_litertlm
+    ModelFormat.GGUF     -> R.string.capabilities_format_gguf
+    ModelFormat.UNKNOWN  -> R.string.capabilities_format_unknown
 }
 
 private fun formatBytes(bytes: Long): String = when {
@@ -335,8 +426,8 @@ private fun ModelProviderCard() {
 
     Card(
         shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = Surface),
-        border    = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors    = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -349,49 +440,47 @@ private fun ModelProviderCard() {
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Model provider", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPri)
-                    Text("shared/model-api · on-device brain", fontSize = 11.sp, color = TextTer, fontFamily = FontFamily.Monospace)
+                    Text(stringResource(R.string.capabilities_model_provider), fontWeight = FontWeight.Medium, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                    Text(stringResource(R.string.capabilities_model_desc), fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                 }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(modelStateColor(state).copy(alpha = 0.12f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(state.label(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = modelStateColor(state))
-                }
+                // T3.4: shared status pill — the model's state as a word +
+                // colour, never colour alone.
+                NewaxStatusChip(
+                    label = stringResource(state.labelRes()),
+                    color = modelStateColor(state)
+                )
             }
 
             Spacer(Modifier.height(8.dp))
             when (state) {
                 ModelState.NOT_INSTALLED -> Text(
-                    "No model pack installed — the deterministic command engine is active. Import a verified .litertlm bundle to enable open-ended reasoning.",
-                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                    stringResource(R.string.capabilities_empty_model),
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.LOADING -> Text(
-                    "Loading ${d.modelName} into memory…",
-                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                    stringResource(R.string.capabilities_model_loading, d.modelName),
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.READY -> Text(
-                    "${d.modelName} is loaded and accepting requests on this device.",
-                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                    stringResource(R.string.capabilities_model_ready, d.modelName),
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.ERROR -> Text(
-                    "Model unavailable — load failed or the pack was removed. Re-import to retry.",
-                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                    stringResource(R.string.capabilities_model_unavailable),
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.CLOSED -> Text(
-                    "Model provider closed — no further requests are accepted.",
-                    fontSize = 13.sp, color = TextSec, lineHeight = 19.sp
+                    stringResource(R.string.capabilities_model_closed),
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
             }
 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tag(d.format.label(), TextSec)
-                if (d.sha256.isNotBlank()) Tag("sha256 ${d.sha256.take(10)}…", TextSec)
-                if (d.sizeBytes > 0) Tag(formatBytes(d.sizeBytes), TextSec)
-                if (d.modelName.isNotBlank() && state != ModelState.NOT_INSTALLED) Tag(d.modelName, TextSec)
+                Tag(stringResource(d.format.labelRes()), NewaxTheme.colors.textSecondary)
+                if (d.sha256.isNotBlank()) Tag("sha256 ${d.sha256.take(10)}…", NewaxTheme.colors.textSecondary)
+                if (d.sizeBytes > 0) Tag(formatBytes(d.sizeBytes), NewaxTheme.colors.textSecondary)
+                if (d.modelName.isNotBlank() && state != ModelState.NOT_INSTALLED) Tag(d.modelName, NewaxTheme.colors.textSecondary)
             }
         }
     }
@@ -399,37 +488,27 @@ private fun ModelProviderCard() {
 
 @Composable
 private fun StatusChip(status: CapabilityStatus) {
-    val color = statusColor(status)
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(status.label(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
-    }
+    // T3.4: shared status pill.
+    NewaxStatusChip(
+        label = status.label(),
+        color = statusColor(status)
+    )
 }
 
 @Composable
 private fun Tag(text: String, color: Color) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(SurfaceMuted)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = color)
-    }
+    // T3.4: shared neutral tag.
+    InfoTag(text = text, color = color)
 }
 
 @Composable
 private fun MetaRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth()) {
-        Text(label, fontSize = 12.sp, color = TextTer, modifier = Modifier.weight(0.35f))
+        Text(label, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, modifier = Modifier.weight(0.35f))
         Text(
             value,
             fontSize = 12.sp,
-            color    = TextSec,
+            color    = NewaxTheme.colors.textSecondary,
             fontFamily = FontFamily.Monospace,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
