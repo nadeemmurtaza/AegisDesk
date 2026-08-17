@@ -1,19 +1,15 @@
 package com.newax.aegis.desktop.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Apps
-import androidx.compose.material.icons.rounded.Flag
-import androidx.compose.material.icons.rounded.Gavel
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,33 +22,41 @@ import com.newax.aegis.desktop.DesktopCapabilitiesHolder
 import com.newax.aegis.desktop.GoalsStore
 import com.newax.aegis.desktop.ui.state.AppsScreenState
 import com.newax.aegis.desktop.ui.state.AuditScreenState
+import com.newax.aegis.desktop.ui.state.ChatState
 import com.newax.aegis.desktop.ui.state.GoalsScreenState
 import com.newax.aegis.desktop.ui.state.LiveGoalRunner
 import com.newax.aegis.desktop.ui.state.PolicyScreenState
 import com.newax.aegis.desktop.ui.state.StatusScreenState
 import com.newax.aegis.platform.windows.WindowsAppIndex
+import com.newax.aegis.ui.theme.NewaxTheme
 import kotlinx.coroutines.CoroutineScope
 
-private enum class DesktopScreen { STATUS, APPS, GOALS, POLICY, AUDIT }
-
 /**
- * The desktop window content: side navigation (Status / Apps / Goals / Policy /
- * Audit) over the five screens, each backed by a plain-Kotlin state holder. The
- * Goals board's executor runs on [appScope] (the process scope that outlives the
- * window's recompositions) and resolves against the process-wide capability
- * registry and the Start Menu [appIndex]. The Policy tab exposes the authority
- * spine (per-class modes, decision history, approval pressure) via the one
- * process engine; a policy-blocked goal's "Change mode" action jumps here. The
- * Audit tab shows the full execution audit trail with CSV export.
+ * The desktop window content under the unified IA (docs/UI_DESIGN.md §5.1):
+ *
+ * - **Chat (home, route 1.1/1.2)** — the conversation sidebar + the thread,
+ *   the product's main surface, backed by [ChatState] (Room-persisted
+ *   conversations, live model streaming).
+ * - **Tasks (3.1)** — the Goals board ([GoalsScreen]).
+ * - **Capabilities (4.1 / 4.3)** — Status + the Start Menu app index.
+ * - **Settings (5.3.1 / 5.3.1.3)** — Policy & Capabilities + the audit trail.
+ *
+ * The previous flat five-screen rail (Status/Apps/Goals/Policy/Audit) is gone:
+ * chat is the home, and the other screens are reached through the sidebar's
+ * section links, matching the route tree.
  */
 @Composable
 fun NewaxDesktopApp(
     appScope: CoroutineScope,
     appIndex: WindowsAppIndex?,
     store: GoalsStore? = null,
+    chatState: ChatState,
 ) {
     NewaxTheme {
-        var screen by remember { mutableStateOf(DesktopScreen.STATUS) }
+        // Chat is home — the window opens on the thread pane.
+        var section by remember { mutableStateOf<SidebarSection?>(null) }
+        var subView by remember { mutableStateOf<SidebarSubView?>(null) }
+
         val statusState = remember { StatusScreenState() }
         val appsState = remember { AppsScreenState({ appIndex }) }
         val goalsState = remember {
@@ -69,61 +73,58 @@ fun NewaxDesktopApp(
             goalsState.refresh()
             auditState.refresh()
             policyState.refresh()
+            chatState.refreshConversations()
         }
 
         Scaffold(
-            contentColor = SurfaceColor,
-            containerColor = SurfaceColor
+            contentColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
         ) { padding ->
             Row(
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                NavigationRail(
-                    containerColor = SurfaceColor,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                ) {
-                    NavigationRailItem(
-                        selected = screen == DesktopScreen.STATUS,
-                        onClick = { screen = DesktopScreen.STATUS },
-                        icon = { Icon(Icons.Rounded.Shield, contentDescription = "Status") },
-                        label = { Text("Status") },
-                    )
-                    NavigationRailItem(
-                        selected = screen == DesktopScreen.APPS,
-                        onClick = { screen = DesktopScreen.APPS },
-                        icon = { Icon(Icons.Rounded.Apps, contentDescription = "Apps") },
-                        label = { Text("Apps") },
-                    )
-                    NavigationRailItem(
-                        selected = screen == DesktopScreen.GOALS,
-                        onClick = { screen = DesktopScreen.GOALS },
-                        icon = { Icon(Icons.Rounded.Flag, contentDescription = "Goals") },
-                        label = { Text("Goals") },
-                    )
-                    NavigationRailItem(
-                        selected = screen == DesktopScreen.POLICY,
-                        onClick = { screen = DesktopScreen.POLICY },
-                        icon = { Icon(Icons.Rounded.Gavel, contentDescription = "Policy") },
-                        label = { Text("Policy") },
-                    )
-                    NavigationRailItem(
-                        selected = screen == DesktopScreen.AUDIT,
-                        onClick = { screen = DesktopScreen.AUDIT },
-                        icon = { Icon(Icons.Rounded.History, contentDescription = "Audit") },
-                        label = { Text("Audit") },
-                    )
-                }
-                when (screen) {
-                    DesktopScreen.STATUS -> StatusScreen(statusState)
-                    DesktopScreen.APPS -> AppsScreen(appsState)
-                    DesktopScreen.GOALS -> GoalsScreen(
-                        state = goalsState,
-                        onOpenPolicy = { screen = DesktopScreen.POLICY },
-                    )
-                    DesktopScreen.POLICY -> PolicyScreen(policyState)
-                    DesktopScreen.AUDIT -> AuditScreen(auditState)
+                ConversationSidebar(
+                    state = chatState,
+                    selectedSection = section,
+                    selectedSubView = subView,
+                    onSelectSection = { s, v ->
+                        section = s
+                        subView = v
+                    },
+                    onOpenConversation = { id ->
+                        chatState.openConversation(id)
+                        section = null
+                        subView = null
+                    },
+                    onNewChat = {
+                        chatState.newChat()
+                        section = null
+                        subView = null
+                    },
+                )
+                Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.weight(1f)) {
+                    when (section) {
+                        null -> ThreadScreen(state = chatState, onNewChat = { chatState.newChat() })
+                        SidebarSection.TASKS -> GoalsScreen(
+                            state = goalsState,
+                            onOpenPolicy = {
+                                section = SidebarSection.SETTINGS
+                                subView = SidebarSubView.POLICY
+                            },
+                        )
+                        SidebarSection.CAPABILITIES -> when (subView ?: SidebarSubView.STATUS) {
+                            SidebarSubView.STATUS -> StatusScreen(statusState)
+                            SidebarSubView.APPS -> AppsScreen(appsState)
+                            else -> StatusScreen(statusState)
+                        }
+                        SidebarSection.SETTINGS -> when (subView ?: SidebarSubView.POLICY) {
+                            SidebarSubView.POLICY -> PolicyScreen(policyState)
+                            SidebarSubView.AUDIT -> AuditScreen(auditState)
+                            else -> PolicyScreen(policyState)
+                        }
+                    }
                 }
             }
         }

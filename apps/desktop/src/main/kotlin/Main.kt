@@ -64,7 +64,10 @@ import com.newax.aegis.desktop.planner.Goal
 import com.newax.aegis.desktop.planner.GoalState
 import com.newax.aegis.desktop.planner.SkillRegistry
 import com.newax.aegis.desktop.planner.TaskStatus
+import com.newax.aegis.db.getNewaxDatabase
 import com.newax.aegis.desktop.ui.NewaxDesktopApp
+import com.newax.aegis.desktop.ui.state.ChatState
+import com.newax.aegis.desktop.ui.state.RoomChatStore
 import com.newax.aegis.desktopsync.DesktopSync
 import com.newax.aegis.model.ModelRequest
 import com.newax.aegis.platform.windows.GgufHeaderParser
@@ -124,13 +127,26 @@ private fun windowMain() {
         }
     }
 
+    // The desktop app database — conversations (route 1.1/1.2 persistence).
+    // Opened on the frozen app-DB name ~/.aegis/aegis.db; DesktopSync owns
+    // ~/.aegis/sync.db separately (R15 keeps both names). A failed open is an
+    // honest null: the chat thread then shows its error state instead of
+    // crashing (R9), and nothing else in the window depends on this DB.
+    val appDir = File(System.getProperty("user.home") ?: ".", ".aegis").apply { mkdirs() }
+    val chatDao = runCatching { getNewaxDatabase(File(appDir, "aegis.db")).conversationDao() }.getOrNull()
+    val chatState = ChatState(
+        scope = appScope,
+        store = chatDao?.let(::RoomChatStore),
+        modelProvider = { DesktopModelProviderHolder.current() },
+    )
+
     application {
         Window(
             onCloseRequest = ::exitApplication,
             title = "Newax Aegis — Desktop",
             state = rememberWindowState(size = DpSize(1120.dp, 760.dp)),
         ) {
-            NewaxDesktopApp(appScope = appScope, appIndex = appIndex, store = goalsStore)
+            NewaxDesktopApp(appScope = appScope, appIndex = appIndex, store = goalsStore, chatState = chatState)
         }
     }
 

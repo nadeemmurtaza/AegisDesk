@@ -68,15 +68,18 @@ class AuditScreenStateTest {
 
     @Test
     fun `export success reports the written path`() {
+        val exported = Paths.get("/home/me/.aegis/audit-1.csv")
         val state = AuditScreenState(
             auditSource = { listOf(entry("g1", completedMs = 5_000L)) },
-            exporter = { Result.success(Paths.get("/home/me/.aegis/audit-1.csv")) },
+            exporter = { Result.success(exported) },
         )
         state.refresh()
 
         state.export()
 
-        assertEquals(ExportState.Done("/home/me/.aegis/audit-1.csv"), state.exportState.value)
+        // The state reports Path.toString(), so the expectation must be built
+        // from the same Path — a hardcoded POSIX string breaks on Windows.
+        assertEquals(ExportState.Done(exported.toString()), state.exportState.value)
     }
 
     @Test

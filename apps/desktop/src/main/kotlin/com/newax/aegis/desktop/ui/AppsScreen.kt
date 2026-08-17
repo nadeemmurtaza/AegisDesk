@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.desktop.ui.state.AppsScreenState
 import com.newax.aegis.platform.windows.AppIndexEntry
+import com.newax.aegis.ui.theme.NewaxTheme
 
 /** How many index entries one screen shows before the "… and N more" note (CLI showed 40). */
 private const val VISIBLE_ENTRIES = 200
@@ -53,8 +54,8 @@ fun AppsScreen(state: AppsScreenState) {
         // ── Header + search ────────────────────────────────────────────────
         Card(
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-            border = BorderStroke(1.dp, BorderColor),
+            colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+            border = BorderStroke(1.dp, NewaxTheme.colors.border),
             elevation = CardDefaults.cardElevation(0.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -65,7 +66,7 @@ fun AppsScreen(state: AppsScreenState) {
                     "Apps · Start Menu index",
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,
-                    color = TextPrimaryColor
+                    color = NewaxTheme.colors.textPrimary
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -76,23 +77,23 @@ fun AppsScreen(state: AppsScreenState) {
                         else -> "${entries.size} matches for \"$query\""
                     },
                     fontSize = 13.sp,
-                    color = TextSecondaryColor
+                    color = NewaxTheme.colors.textSecondary
                 )
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = query,
                     onValueChange = { state.setQuery(it) },
-                    placeholder = { Text("Search installed apps…", fontSize = 14.sp, color = TextTertiaryColor) },
+                    placeholder = { Text("Search installed apps…", fontSize = 14.sp, color = NewaxTheme.colors.textTertiary) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TextSecondaryColor,
-                        unfocusedBorderColor = BorderColor,
-                        focusedContainerColor = SurfaceColor,
-                        unfocusedContainerColor = SurfaceColor
+                        focusedBorderColor = NewaxTheme.colors.textSecondary,
+                        unfocusedBorderColor = NewaxTheme.colors.border,
+                        focusedContainerColor = NewaxTheme.colors.surface,
+                        unfocusedContainerColor = NewaxTheme.colors.surface
                     ),
                     leadingIcon = {
-                        Icon(Icons.Outlined.Search, contentDescription = null, tint = TextTertiaryColor)
+                        Icon(Icons.Outlined.Search, contentDescription = null, tint = NewaxTheme.colors.textTertiary)
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -124,7 +125,7 @@ fun AppsScreen(state: AppsScreenState) {
                         Text(
                             "… and ${entries.size - VISIBLE_ENTRIES} more",
                             fontSize = 12.sp,
-                            color = TextTertiaryColor,
+                            color = NewaxTheme.colors.textTertiary,
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
@@ -138,25 +139,25 @@ fun AppsScreen(state: AppsScreenState) {
 private fun AppCard(entry: AppIndexEntry) {
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, BorderColor),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(entry.name, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPrimaryColor)
+                    Text(entry.name, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text(entry.category, fontSize = 11.sp, color = TextTertiaryColor)
+                    Text(entry.category, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
                 }
-                Tag(entry.lnkPath.substringAfterLast('.').ifBlank { "lnk" }.uppercase(), TextSecondaryColor)
+                Tag(entry.lnkPath.substringAfterLast('.').ifBlank { "lnk" }.uppercase(), NewaxTheme.colors.textSecondary)
             }
             Spacer(Modifier.height(6.dp))
             Text(
                 entry.lnkPath,
                 fontSize = 11.5.sp,
-                color = TextSecondaryColor,
+                color = NewaxTheme.colors.textSecondary,
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

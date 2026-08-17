@@ -30,15 +30,20 @@ import com.newax.aegis.model.ModelFormat
 import com.newax.aegis.model.ModelState
 import com.newax.aegis.platform.CapabilityStatus
 import com.newax.aegis.platform.PrivilegeLevel
+import com.newax.aegis.ui.theme.NewaxTheme
 
-/** Status dot color per capability status — Android CapabilitiesScreen mapping. */
+/**
+ * Status dot colour per capability status — Android CapabilitiesScreen mapping.
+ * Composable because the palette lives behind NewaxTheme (shared:ui tokens).
+ */
+@Composable
 fun statusColor(status: CapabilityStatus): Color = when (status) {
-    CapabilityStatus.READY -> ReadyColor
-    CapabilityStatus.MISSING_PERMISSION -> WarningColor
-    CapabilityStatus.MISSING_CREDENTIAL -> Color(0xFFF97316)
-    CapabilityStatus.DISABLED -> MutedColor
-    CapabilityStatus.UNAVAILABLE -> ErrorColor
-    CapabilityStatus.NOT_SUPPORTED -> NotSupportedColor
+    CapabilityStatus.READY -> NewaxTheme.colors.success
+    CapabilityStatus.MISSING_PERMISSION -> NewaxTheme.colors.warning
+    CapabilityStatus.MISSING_CREDENTIAL -> NewaxTheme.colors.warning
+    CapabilityStatus.DISABLED -> NewaxTheme.colors.textTertiary
+    CapabilityStatus.UNAVAILABLE -> NewaxTheme.colors.error
+    CapabilityStatus.NOT_SUPPORTED -> NewaxTheme.colors.textTertiary
 }
 
 /** "Ready", "Missing permission", … — the CapabilitiesScreen label mapping. */
@@ -62,13 +67,14 @@ fun GoalState.label(): String = when (this) {
     GoalState.ABANDONED -> "Abandoned"
 }
 
-/** Goal state dot color — the GoalsScreen mapping. */
+/** Goal state dot colour — the GoalsScreen mapping (tokens from shared:ui). */
+@Composable
 fun GoalState.dotColor(): Color = when (this) {
-    GoalState.OPEN -> MutedColor
-    GoalState.ACTIVE -> ReadyColor
-    GoalState.BLOCKED -> ErrorColor
-    GoalState.COMPLETED -> ReadyColor
-    GoalState.ABANDONED -> MutedColor
+    GoalState.OPEN -> NewaxTheme.colors.textTertiary
+    GoalState.ACTIVE -> NewaxTheme.colors.success
+    GoalState.BLOCKED -> NewaxTheme.colors.error
+    GoalState.COMPLETED -> NewaxTheme.colors.success
+    GoalState.ABANDONED -> NewaxTheme.colors.textTertiary
 }
 
 /** Model lifecycle label — the CapabilitiesScreen ModelProviderCard mapping. */
@@ -80,12 +86,14 @@ fun ModelState.label(): String = when (this) {
     ModelState.CLOSED -> "Closed"
 }
 
+/** Model state dot colour — the CapabilitiesScreen ModelProviderCard mapping. */
+@Composable
 fun modelStateColor(state: ModelState): Color = when (state) {
-    ModelState.READY -> ReadyColor
-    ModelState.LOADING -> WarningColor
-    ModelState.ERROR -> ErrorColor
-    ModelState.NOT_INSTALLED -> NotSupportedColor
-    ModelState.CLOSED -> NotSupportedColor
+    ModelState.READY -> NewaxTheme.colors.success
+    ModelState.LOADING -> NewaxTheme.colors.warning
+    ModelState.ERROR -> NewaxTheme.colors.error
+    ModelState.NOT_INSTALLED -> NewaxTheme.colors.textTertiary
+    ModelState.CLOSED -> NewaxTheme.colors.textTertiary
 }
 
 /** Runtime format label — LiteRT-LM / GGUF / unknown. */
@@ -115,7 +123,7 @@ fun Tag(text: String, color: Color) {
     Box(
         Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(SurfaceMutedColor)
+            .background(NewaxTheme.colors.surfaceMuted)
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = color)
@@ -150,15 +158,15 @@ fun StateDot(color: Color, size: Dp = 12.dp) {
 @Composable
 fun MetaRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth()) {
-        Text(label, fontSize = 12.sp, color = TextTertiaryColor, modifier = Modifier.weight(0.35f))
+        Text(label, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary, modifier = Modifier.weight(0.35f))
         Spacer(Modifier.width(8.dp))
         Text(
             value,
             fontSize = 12.sp,
-            color = TextSecondaryColor,
+            color = NewaxTheme.colors.textSecondary,
             fontFamily = FontFamily.Monospace,
             maxLines = 2,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(0.65f)
         )
     }
@@ -166,7 +174,7 @@ fun MetaRow(label: String, value: String) {
 
 /** Centered empty/error state with icon dot, title and optional hint — the Android pattern. */
 @Composable
-fun EmptyState(title: String, hint: String?, iconColor: Color = TextTertiaryColor) {
+fun EmptyState(title: String, hint: String?, iconColor: Color = NewaxTheme.colors.textTertiary) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -176,13 +184,13 @@ fun EmptyState(title: String, hint: String?, iconColor: Color = TextTertiaryColo
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             StateDot(iconColor, size = 12.dp)
             Spacer(Modifier.height(14.dp))
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextSecondaryColor)
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = NewaxTheme.colors.textSecondary)
             if (hint != null) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     hint,
                     fontSize = 13.sp,
-                    color = TextTertiaryColor,
+                    color = NewaxTheme.colors.textTertiary,
                     modifier = Modifier.padding(horizontal = 32.dp)
                 )
             }
@@ -197,12 +205,12 @@ fun ExportStatusLine(state: ExportState, idleHint: String = "Exports land in ~/.
         is ExportState.Idle -> Text(
             idleHint,
             fontSize = 12.sp,
-            color = TextTertiaryColor
+            color = NewaxTheme.colors.textTertiary
         )
         is ExportState.Done -> Text(
             "Exported → $state.path",
             fontSize = 12.sp,
-            color = ReadyColor,
+            color = NewaxTheme.colors.success,
             fontFamily = FontFamily.Monospace,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -210,7 +218,7 @@ fun ExportStatusLine(state: ExportState, idleHint: String = "Exports land in ~/.
         is ExportState.Failed -> Text(
             state.message,
             fontSize = 12.sp,
-            color = ErrorColor,
+            color = NewaxTheme.colors.error,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )

@@ -63,7 +63,7 @@ import com.newax.aegis.desktop.ui.state.PolicyUiModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import com.newax.aegis.ui.theme.NewaxLightColors
+import com.newax.aegis.ui.theme.NewaxTheme
 
 /**
  * Policy tab — the desktop face of the authority spine (mirroring Android's
@@ -92,10 +92,10 @@ fun PolicyScreen(state: PolicyScreenState) {
     ) {
         when (val current = model) {
             is PolicyUiModel.Loading -> item {
-                EmptyState("Loading policy…", null, iconColor = WarningColor)
+                EmptyState("Loading policy…", null, iconColor = NewaxTheme.colors.warning)
             }
             is PolicyUiModel.Error -> item {
-                EmptyState("Could not load policy", current.message, iconColor = ErrorColor)
+                EmptyState("Could not load policy", current.message, iconColor = NewaxTheme.colors.error)
             }
             is PolicyUiModel.Content -> {
                 // ── Summary: decisions + approval pressure + export ───────
@@ -166,7 +166,7 @@ fun PolicyScreen(state: PolicyScreenState) {
                             EmptyState(
                                 "No ${decisionLabel(filter ?: PolicyDecision.AUTO_EXECUTE).lowercase()} decisions",
                                 "Try a different filter — nothing in the trail matches this one.",
-                                iconColor = TextTertiaryColor
+                                iconColor = NewaxTheme.colors.textTertiary
                             )
                         }
                     } else {
@@ -179,7 +179,7 @@ fun PolicyScreen(state: PolicyScreenState) {
                         EmptyState(
                             "No policy decisions yet",
                             "Run a goal with a policy-gated skill (launch an app, send a message, set a reminder) to start the trail — every evaluation is recorded here across sessions.",
-                            iconColor = TextTertiaryColor
+                            iconColor = NewaxTheme.colors.textTertiary
                         )
                     }
                 }
@@ -201,7 +201,7 @@ fun PolicyScreen(state: PolicyScreenState) {
                 TextButton(onClick = {
                     state.clear()
                     showClearDialog = false
-                }) { Text("Clear", color = ErrorColor, fontWeight = FontWeight.SemiBold) }
+                }) { Text("Clear", color = NewaxTheme.colors.error, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) { Text("Cancel") }
@@ -213,9 +213,9 @@ fun PolicyScreen(state: PolicyScreenState) {
 @Composable
 private fun SectionTitle(title: String, subtitle: String) {
     Column(Modifier.padding(top = 6.dp)) {
-        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextPrimaryColor)
+        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
         Spacer(Modifier.height(2.dp))
-        Text(subtitle, fontSize = 12.sp, color = TextTertiaryColor)
+        Text(subtitle, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
     }
 }
 
@@ -228,8 +228,8 @@ private fun PolicySummaryCard(
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, BorderColor),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -240,17 +240,17 @@ private fun PolicySummaryCard(
                         else "${model.records.size} ${if (model.records.size == 1) "decision" else "decisions"}",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
-                        color = TextPrimaryColor
+                        color = NewaxTheme.colors.textPrimary
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         "Recorded across sessions — who asked, what was decided",
                         fontSize = 12.sp,
-                        color = TextTertiaryColor
+                        color = NewaxTheme.colors.textTertiary
                     )
                 }
                 IconButton(onClick = onRefresh) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = "Refresh policy", tint = TextSecondaryColor)
+                    Icon(Icons.Rounded.Refresh, contentDescription = "Refresh policy", tint = NewaxTheme.colors.textSecondary)
                 }
             }
             if (model.records.isNotEmpty()) {
@@ -270,13 +270,13 @@ private fun PolicySummaryCard(
 
                 if (model.breakdown.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
-                    HorizontalDivider(color = BorderColor)
+                    HorizontalDivider(color = NewaxTheme.colors.border)
                     Spacer(Modifier.height(10.dp))
                     Text(
                         "Actions needing most approvals",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = TextTertiaryColor
+                        color = NewaxTheme.colors.textTertiary
                     )
                     Spacer(Modifier.height(4.dp))
                     model.breakdown.take(5).forEach { stat ->
@@ -287,7 +287,7 @@ private fun PolicySummaryCard(
                         Text(
                             "+ ${model.breakdown.size - 5} more action classes",
                             fontSize = 11.sp,
-                            color = TextTertiaryColor
+                            color = NewaxTheme.colors.textTertiary
                         )
                     }
                 }
@@ -298,10 +298,10 @@ private fun PolicySummaryCard(
                         onClick = onExport,
                         enabled = model.records.isNotEmpty(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = TextPrimaryColor,
-                            contentColor = SurfaceColor,
-                            disabledContainerColor = SurfaceMutedColor,
-                            disabledContentColor = TextTertiaryColor
+                            containerColor = NewaxTheme.colors.textPrimary,
+                            contentColor = NewaxTheme.colors.surface,
+                            disabledContainerColor = NewaxTheme.colors.surfaceMuted,
+                            disabledContentColor = NewaxTheme.colors.textTertiary
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -322,18 +322,18 @@ private fun DecisionStat(label: String, count: Int, color: Color) {
     Column(
         Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceMutedColor)
+            .background(NewaxTheme.colors.surfaceMuted)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(
             count.toString(),
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            color = if (count > 0) color else TextTertiaryColor,
+            color = if (count > 0) color else NewaxTheme.colors.textTertiary,
             fontFamily = FontFamily.Monospace
         )
         Spacer(Modifier.height(2.dp))
-        Text(label, fontSize = 11.sp, color = TextTertiaryColor)
+        Text(label, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
     }
 }
 
@@ -351,14 +351,14 @@ private fun ActionClassRow(stat: ActionClassStat) {
             Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(if (prompts) WarningColor else ReadyColor)
+                .background(if (prompts) NewaxTheme.colors.warning else NewaxTheme.colors.success)
         )
         Spacer(Modifier.width(10.dp))
         Text(
             stat.actionClass,
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Medium,
-            color = TextPrimaryColor,
+            color = NewaxTheme.colors.textPrimary,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.weight(1f)
         )
@@ -368,7 +368,7 @@ private fun ActionClassRow(stat: ActionClassStat) {
                 if (stat.denied > 0) append(" · ${stat.denied} denied")
             },
             fontSize = 12.sp,
-            color = if (prompts) WarningColor else ReadyColor
+            color = if (prompts) NewaxTheme.colors.warning else NewaxTheme.colors.success
         )
     }
 }
@@ -383,22 +383,22 @@ private fun PolicyModeCard(
     val default = PolicyEngine.defaultModeFor(row.sample.riskLevel)
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, if (row.denied) DenyColor else BorderColor),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, if (row.denied) NewaxTheme.colors.textTertiary else NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(row.label, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPrimaryColor)
+                    Text(row.label, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = NewaxTheme.colors.textPrimary)
                     Spacer(Modifier.height(2.dp))
-                    Text(row.description, fontSize = 12.sp, color = TextTertiaryColor)
+                    Text(row.description, fontSize = 12.sp, color = NewaxTheme.colors.textTertiary)
                 }
                 Spacer(Modifier.width(10.dp))
                 when {
-                    row.denied -> Tag("Denied", DenyColor)
-                    row.custom -> Tag("Custom: ${modeLabel(row.effectiveMode)}", ReadyColor)
-                    else -> Tag("Default: ${modeLabel(default)}", TextTertiaryColor)
+                    row.denied -> Tag("Denied", NewaxTheme.colors.textTertiary)
+                    row.custom -> Tag("Custom: ${modeLabel(row.effectiveMode)}", NewaxTheme.colors.success)
+                    else -> Tag("Default: ${modeLabel(default)}", NewaxTheme.colors.textTertiary)
                 }
             }
 
@@ -421,11 +421,11 @@ private fun PolicyModeCard(
                     onCheckedChange = onDenyChange
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Hard deny", fontSize = 13.sp, color = if (row.denied) DenyColor else TextSecondaryColor)
+                Text("Hard deny", fontSize = 13.sp, color = if (row.denied) NewaxTheme.colors.textTertiary else NewaxTheme.colors.textSecondary)
                 Spacer(Modifier.weight(1f))
                 TextButton(
                     onClick = onReset,
-                    colors = ButtonDefaults.textButtonColors(contentColor = TextTertiaryColor),
+                    colors = ButtonDefaults.textButtonColors(contentColor = NewaxTheme.colors.textTertiary),
                     modifier = Modifier.clip(RoundedCornerShape(8.dp))
                 ) {
                     Text("Reset to default", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -440,8 +440,8 @@ private fun PolicyAuditCard(record: PolicyAuditRecord, fmt: DateTimeFormatter) {
     val color = decisionColor(record.decision)
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, BorderColor),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(
@@ -456,14 +456,14 @@ private fun PolicyAuditCard(record: PolicyAuditRecord, fmt: DateTimeFormatter) {
                         record.actionClass,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = TextPrimaryColor,
+                        color = NewaxTheme.colors.textPrimary,
                         fontFamily = FontFamily.Monospace
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         record.actionSummary,
                         fontSize = 12.sp,
-                        color = TextSecondaryColor,
+                        color = NewaxTheme.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -472,7 +472,7 @@ private fun PolicyAuditCard(record: PolicyAuditRecord, fmt: DateTimeFormatter) {
                 Text(
                     "${modeLabel(record.mode)} · ${record.origin.name.lowercase()} · ${record.reason}",
                     fontSize = 11.5.sp,
-                    color = TextTertiaryColor,
+                    color = NewaxTheme.colors.textTertiary,
                     lineHeight = 16.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -485,7 +485,7 @@ private fun PolicyAuditCard(record: PolicyAuditRecord, fmt: DateTimeFormatter) {
                 Text(
                     fmt.format(Instant.ofEpochMilli(record.auditedAtMs).atZone(ZoneId.systemDefault())),
                     fontSize = 10.5.sp,
-                    color = TextTertiaryColor,
+                    color = NewaxTheme.colors.textTertiary,
                     fontFamily = FontFamily.Monospace
                 )
             }
@@ -494,8 +494,8 @@ private fun PolicyAuditCard(record: PolicyAuditRecord, fmt: DateTimeFormatter) {
 }
 
 // ── Labels & colors (shared with the audit decision rendering) ─────────────
-private val DenyColor = NewaxLightColors.textTertiary
-private val AutoColor = ReadyColor
+@Composable
+private fun AutoColor(): Color = NewaxTheme.colors.success
 
 private fun modeLabel(mode: PolicyMode): String = when (mode) {
     PolicyMode.AUTO -> "Auto"
@@ -511,11 +511,12 @@ private fun decisionLabel(decision: PolicyDecision): String = when (decision) {
     PolicyDecision.DENY -> "Denied"
 }
 
+@Composable
 private fun decisionColor(decision: PolicyDecision): Color = when (decision) {
-    PolicyDecision.AUTO_EXECUTE -> AutoColor
-    PolicyDecision.REQUIRE_APPROVAL -> WarningColor
-    PolicyDecision.REQUIRE_STRONG -> ErrorColor
-    PolicyDecision.DENY -> DenyColor
+    PolicyDecision.AUTO_EXECUTE -> NewaxTheme.colors.success
+    PolicyDecision.REQUIRE_APPROVAL -> NewaxTheme.colors.warning
+    PolicyDecision.REQUIRE_STRONG -> NewaxTheme.colors.error
+    PolicyDecision.DENY -> NewaxTheme.colors.textTertiary
 }
 
 private val POLICY_TIME_FORMATTER: DateTimeFormatter =

@@ -38,6 +38,7 @@ import com.newax.aegis.desktop.ui.state.StatusScreenState
 import com.newax.aegis.model.ModelDescriptor
 import com.newax.aegis.model.ModelState
 import com.newax.aegis.platform.CapabilityStatus
+import com.newax.aegis.ui.theme.NewaxTheme
 
 /**
  * Status / capabilities screen — the desktop face of the platform contract
@@ -64,8 +65,8 @@ fun StatusScreen(state: StatusScreenState) {
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                border = BorderStroke(1.dp, BorderColor),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -77,7 +78,7 @@ fun StatusScreen(state: StatusScreenState) {
                             if (rows == null) "Capabilities" else "${rows.size} capabilities",
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 15.sp,
-                            color = TextPrimaryColor
+                            color = NewaxTheme.colors.textPrimary
                         )
                         Spacer(Modifier.height(2.dp))
                         val ready = rows?.count { it.status == CapabilityStatus.READY } ?: 0
@@ -88,14 +89,14 @@ fun StatusScreen(state: StatusScreenState) {
                                 else -> "$ready ready · ${rows.size - ready} need attention"
                             },
                             fontSize = 13.sp,
-                            color = TextSecondaryColor
+                            color = NewaxTheme.colors.textSecondary
                         )
                     }
                     IconButton(onClick = { refreshKey++ }) {
                         Icon(
                             Icons.Rounded.Refresh,
                             contentDescription = "Refresh status",
-                            tint = TextSecondaryColor
+                            tint = NewaxTheme.colors.textSecondary
                         )
                     }
                 }
@@ -109,24 +110,24 @@ fun StatusScreen(state: StatusScreenState) {
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                border = BorderStroke(1.dp, BorderColor),
+                colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+                border = BorderStroke(1.dp, NewaxTheme.colors.border),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        StateDot(if (state.syncedMemoryCategories > 0) ReadyColor else TextTertiaryColor)
+                        StateDot(if (state.syncedMemoryCategories > 0) NewaxTheme.colors.success else NewaxTheme.colors.textTertiary)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("Automatic sync", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPrimaryColor)
-                            Text("LAN transport · Room-backed journal", fontSize = 11.sp, color = TextTertiaryColor, fontFamily = FontFamily.Monospace)
+                            Text("Automatic sync", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                            Text("LAN transport · Room-backed journal", fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text(state.syncStatus, fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp)
+                    Text(state.syncStatus, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
                     if (state.syncedMemoryCategories > 0) {
                         Spacer(Modifier.height(8.dp))
-                        Text("${state.syncedMemoryCategories} memory ${if (state.syncedMemoryCategories == 1) "category" else "categories"} synced from paired devices", fontSize = 12.sp, color = TextSecondaryColor)
+                        Text("${state.syncedMemoryCategories} memory ${if (state.syncedMemoryCategories == 1) "category" else "categories"} synced from paired devices", fontSize = 12.sp, color = NewaxTheme.colors.textSecondary)
                     }
                 }
             }
@@ -138,7 +139,7 @@ fun StatusScreen(state: StatusScreenState) {
                 EmptyState(
                     title = "Capabilities not initialized",
                     hint = "Restart the app to register the platform surface",
-                    iconColor = TextTertiaryColor,
+                    iconColor = NewaxTheme.colors.textTertiary,
                 )
             }
             rows.isEmpty() -> item {
@@ -153,8 +154,8 @@ fun StatusScreen(state: StatusScreenState) {
 private fun CapabilityCard(row: CapabilityUiRow) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, BorderColor),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -162,14 +163,14 @@ private fun CapabilityCard(row: CapabilityUiRow) {
                 StateDot(statusColor(row.status))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(row.displayName, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPrimaryColor)
-                    Text(row.id.name, fontSize = 11.sp, color = TextTertiaryColor, fontFamily = FontFamily.Monospace)
+                    Text(row.displayName, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                    Text(row.id.name, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                 }
                 StatusChip(row.status.label(), statusColor(row.status))
             }
 
             Spacer(Modifier.height(8.dp))
-            Text(row.description, fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp)
+            Text(row.description, fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp)
 
             if (row.requiredPermission != null || row.requiredCredentialKey != null) {
                 Spacer(Modifier.height(10.dp))
@@ -181,8 +182,8 @@ private fun CapabilityCard(row: CapabilityUiRow) {
 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tag("Privilege · ${row.privilegeLevel.label()}", TextSecondaryColor)
-                if (row.offline) Tag("Offline", ReadyColor)
+                Tag("Privilege · ${row.privilegeLevel.label()}", NewaxTheme.colors.textSecondary)
+                if (row.offline) Tag("Offline", NewaxTheme.colors.success)
             }
         }
     }
@@ -192,8 +193,8 @@ private fun CapabilityCard(row: CapabilityUiRow) {
 private fun ModelProviderCard(modelState: ModelState, descriptor: ModelDescriptor) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, BorderColor),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -201,8 +202,8 @@ private fun ModelProviderCard(modelState: ModelState, descriptor: ModelDescripto
                 StateDot(modelStateColor(modelState))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Model provider", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPrimaryColor)
-                    Text("shared/model-api · on-device brain", fontSize = 11.sp, color = TextTertiaryColor, fontFamily = FontFamily.Monospace)
+                    Text("Model provider", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = NewaxTheme.colors.textPrimary)
+                    Text("shared/model-api · on-device brain", fontSize = 11.sp, color = NewaxTheme.colors.textTertiary, fontFamily = FontFamily.Monospace)
                 }
                 StatusChip(modelState.label(), modelStateColor(modelState))
             }
@@ -211,33 +212,33 @@ private fun ModelProviderCard(modelState: ModelState, descriptor: ModelDescripto
             when (modelState) {
                 ModelState.NOT_INSTALLED -> Text(
                     "No model pack installed — the deterministic fallback is active. Place a .gguf under ~/.aegis/models/ and restart to enable open-ended reasoning.",
-                    fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.LOADING -> Text(
                     "Loading ${descriptor.modelName} into memory…",
-                    fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.READY -> Text(
                     "${descriptor.modelName} is loaded and accepting requests on this device.",
-                    fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.ERROR -> Text(
                     "Model unavailable — load failed or the pack was removed. Re-import to retry.",
-                    fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
                 ModelState.CLOSED -> Text(
                     "Model provider closed — no further requests are accepted.",
-                    fontSize = 13.sp, color = TextSecondaryColor, lineHeight = 19.sp
+                    fontSize = 13.sp, color = NewaxTheme.colors.textSecondary, lineHeight = 19.sp
                 )
             }
 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tag(descriptor.format.label(), TextSecondaryColor)
-                if (descriptor.sha256.isNotBlank()) Tag("sha256 ${descriptor.sha256.take(10)}…", TextSecondaryColor)
-                if (descriptor.sizeBytes > 0) Tag(formatBytes(descriptor.sizeBytes), TextSecondaryColor)
+                Tag(descriptor.format.label(), NewaxTheme.colors.textSecondary)
+                if (descriptor.sha256.isNotBlank()) Tag("sha256 ${descriptor.sha256.take(10)}…", NewaxTheme.colors.textSecondary)
+                if (descriptor.sizeBytes > 0) Tag(formatBytes(descriptor.sizeBytes), NewaxTheme.colors.textSecondary)
                 if (descriptor.modelName.isNotBlank() && modelState != ModelState.NOT_INSTALLED) {
-                    Tag(descriptor.modelName, TextSecondaryColor)
+                    Tag(descriptor.modelName, NewaxTheme.colors.textSecondary)
                 }
             }
         }

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newax.aegis.desktop.AuditSummary
 import com.newax.aegis.desktop.ExecutionAuditEntry
+import com.newax.aegis.ui.theme.NewaxTheme
 import com.newax.aegis.desktop.TierBreakdown
 import com.newax.aegis.desktop.ui.state.AuditScreenState
 import com.newax.aegis.desktop.ui.state.AuditUiModel
@@ -72,10 +73,10 @@ fun AuditScreen(state: AuditScreenState) {
     ) {
         when (val current = model) {
             is AuditUiModel.Loading -> item {
-                EmptyState("Loading audit trail…", null, iconColor = WarningColor)
+                EmptyState("Loading audit trail…", null, iconColor = NewaxTheme.colors.warning)
             }
             is AuditUiModel.Error -> item {
-                EmptyState("Could not load the audit trail", current.message, iconColor = ErrorColor)
+                EmptyState("Could not load the audit trail", current.message, iconColor = NewaxTheme.colors.error)
             }
             is AuditUiModel.Content -> {
                 if (current.entries.isEmpty()) {
@@ -114,8 +115,8 @@ private fun AuditSummaryCard(
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, BorderColor),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, NewaxTheme.colors.border),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -125,18 +126,18 @@ private fun AuditSummaryCard(
                         "Execution audit",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
-                        color = TextPrimaryColor
+                        color = NewaxTheme.colors.textPrimary
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         "Every goal execution, audited with its outcome and launch tier — export the full trail as CSV.",
                         fontSize = 12.sp,
-                        color = TextTertiaryColor,
+                        color = NewaxTheme.colors.textTertiary,
                         lineHeight = 17.sp
                     )
                 }
                 IconButton(onClick = onRefresh) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = "Refresh audit trail", tint = TextSecondaryColor)
+                    Icon(Icons.Rounded.Refresh, contentDescription = "Refresh audit trail", tint = NewaxTheme.colors.textSecondary)
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -156,7 +157,7 @@ private fun AuditSummaryCard(
                     "By launch tier",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
-                    color = TextTertiaryColor
+                    color = NewaxTheme.colors.textTertiary
                 )
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -169,10 +170,10 @@ private fun AuditSummaryCard(
                     onClick = onExport,
                     enabled = canExport,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = TextPrimaryColor,
-                        contentColor = SurfaceColor,
-                        disabledContainerColor = SurfaceMutedColor,
-                        disabledContentColor = TextTertiaryColor
+                        containerColor = NewaxTheme.colors.textPrimary,
+                        contentColor = NewaxTheme.colors.surface,
+                        disabledContainerColor = NewaxTheme.colors.surfaceMuted,
+                        disabledContentColor = NewaxTheme.colors.textTertiary
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -188,7 +189,7 @@ private fun AuditSummaryCard(
 }
 
 @Composable
-private fun SummaryStat(label: String, value: String, color: Color = TextPrimaryColor) {
+private fun SummaryStat(label: String, value: String, color: Color = NewaxTheme.colors.textPrimary) {
     Column {
         Text(
             value,
@@ -198,7 +199,7 @@ private fun SummaryStat(label: String, value: String, color: Color = TextPrimary
             fontFamily = FontFamily.Monospace
         )
         Spacer(Modifier.height(2.dp))
-        Text(label, fontSize = 11.sp, color = TextTertiaryColor)
+        Text(label, fontSize = 11.sp, color = NewaxTheme.colors.textTertiary)
     }
 }
 
@@ -208,14 +209,14 @@ private fun TierStat(breakdown: TierBreakdown) {
     Column(
         Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceMutedColor)
+            .background(NewaxTheme.colors.surfaceMuted)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(
             breakdown.tier,
             fontSize = 11.5.sp,
             fontWeight = FontWeight.SemiBold,
-            color = TextSecondaryColor,
+            color = NewaxTheme.colors.textSecondary,
             fontFamily = FontFamily.Monospace
         )
         Spacer(Modifier.height(3.dp))
@@ -228,10 +229,11 @@ private fun TierStat(breakdown: TierBreakdown) {
 }
 
 /** Success-rate traffic light — green above 80%, amber above 50%, red below. */
+@Composable
 private fun successRateColor(percent: Int): Color = when {
-    percent >= 80 -> ReadyColor
-    percent >= 50 -> WarningColor
-    else -> ErrorColor
+    percent >= 80 -> NewaxTheme.colors.success
+    percent >= 50 -> NewaxTheme.colors.warning
+    else -> NewaxTheme.colors.error
 }
 
 @Composable
@@ -239,26 +241,26 @@ private fun AuditEntryCard(entry: ExecutionAuditEntry) {
     val ok = entry.outcome == "COMPLETED"
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, if (ok) BorderColor else ErrorColor.copy(alpha = 0.35f)),
+        colors = CardDefaults.cardColors(containerColor = NewaxTheme.colors.surface),
+        border = BorderStroke(1.dp, if (ok) NewaxTheme.colors.border else NewaxTheme.colors.error.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
             // ── Headline: dot · goal · outcome chip ───────────────────────
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(if (ok) ReadyColor else ErrorColor))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(if (ok) NewaxTheme.colors.success else NewaxTheme.colors.error))
                 Spacer(Modifier.width(10.dp))
                 Text(
                     entry.goalDescription,
                     fontWeight = FontWeight.Medium,
                     fontSize = 15.sp,
-                    color = TextPrimaryColor,
+                    color = NewaxTheme.colors.textPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
-                StatusChip(entry.outcome, if (ok) ReadyColor else ErrorColor)
+                StatusChip(entry.outcome, if (ok) NewaxTheme.colors.success else NewaxTheme.colors.error)
             }
 
             // ── Meta: tiers · tasks · window · duration ───────────────────
@@ -271,7 +273,7 @@ private fun AuditEntryCard(entry: ExecutionAuditEntry) {
                     if (entry.durationMs > 0) append("  ·  ${entry.durationMs} ms")
                 },
                 fontSize = 11.5.sp,
-                color = TextTertiaryColor,
+                color = NewaxTheme.colors.textTertiary,
                 fontFamily = FontFamily.Monospace,
                 lineHeight = 16.sp
             )
@@ -282,7 +284,7 @@ private fun AuditEntryCard(entry: ExecutionAuditEntry) {
                 Text(
                     "✗ $reason",
                     fontSize = 12.sp,
-                    color = ErrorColor,
+                    color = NewaxTheme.colors.error,
                     lineHeight = 16.sp,
                     modifier = Modifier.fillMaxWidth()
                 )
