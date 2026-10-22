@@ -2,6 +2,15 @@
 
 A native Kotlin/Jetpack Compose MVP that can read the current accessibility tree, propose UI actions, require approval, and then tap/type/send on the user's behalf.
 
+## Part of the NEWAX ecosystem
+
+This repo is tracked as part of the broader NEWAX ecosystem (see
+[`ECOSYSTEM.md`](ECOSYSTEM.md)), but is on a **separate, unscheduled track**:
+its "no Internet permission" design is a core constraint, and integrating
+with the rest of the ecosystem (shared login, Module Gateway) would require
+an explicit product-direction decision this repo hasn't made. Don't assume
+it's wired in.
+
 ## What works now
 
 - Fully offline deterministic commands: screen reading, tapping, typing, replying, app opening, scrolling, Home, Recents, and Back.
