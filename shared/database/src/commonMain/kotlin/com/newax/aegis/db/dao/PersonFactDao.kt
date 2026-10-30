@@ -18,7 +18,15 @@ interface PersonFactDao {
     @Query("SELECT COUNT(*) FROM person_facts WHERE personId = :personId")
     suspend fun countForPerson(personId: Long): Int
 
-    /** Full-text search via FTS4 virtual table (created by NewaxDatabase.Callback). */
+    /**
+     * Full-text search over the `person_facts_fts` FTS4 table.
+     *
+     * That table is a **Room-managed** `@Fts4(contentEntity = PersonFactEntity::class)`
+     * entity ([PersonFactFts]), declared in `NewaxDatabase` — which is why this query
+     * compiles without `@SkipQueryVerification`: Room knows the table and verifies the
+     * SQL. It was hand-rolled by `FtsSetupCallback` until migration 11→12 replaced it;
+     * this comment said so for four schema versions after it stopped being true.
+     */
     @Query("""
         SELECT * FROM person_facts
         WHERE id IN (SELECT rowid FROM person_facts_fts WHERE person_facts_fts MATCH :query)
